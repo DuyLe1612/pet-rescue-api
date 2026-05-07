@@ -61,6 +61,28 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         return queryRepo.findMapMarkers(statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
     }
 
+        @Override
+        public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, Pageable pageable) {
+        List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
+            ? Arrays.stream(OrganizationStatus.values()).toList()
+            : statuses;
+        List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
+        return queryRepo.findWithinBoundingBoxSummary(minLat, minLng, maxLat, maxLng, statusNames, pageable)
+            .map(this::toSummaryDto);
+        }
+
+        @Override
+        public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types) {
+        List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
+            ? Arrays.stream(OrganizationStatus.values()).toList()
+            : statuses;
+        List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
+        List<String> normalizedTypes = (types == null || types.isEmpty())
+            ? List.of("SHELTER", "VET_CENTER")
+            : types;
+        return queryRepo.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
+        }
+
     // ── Private mapping helpers ──────────────────────────
 
     private OrganizationSummaryResponseDto toSummaryDto(OrganizationSummaryProjection p) {

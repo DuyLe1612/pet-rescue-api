@@ -227,4 +227,27 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           @Param("status") java.util.List<String> status,
           @Param("priority") java.util.List<String> priority,
             @Param("species") String species);
+
+    @Query(value = """
+        SELECT rc.case_id AS caseId,
+               rc.case_code AS caseCode,
+               ST_Y(rc.location) AS latitude,
+               ST_X(rc.location) AS longitude,
+               rc.priority AS priority,
+               rc.status AS status,
+               rc.species AS species,
+               (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt
+        FROM rescue_cases rc
+        WHERE rc.is_deleted = false
+          AND rc.location IS NOT NULL
+          AND rc.status IN (:status)
+          AND rc.priority IN (:priority)
+          AND (:species IS NULL OR rc.species = :species)
+        ORDER BY rc.reported_at DESC
+        LIMIT 500
+    """, nativeQuery = true)
+    List<RescueMapMarkerProjection> findMapMarkers(
+            @Param("status") java.util.List<String> status,
+            @Param("priority") java.util.List<String> priority,
+            @Param("species") String species);
 }

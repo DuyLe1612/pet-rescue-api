@@ -160,12 +160,39 @@ public class OrganizationController {
     }
 
     @GetMapping("/map/markers")
-    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers with optional type and status filters")
+    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed.")
     public ResponseEntity<ApiResponse<List<OrganizationMapMarkerDto>>> getMapMarkers(
+            @RequestParam(required = false) Double minLat,
+            @RequestParam(required = false) Double minLng,
+            @RequestParam(required = false) Double maxLat,
+            @RequestParam(required = false) Double maxLng,
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) List<String> type) {
+
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
+        boolean hasBbox = minLat != null && minLng != null && maxLat != null && maxLng != null;
+
+        if (hasBbox) {
+            return ResponseEntity.ok(ApiResponse.ok(queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, type)));
+        }
+
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type)));
+    }
+
+    @GetMapping("/map/bounding-box")
+    @Operation(summary = "List organizations within bounding box (paginated)", description = "Return organization summaries constrained to the provided bounding box")
+    public ResponseEntity<ApiResponse<PageResponse<OrganizationSummaryResponseDto>>> getWithinBoundingBox(
+            @RequestParam double minLat,
+            @RequestParam double minLng,
+            @RequestParam double maxLat,
+            @RequestParam double maxLng,
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, PageRequest.of(page, size))
+        )));
     }
 
     private OrganizationStatus parseOrganizationStatus(String value) {

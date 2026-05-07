@@ -98,6 +98,21 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .toList();
     }
 
+    @Override
+    public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
+        List<String> statusNames = (status == null || status.isEmpty())
+            ? java.util.Arrays.stream(RescueCaseStatus.values()).map(Enum::name).toList()
+            : status.stream().map(Enum::name).toList();
+        List<String> priorityNames = (priority == null || priority.isEmpty())
+            ? java.util.Arrays.stream(RescuePriority.values()).map(Enum::name).toList()
+            : priority.stream().map(Enum::name).toList();
+
+        return queryRepo.findMapMarkers(statusNames, priorityNames, species)
+                .stream()
+                .map(this::toMarkerDto)
+                .toList();
+    }
+
     // ── Projection → DTO mappers ────────────────
 
     private RescueCaseSummaryResponseDto toSummaryDto(RescueCaseSummaryProjection p) {

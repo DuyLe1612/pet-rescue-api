@@ -71,4 +71,9 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
                 minLat, minLng, maxLat, maxLng, status, priority, species);
         return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);
     }
+
+    public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
+        log.debug("Query: find global map markers (no bbox), status={}, priority={}, species={}", status, priority, species);
+        return queryDataPort.findMapMarkers(status, priority, species);
+    }
 }

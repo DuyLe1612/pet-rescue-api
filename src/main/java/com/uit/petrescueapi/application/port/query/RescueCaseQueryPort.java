@@ -24,4 +24,9 @@ public interface RescueCaseQueryPort {
                                                     List<RescueCaseStatus> status,
                                                     List<RescuePriority> priority,
                                                     String species);
+
+    /**
+     * Global map feed (no bounding box). Filters optional; limited to 500 markers.
+     */
+    List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
 }

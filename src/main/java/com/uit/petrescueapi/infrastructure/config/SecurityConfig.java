@@ -43,6 +43,8 @@ public class SecurityConfig {
             "/api/v1/auth/resend-verification",
             "/api/v1/auth/forgot-password",
             "/api/v1/auth/reset-password",
+            "/api/v1/organizations/map/**",
+            "/api/v1/rescue-cases/map/**",
             "/ws/**",
             "/api/v1/dev/**",          // Development-only endpoints (active only with 'dev' profile)
             "/swagger-ui/**",

@@ -41,4 +41,9 @@ public interface RescueCaseQueryDataPort {
         List<RescueMapMarkerDto> findMarkersWithFilters(
             double minLat, double minLng, double maxLat, double maxLng,
             List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
+
+    /**
+     * Find map markers without bounding box (global feed limited to 500). Filters optional.
+     */
+    List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
 }

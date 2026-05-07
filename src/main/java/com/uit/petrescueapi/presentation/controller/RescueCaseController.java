@@ -85,7 +85,7 @@ public class RescueCaseController {
                 PageResponse.from(queryPort.findNearby(lat, lng, distance, PageRequest.of(page, size)))));
     }
 
-    @GetMapping("/bounding-box")
+    @GetMapping("/map/bounding-box")
     @Operation(summary = "Find rescue cases within bounding box")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getInBoundingBox(
             @RequestParam double minLat,
@@ -107,21 +107,28 @@ public class RescueCaseController {
     @Operation(summary = "Get map markers in bounding box",
             description = "Ultra-lightweight endpoint for map rendering. Returns up to 500 markers with minimal data (~100 bytes each).")
     public ResponseEntity<ApiResponse<List<RescueMapMarkerDto>>> getMapMarkers(
-            @RequestParam double minLat,
-            @RequestParam double minLng,
-            @RequestParam double maxLat,
-            @RequestParam double maxLng,
+            @RequestParam(required = false) Double minLat,
+            @RequestParam(required = false) Double minLng,
+            @RequestParam(required = false) Double maxLat,
+            @RequestParam(required = false) Double maxLng,
             @RequestParam(required = false) List<RescueCaseStatus> status,
             @RequestParam(required = false) List<RescuePriority> priority,
             @RequestParam(required = false) String species) {
-        
+
         List<RescueMapMarkerDto> markers;
-        if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null) {
-            markers = queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng);
+        boolean hasBbox = minLat != null && minLng != null && maxLat != null && maxLng != null;
+
+        if (hasBbox) {
+            if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null) {
+                markers = queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng);
+            } else {
+                markers = queryPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);
+            }
         } else {
-            markers = queryPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);
+            // no bbox provided — fall back to global map feed limited to 500
+            markers = queryPort.findMapMarkers(status, priority, species);
         }
-        
+
         return ResponseEntity.ok(ApiResponse.ok(markers));
     }
 }

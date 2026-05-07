@@ -83,4 +83,63 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                 """, nativeQuery = true)
                 List<OrganizationMapMarkerProjection> findMapMarkers(@Param("statuses") List<String> statuses,
                                                                                                                                                                                                                                  @Param("types") List<String> types);
+
+                @Query(value = """
+                                                SELECT o.organization_id AS organizationId,
+                                                                         o.organization_code AS organizationCode,
+                                                                         o.name AS name,
+                                                                         o.type AS type,
+                                                                         o.status AS status,
+                                                                         o.street_address AS streetAddress,
+                                                                         o.ward_name AS wardName,
+                                                                         o.province_name AS provinceName,
+                                                                         o.phone AS phone,
+                                                                         o.email AS email,
+                                                                         o.image_url AS imageUrl
+                                                FROM organizations o
+                                                WHERE o.is_deleted = false
+                                                        AND o.location IS NOT NULL
+                                                        AND ST_Y(o.location) BETWEEN :minLat AND :maxLat
+                                                        AND ST_X(o.location) BETWEEN :minLng AND :maxLng
+                                                        AND o.status IN (:statuses)
+                                                ORDER BY o.created_at DESC
+                                                """,
+                                                countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Y(o.location) BETWEEN :minLat AND :maxLat AND ST_X(o.location) BETWEEN :minLng AND :maxLng AND o.status IN (:statuses)",
+                                                nativeQuery = true)
+                Page<OrganizationSummaryProjection> findWithinBoundingBoxSummary(@Param("minLat") double minLat,
+                                                                                                                                                                                                                                                                                        @Param("minLng") double minLng,
+                                                                                                                                                                                                                                                                                        @Param("maxLat") double maxLat,
+                                                                                                                                                                                                                                                                                        @Param("maxLng") double maxLng,
+                                                                                                                                                                                                                                                                                        @Param("statuses") List<String> statuses,
+                                                                                                                                                                                                                                                                                        Pageable pageable);
+
+                @Query(value = """
+                                                SELECT o.organization_id AS organizationId,
+                                                                         o.organization_code AS organizationCode,
+                                                                         o.name AS name,
+                                                                         o.type AS type,
+                                                                         o.status AS status,
+                                                                         ST_Y(o.location) AS latitude,
+                                                                         ST_X(o.location) AS longitude,
+                                                                         o.phone AS phone,
+                                                                         o.image_url AS imageUrl,
+                                                                         o.ward_name AS wardName,
+                                                                         o.province_name AS provinceName
+                                                FROM organizations o
+                                                WHERE o.is_deleted = false
+                                                        AND o.location IS NOT NULL
+                                                        AND ST_Y(o.location) BETWEEN :minLat AND :maxLat
+                                                        AND ST_X(o.location) BETWEEN :minLng AND :maxLng
+                                                        AND o.status IN (:statuses)
+                                                        AND o.type IN (:types)
+                                                ORDER BY o.created_at DESC
+                                                LIMIT 500
+                                                """,
+                                                nativeQuery = true)
+                List<OrganizationMapMarkerProjection> findMarkersInBounds(@Param("minLat") double minLat,
+                                                                                                                                                                                                                                                         @Param("minLng") double minLng,
+                                                                                                                                                                                                                                                         @Param("maxLat") double maxLat,
+                                                                                                                                                                                                                                                         @Param("maxLng") double maxLng,
+                                                                                                                                                                                                                                                         @Param("statuses") List<String> statuses,
+                                                                                                                                                                                                                                                         @Param("types") List<String> types);
 }
