@@ -17,6 +17,8 @@ public interface AdoptionWebMapper {
     @Mapping(target = "decidedAt", source = "decidedAt")
     @Mapping(target = "decidedBy", source = "decidedBy")
     @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "rejectReason", source = "rejectReason")
+    @Mapping(target = "readyAt", source = "readyAt")
     @Mapping(target = "petName", ignore = true)
     @Mapping(target = "petPrimaryImageUrl", ignore = true)
     @Mapping(target = "applicantUsername", ignore = true)

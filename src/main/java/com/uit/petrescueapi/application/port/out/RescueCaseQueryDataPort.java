@@ -38,7 +38,7 @@ public interface RescueCaseQueryDataPort {
     /**
      * Find markers with filters - for filtered map views.
      */
-    List<RescueMapMarkerDto> findMarkersWithFilters(
+        List<RescueMapMarkerDto> findMarkersWithFilters(
             double minLat, double minLng, double maxLat, double maxLng,
-            RescueCaseStatus status, RescuePriority priority, String species);
+            List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
 }

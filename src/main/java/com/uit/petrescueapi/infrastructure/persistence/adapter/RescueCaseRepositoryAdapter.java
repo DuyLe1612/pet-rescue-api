@@ -3,8 +3,11 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.repository.RescueCaseRepository;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
+import com.uit.petrescueapi.domain.entity.MediaFile;
+import com.uit.petrescueapi.domain.repository.MediaFileRepository;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.RescueCaseEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.RescueCaseJpaRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,10 +22,34 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
 
     private final RescueCaseJpaRepository jpa;
     private final RescueCaseEntityMapper mapper;
+    private final MediaFileRepository mediaFileRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public RescueCase save(RescueCase rescueCase) {
-        return mapper.toDomain(jpa.save(mapper.toEntity(rescueCase)));
+        // Persist rescue case
+        var saved = mapper.toDomain(jpa.save(mapper.toEntity(rescueCase)));
+
+        // If FE provided image URLs (public ids), register them in media_files and link via rescue_media
+        if (rescueCase.getImagePublicIds() != null && !rescueCase.getImagePublicIds().isEmpty()) {
+            for (String publicId : rescueCase.getImagePublicIds()) {
+                MediaFile mf = MediaFile.builder()
+                        .publicId(publicId)
+                        .uploaderId(rescueCase.getReportedBy())
+                        .status("PERMANENT")
+                        .build();
+                MediaFile savedMf = mediaFileRepository.save(mf);
+                // Insert link into rescue_media (idempotent)
+                try {
+                    jdbcTemplate.update("INSERT INTO rescue_media (case_id, media_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                            saved.getCaseId(), savedMf.getMediaId());
+                } catch (Exception e) {
+                    // swallow - linking failure should not block rescue case creation
+                }
+            }
+        }
+
+        return saved;
     }
 
     @Override

@@ -66,7 +66,7 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
     @Override
     public List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng, double maxLat, double maxLng,
-                                                           RescueCaseStatus status, RescuePriority priority, String species) {
+                                                           List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
         log.debug("Query: find map markers with filters - bounds ({},{}) to ({},{}), status={}, priority={}, species={}",
                 minLat, minLng, maxLat, maxLng, status, priority, species);
         return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);

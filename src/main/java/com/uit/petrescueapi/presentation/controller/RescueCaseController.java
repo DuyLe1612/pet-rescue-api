@@ -111,12 +111,12 @@ public class RescueCaseController {
             @RequestParam double minLng,
             @RequestParam double maxLat,
             @RequestParam double maxLng,
-            @RequestParam(required = false) RescueCaseStatus status,
-            @RequestParam(required = false) RescuePriority priority,
+            @RequestParam(required = false) List<RescueCaseStatus> status,
+            @RequestParam(required = false) List<RescuePriority> priority,
             @RequestParam(required = false) String species) {
         
         List<RescueMapMarkerDto> markers;
-        if (status == null && priority == null && species == null) {
+        if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null) {
             markers = queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng);
         } else {
             markers = queryPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);

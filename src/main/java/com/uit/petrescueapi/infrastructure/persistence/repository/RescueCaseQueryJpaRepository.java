@@ -35,19 +35,28 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     // ── Summary (list views) ────────────────────
 
     @Query(value = """
-        SELECT rc.caseId       AS caseId,
-               rc.caseCode     AS caseCode,
-               rc.species      AS species,
-               rc.priority     AS priority,
-               rc.status       AS status,
-               rc.reportedAt   AS reportedAt,
-               rc.locationText AS locationText,
-               u.username      AS reporterUsername
-        FROM RescueCaseJpaEntity rc
-        LEFT JOIN UserJpaEntity u ON rc.reportedBy = u.userId
-        WHERE rc.deleted = false
+      SELECT rc.case_id       AS caseId,
+           rc.case_code     AS caseCode,
+           rc.species       AS species,
+           rc.priority      AS priority,
+           rc.status        AS status,
+           rc.reported_at   AS reportedAt,
+           rc.location_text AS locationText,
+           u.username       AS reporterUsername,
+           (
+             SELECT mf.public_id
+             FROM rescue_media rm
+             JOIN media_files mf ON mf.media_id = rm.media_id
+             WHERE rm.case_id = rc.case_id
+             ORDER BY mf.created_at ASC
+             LIMIT 1
+           ) AS firstImageUrl
+      FROM rescue_cases rc
+      LEFT JOIN users u ON rc.reported_by = u.user_id
+      WHERE rc.is_deleted = false
     """,
-    countQuery = "SELECT COUNT(rc.caseId) FROM RescueCaseJpaEntity rc WHERE rc.deleted = false")
+    countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc WHERE rc.is_deleted = false",
+    nativeQuery = true)
     Page<RescueCaseSummaryProjection> findAllSummaries(Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
@@ -73,6 +82,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                CAST(NULL AS double) AS locationLng,
                rc.wardName      AS wardName,
                rc.provinceName  AS provinceName,
+               rc.contactPhone  AS contactPhone,
                rc.resolvedAt    AS resolvedAt
         FROM RescueCaseJpaEntity rc
         LEFT JOIN UserJpaEntity u ON rc.reportedBy = u.userId
@@ -81,6 +91,9 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         WHERE rc.deleted = false AND rc.caseId = :id
     """)
     Optional<RescueCaseDetailProjection> findDetailById(@Param("id") UUID id);
+
+    @Query(value = "SELECT mf.public_id FROM media_files mf JOIN rescue_media rm ON rm.media_id = mf.media_id WHERE rm.case_id = :caseId ORDER BY mf.created_at", nativeQuery = true)
+    java.util.List<String> findMediaPublicIdsByCaseId(@Param("caseId") UUID caseId);
 
     // ── Nearby (PostGIS spatial query) ──────────
 
@@ -192,8 +205,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         WHERE rc.is_deleted = false
           AND rc.location IS NOT NULL
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
-          AND (:status IS NULL OR rc.status = :status)
-          AND (:priority IS NULL OR rc.priority = :priority)
+          AND rc.status IN (:status)
+          AND rc.priority IN (:priority)
           AND (:species IS NULL OR rc.species = :species)
         ORDER BY 
           CASE rc.priority
@@ -206,12 +219,12 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           rc.reported_at DESC
         LIMIT 500
     """, nativeQuery = true)
-    List<RescueMapMarkerProjection> findMarkersWithFilters(
+        List<RescueMapMarkerProjection> findMarkersWithFilters(
             @Param("minLng") double minLng,
             @Param("minLat") double minLat,
             @Param("maxLng") double maxLng,
             @Param("maxLat") double maxLat,
-            @Param("status") String status,
-            @Param("priority") String priority,
+          @Param("status") java.util.List<String> status,
+          @Param("priority") java.util.List<String> priority,
             @Param("species") String species);
 }

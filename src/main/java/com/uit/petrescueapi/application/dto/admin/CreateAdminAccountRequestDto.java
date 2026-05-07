@@ -33,6 +33,7 @@ public class CreateAdminAccountRequestDto {
 
     private String fullName;
     private String avatarUrl;
+    @com.uit.petrescueapi.validation.Phone
     private String phone;
     private String gender;
     private String streetAddress;

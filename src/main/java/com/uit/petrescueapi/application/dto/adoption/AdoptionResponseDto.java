@@ -51,4 +51,8 @@ public class AdoptionResponseDto {
     private LocalDateTime decidedAt;
     private UUID decidedBy;
     private String decidedByUsername;
+    @Schema(example = "this pets isn't available anymore because it find a new home already")
+    private String rejectReason;
+    @Schema(example = "12024-12-31T10:00:00")
+    private LocalDateTime readyAt;
 }

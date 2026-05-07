@@ -23,4 +23,5 @@ public class RescueCaseSummaryResponseDto {
     private String reporterUsername;
     private String locationText;
     private LocalDateTime reportedAt;
+    private String firstImageUrl;
 }

@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.dto.auth;
 
+import com.uit.petrescueapi.validation.Phone;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +36,7 @@ public class RegisterRequestDto {
     private String fullName;
 
     @Schema(example = "+84912345678")
+    @Phone
     private String phone;
 
     @Schema(example = "MALE", allowableValues = {"MALE", "FEMALE", "OTHER"})

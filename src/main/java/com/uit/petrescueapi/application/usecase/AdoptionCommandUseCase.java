@@ -39,13 +39,13 @@ public class AdoptionCommandUseCase implements AdoptionCommandPort {
     @Override
     public AdoptionApplication approve(UUID applicationId, DecisionRequestDto decision, UUID decidedBy) {
         log.debug("Command: approve adoption application {}", applicationId);
-        return domainService.approve(applicationId, decidedBy);
+        return domainService.approve(applicationId, decidedBy, decision.getReadyAt());
     }
 
     @Override
     public AdoptionApplication reject(UUID applicationId, DecisionRequestDto decision, UUID decidedBy) {
         log.debug("Command: reject adoption application {}", applicationId);
-        return domainService.reject(applicationId, decidedBy);
+        return domainService.reject(applicationId, decidedBy, decision.getRejectReason());
     }
 
     @Override

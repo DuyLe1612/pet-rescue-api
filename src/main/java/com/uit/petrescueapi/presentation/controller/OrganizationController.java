@@ -144,7 +144,7 @@ public class OrganizationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         List<OrganizationStatus> statusList = status == null ? null : 
-                status.stream().map(OrganizationStatus::valueOf).toList();
+            status.stream().map(this::parseOrganizationStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findAll(statusList, PageRequest.of(page, size)))));
     }
@@ -157,5 +157,22 @@ public class OrganizationController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findMembers(id, PageRequest.of(page, size)))));
+    }
+
+    @GetMapping("/map/markers")
+    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers with optional type and status filters")
+    public ResponseEntity<ApiResponse<List<OrganizationMapMarkerDto>>> getMapMarkers(
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) List<String> type) {
+        List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type)));
+    }
+
+    private OrganizationStatus parseOrganizationStatus(String value) {
+        try {
+            return OrganizationStatus.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("Invalid organization status: " + value, "INVALID_ORG_STATUS");
+        }
     }
 }

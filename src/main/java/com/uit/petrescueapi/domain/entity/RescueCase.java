@@ -6,6 +6,7 @@ import lombok.*;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -39,4 +40,6 @@ public class RescueCase extends BaseEntity {
     private RescueCaseStatus status;
     private LocalDateTime reportedAt;
     private LocalDateTime resolvedAt;
+    private List<String> imagePublicIds;
+    private String contactPhone;
 }

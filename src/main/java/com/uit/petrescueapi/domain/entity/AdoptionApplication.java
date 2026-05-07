@@ -28,4 +28,6 @@ public class AdoptionApplication extends BaseEntity {
     private String liveCondition;
     private LocalDateTime decidedAt;
     private UUID decidedBy;
+    private String rejectReason;
+    private LocalDateTime readyAt;
 }

@@ -2,7 +2,9 @@ package com.uit.petrescueapi.application.dto.rescue;
 
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import lombok.*;
+import com.uit.petrescueapi.validation.Phone;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -28,4 +30,7 @@ public class CreateRescueCaseRequestDto {
     private String provinceName;
     private String wardCode;
     private String wardName;
+    private List<String> imageUrls;
+    @Phone
+    private String contactPhone;
 }

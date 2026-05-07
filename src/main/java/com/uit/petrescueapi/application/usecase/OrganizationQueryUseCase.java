@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.OrganizationQueryDataPort;
@@ -43,5 +44,10 @@ public class OrganizationQueryUseCase implements OrganizationQueryPort {
     @Override
     public Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable) {
         return queryDataPort.findMembers(organizationId, pageable);
+    }
+
+    @Override
+    public List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types) {
+        return queryDataPort.findMapMarkers(statuses, types);
     }
 }

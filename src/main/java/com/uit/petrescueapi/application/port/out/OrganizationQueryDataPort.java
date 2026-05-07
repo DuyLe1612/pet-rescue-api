@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.application.port.out;
 
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
@@ -19,4 +20,5 @@ public interface OrganizationQueryDataPort {
     Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, Pageable pageable);
     Optional<OrganizationResponseDto> findById(UUID id);
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);
+    List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types);
 }

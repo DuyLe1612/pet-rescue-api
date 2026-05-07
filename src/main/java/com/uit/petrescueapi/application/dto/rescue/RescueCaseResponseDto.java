@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -41,4 +42,6 @@ public class RescueCaseResponseDto {
     private LocalDateTime reportedAt;
     private LocalDateTime resolvedAt;
     private LocalDateTime createdAt;
+    private List<String> imageUrls;
+    private String contactPhone;
 }

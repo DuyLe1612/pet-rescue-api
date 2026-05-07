@@ -8,6 +8,7 @@ import com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
 import com.uit.petrescueapi.application.port.query.PetQueryPort;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
+import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
@@ -131,7 +132,7 @@ public class PetController {
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID organizationId) {
         java.util.List<PetStatus> statusList = status == null ? null : 
-                status.stream().map(PetStatus::valueOf).toList();
+                status.stream().map(this::parsePetStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
                         species, breed, gender, searchName, statusList, userId, organizationId, PageRequest.of(page, size)
@@ -182,4 +183,12 @@ public class PetController {
                         userId, species, breed, gender, PageRequest.of(page, size)
                 ))));
     }
+
+        private PetStatus parsePetStatus(String value) {
+                try {
+                        return PetStatus.valueOf(value);
+                } catch (IllegalArgumentException ex) {
+                        throw new BusinessException("Invalid pet status: " + value, "INVALID_PET_STATUS");
+                }
+        }
 }

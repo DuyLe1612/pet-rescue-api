@@ -19,7 +19,9 @@ public interface RescueCaseQueryPort {
 
     // ── Map marker queries (optimized for fast map rendering) ──
     List<RescueMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng);
-    List<RescueMapMarkerDto> findMarkersWithFilters(
-            double minLat, double minLng, double maxLat, double maxLng,
-            RescueCaseStatus status, RescuePriority priority, String species);
+    List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng,
+                                                    double maxLat, double maxLng,
+                                                    List<RescueCaseStatus> status,
+                                                    List<RescuePriority> priority,
+                                                    String species);
 }

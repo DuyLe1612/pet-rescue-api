@@ -3,6 +3,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.entity.OrganizationJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationDetailProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMapMarkerProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationSummaryProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -59,4 +60,27 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
             WHERE o.organization_id = :id
             """, nativeQuery = true)
     Optional<OrganizationDetailProjection> findDetailById(@Param("id") UUID id);
+
+                @Query(value = """
+                                                SELECT o.organization_id AS organizationId,
+                                                                         o.organization_code AS organizationCode,
+                                                                         o.name AS name,
+                                                                         o.type AS type,
+                                                                         o.status AS status,
+                                                                         ST_Y(o.location) AS latitude,
+                                                                         ST_X(o.location) AS longitude,
+                                                                         o.phone AS phone,
+                                                                         o.image_url AS imageUrl,
+                                                                         o.ward_name AS wardName,
+                                                                         o.province_name AS provinceName
+                                                FROM organizations o
+                                                WHERE o.is_deleted = false
+                                                        AND o.location IS NOT NULL
+                                                        AND o.status IN (:statuses)
+                                                        AND o.type IN (:types)
+                                                ORDER BY o.created_at DESC
+                                                LIMIT 500
+                                                """, nativeQuery = true)
+                List<OrganizationMapMarkerProjection> findMapMarkers(@Param("statuses") List<String> statuses,
+                                                                                                                                                                                                                                 @Param("types") List<String> types);
 }

@@ -12,4 +12,6 @@ import lombok.*;
 public class DecisionRequestDto {
 
     private String note;
+    private String rejectReason;
+    private java.time.LocalDateTime readyAt;
 }

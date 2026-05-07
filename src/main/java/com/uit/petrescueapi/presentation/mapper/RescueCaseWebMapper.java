@@ -17,5 +17,7 @@ public interface RescueCaseWebMapper {
     @Mapping(target = "petName", ignore = true)
     @Mapping(target = "reporterUsername", ignore = true)
     @Mapping(target = "organizationName", ignore = true)
+    @Mapping(target = "imageUrls", source = "imagePublicIds")
+    @Mapping(target = "contactPhone", source = "contactPhone")
     RescueCaseResponseDto toDto(RescueCase rc);
 }

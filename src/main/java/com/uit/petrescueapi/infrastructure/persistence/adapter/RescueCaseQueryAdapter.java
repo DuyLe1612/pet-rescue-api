@@ -62,7 +62,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     public RescueCaseResponseDto findById(UUID caseId) {
         RescueCaseDetailProjection proj = queryRepo.findDetailById(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("RescueCase", "caseId", caseId));
-        return toResponseDto(proj);
+        return toResponseDto(proj, queryRepo.findMediaPublicIdsByCaseId(caseId));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -82,13 +82,17 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     @Override
     public List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng,
                                                             double maxLat, double maxLng,
-                                                            RescueCaseStatus status,
-                                                            RescuePriority priority,
+                                                            List<RescueCaseStatus> status,
+                                                            List<RescuePriority> priority,
                                                             String species) {
-        String statusStr = status != null ? status.name() : null;
-        String priorityStr = priority != null ? priority.name() : null;
-        
-        return queryRepo.findMarkersWithFilters(minLng, minLat, maxLng, maxLat, statusStr, priorityStr, species)
+        List<String> statusNames = (status == null || status.isEmpty())
+            ? java.util.Arrays.stream(RescueCaseStatus.values()).map(Enum::name).toList()
+            : status.stream().map(Enum::name).toList();
+        List<String> priorityNames = (priority == null || priority.isEmpty())
+            ? java.util.Arrays.stream(RescuePriority.values()).map(Enum::name).toList()
+            : priority.stream().map(Enum::name).toList();
+
+        return queryRepo.findMarkersWithFilters(minLng, minLat, maxLng, maxLat, statusNames, priorityNames, species)
                 .stream()
                 .map(this::toMarkerDto)
                 .toList();
@@ -106,10 +110,11 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .reporterUsername(p.getReporterUsername())
                 .locationText(p.getLocationText())
                 .reportedAt(p.getReportedAt())
+            .firstImageUrl(p.getFirstImageUrl())
                 .build();
     }
 
-    private RescueCaseResponseDto toResponseDto(RescueCaseDetailProjection p) {
+    private RescueCaseResponseDto toResponseDto(RescueCaseDetailProjection p, java.util.List<String> imagePublicIds) {
         return RescueCaseResponseDto.builder()
                 .caseId(p.getCaseId())
                 .caseCode(p.getCaseCode())
@@ -132,6 +137,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .provinceName(p.getProvinceName())
                 .reportedAt(p.getReportedAt())
                 .resolvedAt(p.getResolvedAt())
+                .imageUrls(imagePublicIds)
+                .contactPhone(p.getContactPhone())
                 .build();
     }
 

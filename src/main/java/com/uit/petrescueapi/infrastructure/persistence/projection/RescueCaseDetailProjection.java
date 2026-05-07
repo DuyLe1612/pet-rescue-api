@@ -35,4 +35,5 @@ public interface RescueCaseDetailProjection {
     String getWardName();
     String getProvinceName();
     LocalDateTime getResolvedAt();
+    String getContactPhone();
 }

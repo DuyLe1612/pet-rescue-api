@@ -1,12 +1,14 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.OrganizationQueryDataPort;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMemberProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMapMarkerProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.repository.OrganizationMemberJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.OrganizationQueryJpaRepository;
@@ -45,6 +47,18 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     @Override
     public Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable) {
         return memberRepo.findByOrganizationId(organizationId, pageable).map(this::toMemberDto);
+    }
+
+    @Override
+    public List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types) {
+        List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
+                ? Arrays.stream(OrganizationStatus.values()).toList()
+                : statuses;
+        List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
+        List<String> normalizedTypes = (types == null || types.isEmpty())
+            ? List.of("SHELTER", "VET_CENTER")
+            : types;
+        return queryRepo.findMapMarkers(statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
     }
 
     // ── Private mapping helpers ──────────────────────────
@@ -99,6 +113,22 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .role(p.getRole())
                 .status(p.getStatus())
                 .joinedAt(p.getJoinedAt())
+                .build();
+    }
+
+    private OrganizationMapMarkerDto toMarkerDto(OrganizationMapMarkerProjection p) {
+        return OrganizationMapMarkerDto.builder()
+                .organizationId(p.getOrganizationId())
+                .organizationCode(p.getOrganizationCode())
+                .name(p.getName())
+                .type(p.getType())
+                .status(p.getStatus())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .phone(p.getPhone())
+                .imageUrl(p.getImageUrl())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
                 .build();
     }
 }

@@ -74,6 +74,9 @@ public class RescueCaseJpaEntity extends BaseJpaEntity {
     @Column(name = "ward_name")
     private String wardName;
 
+    @Column(name = "contact_phone", length = 50)
+    private String contactPhone;
+
     @Column(name = "status", length = 50)
     private String status;
 

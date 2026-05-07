@@ -57,6 +57,12 @@ public class AdoptionApplicationJpaEntity extends BaseJpaEntity {
     @Column(name = "decided_by")
     private UUID decidedBy;
 
+    @Column(name = "reject_reason", columnDefinition = "TEXT")
+    private String rejectReason;
+
+    @Column(name = "ready_at", columnDefinition = "TIMESTAMPTZ")
+    private LocalDateTime readyAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pet_id", insertable = false, updatable = false)
     private PetJpaEntity pet;

@@ -62,14 +62,19 @@ public class AdoptionDomainService {
      * Approve an adoption application.
      * Validates the current status is PENDING before transitioning to APPROVED.
      */
-    public AdoptionApplication approve(UUID applicationId, UUID decidedBy) {
+    public AdoptionApplication approve(UUID applicationId, UUID decidedBy, LocalDateTime readyAt) {
         log.info("Approving adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
         validateStatus(app, "PENDING", "APPROVED");
 
+        if (readyAt == null) {
+            throw new IllegalArgumentException("readyAt is required when approving adoption");
+        }
+
         app.setStatus("APPROVED");
         app.setDecidedBy(decidedBy);
         app.setDecidedAt(LocalDateTime.now());
+        app.setReadyAt(readyAt);
         app.setUpdatedAt(LocalDateTime.now());
         return applicationRepository.save(app);
     }
@@ -78,14 +83,19 @@ public class AdoptionDomainService {
      * Reject an adoption application.
      * Validates the current status is PENDING before transitioning to REJECTED.
      */
-    public AdoptionApplication reject(UUID applicationId, UUID decidedBy) {
+    public AdoptionApplication reject(UUID applicationId, UUID decidedBy, String rejectReason) {
         log.info("Rejecting adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
         validateStatus(app, "PENDING", "REJECTED");
 
+        if (rejectReason == null || rejectReason.isBlank()) {
+            throw new IllegalArgumentException("rejectReason is required when rejecting adoption");
+        }
+
         app.setStatus("REJECTED");
         app.setDecidedBy(decidedBy);
         app.setDecidedAt(LocalDateTime.now());
+        app.setRejectReason(rejectReason);
         app.setUpdatedAt(LocalDateTime.now());
         return applicationRepository.save(app);
     }
