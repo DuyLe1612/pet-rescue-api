@@ -69,4 +69,23 @@ class PostLikeEventListenerTest {
 
         verify(postRepo).decrementLikeCount(postId);
     }
+
+    @Test
+    void handlePostUnlikedSkipsDbWhenRedisHasNoLike() {
+        RedisCounterService redis = mock(RedisCounterService.class);
+        PostJpaRepository postRepo = mock(PostJpaRepository.class);
+        PostLikeEventListener listener = new PostLikeEventListener(redis, postRepo);
+
+        UUID postId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(redis.decrementPostLikes(postId, userId)).thenReturn(false);
+
+        listener.handlePostUnliked(PostUnlikedEvent.builder()
+                .postId(postId)
+                .userId(userId)
+                .timestamp(LocalDateTime.now())
+                .build());
+
+        verify(postRepo, never()).decrementLikeCount(postId);
+    }
 }
