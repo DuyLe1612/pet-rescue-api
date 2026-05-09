@@ -10,6 +10,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -42,7 +43,7 @@ class RedisCounterServiceTest {
     void incrementPostLikesReturnsTrueWhenAdded() {
         UUID postId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(zSetOps.addIfAbsent(eq(String.format("post:%s:likes", postId)), eq(userId.toString()), org.mockito.ArgumentMatchers.anyDouble()))
+        when(zSetOps.addIfAbsent(eq(String.format("post:%s:likes", postId)), eq(userId.toString()), anyDouble()))
                 .thenReturn(true);
 
         boolean added = service.incrementPostLikes(postId, userId);
@@ -54,7 +55,7 @@ class RedisCounterServiceTest {
     void incrementPostLikesReturnsFalseWhenAlreadyExists() {
         UUID postId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(zSetOps.addIfAbsent(eq(String.format("post:%s:likes", postId)), eq(userId.toString()), org.mockito.ArgumentMatchers.anyDouble()))
+        when(zSetOps.addIfAbsent(eq(String.format("post:%s:likes", postId)), eq(userId.toString()), anyDouble()))
                 .thenReturn(false);
 
         boolean added = service.incrementPostLikes(postId, userId);
@@ -139,7 +140,7 @@ class RedisCounterServiceTest {
     void incrementCommentLikesReturnsTrueWhenAdded() {
         UUID commentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(zSetOps.addIfAbsent(eq(String.format("comment:%s:likes", commentId)), eq(userId.toString()), org.mockito.ArgumentMatchers.anyDouble()))
+        when(zSetOps.addIfAbsent(eq(String.format("comment:%s:likes", commentId)), eq(userId.toString()), anyDouble()))
                 .thenReturn(true);
 
         boolean added = service.incrementCommentLikes(commentId, userId);
@@ -151,7 +152,7 @@ class RedisCounterServiceTest {
     void incrementCommentLikesReturnsFalseWhenAlreadyExists() {
         UUID commentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(zSetOps.addIfAbsent(eq(String.format("comment:%s:likes", commentId)), eq(userId.toString()), org.mockito.ArgumentMatchers.anyDouble()))
+        when(zSetOps.addIfAbsent(eq(String.format("comment:%s:likes", commentId)), eq(userId.toString()), anyDouble()))
                 .thenReturn(false);
 
         boolean added = service.incrementCommentLikes(commentId, userId);
