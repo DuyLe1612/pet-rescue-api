@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
+import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
@@ -18,9 +19,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -39,6 +40,7 @@ public class PostQueryAdapter implements PostQueryDataPort {
 
     private final PostQueryJpaRepository queryRepo;
     private final PostJpaRepository postJpaRepo;
+        private final CloudStoragePort cloudStoragePort;
 
     // ── List (summary) queries ──────────────────
 
@@ -49,13 +51,36 @@ public class PostQueryAdapter implements PostQueryDataPort {
 
     @Override
     public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId) {
-        Page<PostSummaryResponseDto> page = queryRepo.findFeedByCursor(
-                cursor,
-                viewerId,
-                org.springframework.data.domain.PageRequest.of(0, size)
-        ).map(this::toSummaryDto);
+        Page<PostSummaryResponseDto> page = (cursor == null)
+                ? queryRepo.findFirstFeedPage(viewerId, org.springframework.data.domain.PageRequest.of(0, size)).map(this::toSummaryDto)
+                : queryRepo.findFeedByCursor(cursor, viewerId, org.springframework.data.domain.PageRequest.of(0, size)).map(this::toSummaryDto);
 
         List<PostSummaryResponseDto> items = page.getContent();
+
+        // Batch-load media for all posts in the page to avoid N+1 queries
+        List<UUID> postIds = items.stream().map(PostSummaryResponseDto::getPostId).toList();
+        if (!postIds.isEmpty()) {
+            var entities = postJpaRepo.findAllById(postIds);
+            var mediaMap = entities.stream().collect(
+                    java.util.stream.Collectors.toMap(
+                            e -> e.getPostId(),
+                            e -> e.getMediaFiles().stream()
+                                    .map(m -> MediaFileResponseDto.builder()
+                                            .mediaId(m.getMediaId())
+                                            .uploaderId(m.getUploaderId())
+                                            .publicId(m.getPublicId())
+                                            .url(cloudStoragePort.buildUrl(m.getPublicId()))
+                                            .type(m.getResourceType())
+                                            .createdAt(m.getCreatedAt())
+                                            .build())
+                                    .toList()
+                    )
+            );
+
+            for (PostSummaryResponseDto item : items) {
+                item.setMedia(mediaMap.getOrDefault(item.getPostId(), java.util.Collections.emptyList()));
+            }
+        }
         LocalDateTime nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getCreatedAt();
         boolean hasMore = items.size() == size;
 

@@ -5,6 +5,7 @@ import com.uit.petrescueapi.domain.repository.PostRepository;
 import com.uit.petrescueapi.infrastructure.persistence.entity.PostJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.PostEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaRepository;
+import com.uit.petrescueapi.infrastructure.persistence.repository.MediaFileJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,10 +21,19 @@ public class PostRepositoryAdapter implements PostRepository {
 
     private final PostJpaRepository jpa;
     private final PostEntityMapper mapper;
+    private final MediaFileJpaRepository mediaFileJpaRepository;
 
     @Override
     public Post save(Post post) {
-        return mapper.toDomain(jpa.save(mapper.toEntity(post)));
+        PostJpaEntity entity = mapper.toEntity(post);
+
+        // If client provided mediaIds, resolve the JPA media entities and attach them
+        if (post.getMediaIds() != null && !post.getMediaIds().isEmpty()) {
+            var mediaEntities = mediaFileJpaRepository.findAllById(post.getMediaIds());
+            entity.setMediaFiles(mediaEntities);
+        }
+
+        return mapper.toDomain(jpa.save(entity));
     }
 
     @Override

@@ -22,17 +22,19 @@ import java.util.UUID;
 public class MediaQueryUseCase implements MediaQueryPort {
 
     private final MediaFileDomainService domainService;
+    private final com.uit.petrescueapi.application.port.out.CloudStoragePort cloudStoragePort;
 
     @Override
     public MediaFileResponseDto findById(UUID mediaId) {
         log.debug("Query: find media file by id {}", mediaId);
         MediaFile media = domainService.findById(mediaId);
         return MediaFileResponseDto.builder()
-                .mediaId(media.getMediaId())
-                .uploaderId(media.getUploaderId())
+            .mediaId(media.getMediaId())
+            .uploaderId(media.getUploaderId())
             .publicId(media.getPublicId())
-                .type(media.getResourceType())
-                .createdAt(media.getCreatedAt())
-                .build();
+            .url(cloudStoragePort.buildUrl(media.getPublicId()))
+            .type(media.getResourceType())
+            .createdAt(media.getCreatedAt())
+            .build();
     }
 }

@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
 import java.util.UUID;
 
 /**
@@ -33,4 +34,5 @@ public class PostSummaryResponseDto {
     private Integer commentCount;
 
     private LocalDateTime createdAt;
+    private List<MediaFileResponseDto> media;
 }
