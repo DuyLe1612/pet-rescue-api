@@ -1,6 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
-import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
+import com.uit.petrescueapi.application.dto.media.PetMediaResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetMedicalRecordResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetOwnershipResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
@@ -71,7 +71,7 @@ public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
      * <p>After: 1 query (JOIN pet_media with media_files, paginated)
      */
     @Override
-    public Page<MediaFileResponseDto> findDiaryMedia(UUID petId, Pageable pageable) {
+    public Page<PetMediaResponseDto> findDiaryMedia(UUID petId, Pageable pageable) {
         return petMediaJpaRepo.findMediaWithFilesByPetId(petId, pageable)
                 .map(this::toMediaDto);
     }
@@ -102,15 +102,18 @@ public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
      * Maps projection (from JOIN query) to DTO.
      * URL is built from publicId already included in projection — no extra query!
      */
-    private MediaFileResponseDto toMediaDto(PetMediaProjection p) {
+    private PetMediaResponseDto toMediaDto(PetMediaProjection p) {
         String url = (p.getPublicId() != null)
                 ? cloudStoragePort.buildUrl(p.getPublicId())
                 : null;
 
-        return MediaFileResponseDto.builder()
+        return PetMediaResponseDto.builder()
                 .mediaId(p.getMediaId())
+                .petId(p.getPetId())
+                .mediaFileId(p.getMediaFileId())
                 .url(url)
                 .type(p.getType())
+                .primaryMedia(p.isPrimaryMedia())
                 .createdAt(p.getCreatedAt())
                 .build();
     }

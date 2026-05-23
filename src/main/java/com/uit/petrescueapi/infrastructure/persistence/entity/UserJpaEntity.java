@@ -67,6 +67,9 @@ public class UserJpaEntity extends BaseJpaEntity {
     @Column(name = "province_name", length = 255)
     private String provinceName;
 
+        @Column(name = "expo_push_token", length = 255)
+        private String expoPushToken;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private UserStatus status;

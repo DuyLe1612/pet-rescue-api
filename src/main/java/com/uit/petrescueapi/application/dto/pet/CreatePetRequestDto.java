@@ -1,6 +1,11 @@
 package com.uit.petrescueapi.application.dto.pet;
 
 import com.uit.petrescueapi.domain.valueobject.Gender;
+import com.uit.petrescueapi.domain.valueobject.HealthStatus;
+import com.uit.petrescueapi.domain.valueobject.PetStatus;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
@@ -43,10 +48,11 @@ public class CreatePetRequestDto {
     @Size(max = 2000)
     private String description;
 
-
     private boolean vaccinated;
 
     private boolean neutered;
+
+    private HealthStatus healthStatus;
 
     @PastOrPresent
     private LocalDate rescueDate;
@@ -56,6 +62,9 @@ public class CreatePetRequestDto {
 
     @Size(max = 10)
     private List<String> imageUrls;
+
+    @Size(max = 10)
+    private List<UUID> mediaIds;
 
     private UUID shelterId;
 

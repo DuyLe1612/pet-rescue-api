@@ -9,6 +9,7 @@ import org.mapstruct.Mapping;
 public interface MediaFileWebMapper {
     @Mapping(target = "mediaId", source = "mediaId")
     @Mapping(target = "uploaderId", source = "uploaderId")
+    @Mapping(target = "publicId", source = "publicId")
     @Mapping(target = "url", ignore = true)
     @Mapping(target = "type", source = "resourceType")
     @Mapping(target = "createdAt", source = "createdAt")

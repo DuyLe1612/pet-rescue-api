@@ -1,6 +1,6 @@
 package com.uit.petrescueapi.application.port.out;
 
-import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
+import com.uit.petrescueapi.application.dto.media.PetMediaResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetMedicalRecordResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetOwnershipResponseDto;
 import org.springframework.data.domain.Page;
@@ -20,5 +20,5 @@ public interface PetDetailsQueryDataPort {
 
     Page<PetOwnershipResponseDto> findOwnerships(UUID petId, Pageable pageable);
 
-    Page<MediaFileResponseDto> findDiaryMedia(UUID petId, Pageable pageable);
+    Page<PetMediaResponseDto> findDiaryMedia(UUID petId, Pageable pageable);
 }

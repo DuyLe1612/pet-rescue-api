@@ -104,6 +104,29 @@ public class CloudinaryStorageAdapter implements CloudStoragePort {
         return cloudinary.url().generate(publicId);
     }
 
+    @Override
+    public String buildUploadUrl() {
+        return "https://api.cloudinary.com/v1_1/" + cloudinary.config.cloudName + "/auto/upload";
+    }
+
+    @Override
+    public SignedUploadResult createSignedUpload(String folder, String publicId) {
+        long timestamp = System.currentTimeMillis() / 1000;
+        Map<String, Object> params = ObjectUtils.asMap(
+                "timestamp", timestamp,
+                "folder", folder,
+                "public_id", publicId
+        );
+        String signature = cloudinary.apiSignRequest(params, cloudinary.config.apiSecret);
+        return new SignedUploadResult(
+                cloudinary.config.apiKey,
+                signature,
+                timestamp,
+                folder,
+                publicId
+        );
+    }
+
     private String extractFileName(String publicId) {
         int lastSlash = publicId.lastIndexOf('/');
         return lastSlash >= 0 ? publicId.substring(lastSlash + 1) : publicId;

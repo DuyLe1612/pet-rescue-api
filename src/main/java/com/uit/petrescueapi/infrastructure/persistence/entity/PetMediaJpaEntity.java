@@ -37,6 +37,10 @@ public class PetMediaJpaEntity {
     @Column(name = "type", length = 20)
     private String type;
 
+    @Column(name = "is_primary", nullable = false)
+    @Builder.Default
+    private boolean primaryMedia = false;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

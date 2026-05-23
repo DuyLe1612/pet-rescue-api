@@ -20,5 +20,6 @@ public class PetMedia {
     private UUID petId;
     private UUID mediaFileId;  // Reference to media_files table
     private String type;
+    private boolean primaryMedia;
     private LocalDateTime createdAt;
 }

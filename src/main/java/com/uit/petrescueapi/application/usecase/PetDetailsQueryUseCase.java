@@ -1,6 +1,6 @@
 package com.uit.petrescueapi.application.usecase;
 
-import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
+import com.uit.petrescueapi.application.dto.media.PetMediaResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetMedicalRecordResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetOwnershipResponseDto;
 import com.uit.petrescueapi.application.port.out.PetDetailsQueryDataPort;
@@ -40,7 +40,7 @@ public class PetDetailsQueryUseCase implements PetDetailsQueryPort {
     }
 
     @Override
-    public Page<MediaFileResponseDto> findDiaryMedia(UUID petId, Pageable pageable) {
+    public Page<PetMediaResponseDto> findDiaryMedia(UUID petId, Pageable pageable) {
         log.debug("Query: find diary media for pet {}", petId);
         return queryDataPort.findDiaryMedia(petId, pageable);
     }

@@ -4,6 +4,7 @@ import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.TransferOwnershipRequestDto;
 import com.uit.petrescueapi.application.dto.pet.UpdatePetRequestDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
+import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
@@ -31,6 +32,7 @@ public class PetCommandUseCase implements PetCommandPort {
     private final PetDomainService domainService;
     private final OrganizationDomainService organizationDomainService;
     private final UserDomainService userDomainService;
+    private final MediaQueryPort mediaQueryPort;
     private final PetCurrentOwnerRepository currentOwnerRepository;
 
     @Override
@@ -95,7 +97,7 @@ public class PetCommandUseCase implements PetCommandPort {
                 .neutered(cmd.isNeutered())
                 .rescueDate(cmd.getRescueDate())
                 .rescueLocation(cmd.getRescueLocation())
-                .imageUrls(cmd.getImageUrls())
+                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls()))
                 .rescueCaseId(cmd.getRescueCaseId())
                 .build();
     }
@@ -116,9 +118,20 @@ public class PetCommandUseCase implements PetCommandPort {
                 .healthStatus(cmd.getHealthStatus())
                 .vaccinated(cmd.isVaccinated())
                 .neutered(cmd.isNeutered())
-                .imageUrls(cmd.getImageUrls())
+                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls()))
                 .build();
         return domainService.update(id, patch);
+    }
+
+    private java.util.List<String> resolveImageUrls(java.util.List<UUID> mediaIds, java.util.List<String> imageUrls) {
+        if (mediaIds != null && !mediaIds.isEmpty()) {
+            return mediaIds.stream()
+                    .map(mediaQueryPort::findById)
+                    .map(media -> media.getUrl())
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
+        return imageUrls;
     }
 
     @Override

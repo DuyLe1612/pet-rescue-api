@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,7 @@ public interface PetMediaJpaRepository extends JpaRepository<PetMediaJpaEntity, 
                    pm.pet_id        AS petId,
                    pm.media_file_id AS mediaFileId,
                    pm.type          AS type,
+                 pm.is_primary    AS primaryMedia,
                    pm.created_at    AS createdAt,
                    mf.public_id     AS publicId
             FROM pet_media pm
@@ -46,5 +48,26 @@ public interface PetMediaJpaRepository extends JpaRepository<PetMediaJpaEntity, 
 
     @Modifying
     @Query("DELETE FROM PetMediaJpaEntity pm WHERE pm.petId = :petId")
+    @Transactional
     void deleteAllByPetId(@Param("petId") UUID petId);
+
+    List<PetMediaJpaEntity> findByPetIdAndMediaFileId(UUID petId, UUID mediaFileId);
+
+    @Modifying
+    @Query(value = "UPDATE pet_media SET is_primary = FALSE WHERE pet_id = :petId", nativeQuery = true)
+    @Transactional
+    void clearPrimaryByPetId(@Param("petId") UUID petId);
+
+    @Modifying
+    @Query(value = "UPDATE pet_media SET is_primary = TRUE WHERE pet_id = :petId AND media_id = :mediaId", nativeQuery = true)
+    @Transactional
+    void setPrimaryByPetIdAndMediaId(@Param("petId") UUID petId, @Param("mediaId") UUID mediaId);
+
+    @Modifying
+    @Query(value = "DELETE FROM pet_media WHERE pet_id = :petId AND media_id = :mediaId", nativeQuery = true)
+    @Transactional
+    void deleteByPetIdAndMediaId(@Param("petId") UUID petId, @Param("mediaId") UUID mediaId);
+
+    @Query(value = "SELECT * FROM pet_media WHERE pet_id = :petId AND is_primary = TRUE LIMIT 1", nativeQuery = true)
+    java.util.Optional<PetMediaJpaEntity> findPrimaryByPetId(@Param("petId") UUID petId);
 }

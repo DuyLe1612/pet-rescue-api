@@ -47,6 +47,7 @@ public class SecurityConfig {
             "/api/v1/rescue-cases/map/**",
             "/ws/**",
             "/api/v1/dev/**",          // Development-only endpoints (active only with 'dev' profile)
+            "/chat-ws/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api-docs/**",

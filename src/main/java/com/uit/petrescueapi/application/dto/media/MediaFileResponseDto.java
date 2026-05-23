@@ -21,6 +21,9 @@ public class MediaFileResponseDto {
 
     private UUID uploaderId;
 
+    @Schema(example = "pets/buddy-01")
+    private String publicId;
+
     @Schema(example = "https://storage.example.com/pets/buddy-01.jpg")
     private String url;
 

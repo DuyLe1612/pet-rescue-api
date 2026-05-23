@@ -32,6 +32,7 @@ public class User {
     private String wardName;
     private String provinceCode;
     private String provinceName;
+    private String expoPushToken;
 
     @Builder.Default
     private UserStatus status = UserStatus.PENDING_VERIFICATION;

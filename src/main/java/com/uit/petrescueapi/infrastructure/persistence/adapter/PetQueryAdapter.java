@@ -123,12 +123,16 @@ public class PetQueryAdapter implements PetQueryDataPort {
         PetDetailProjection proj = queryRepo.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pet", "id", id));
 
+        String primaryImageUrl = queryRepo.findPrimaryImagePublicIdById(id)
+                .map(cloudStoragePort::buildUrl)
+                .orElse(null);
+
         List<String> imageUrls = queryRepo.findImagePublicIdsById(id).stream()
                 .filter(publicId -> publicId != null)
                 .map(cloudStoragePort::buildUrl)
                 .toList();
 
-        return toResponseDto(proj, imageUrls);
+        return toResponseDto(proj, primaryImageUrl, imageUrls);
     }
 
     // ── Projection → DTO mappers ────────────────
@@ -173,7 +177,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .build();
     }
 
-    private PetResponseDto toResponseDto(PetDetailProjection p, List<String> imageUrls) {
+        private PetResponseDto toResponseDto(PetDetailProjection p, String primaryImageUrl, List<String> imageUrls) {
         return PetResponseDto.builder()
                 .petId(p.getId())
                 .petCode(p.getPetCode())
@@ -211,6 +215,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .neutered(p.getNeutered())
                 .rescueDate(p.getRescueDate())
                 .rescueLocation(p.getRescueLocation())
+                .primaryImageUrl(primaryImageUrl)
                 .imageUrls(imageUrls)
                 .shelterId(p.getShelterId())
                 .createdAt(p.getCreatedAt())

@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.usecase;
 import com.uit.petrescueapi.application.dto.rescue.CreateRescueCaseRequestDto;
 import com.uit.petrescueapi.application.dto.rescue.UpdateRescueCaseStatusRequestDto;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
+import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.service.RescueCaseDomainService;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
 
     private final RescueCaseDomainService domainService;
+    private final MediaQueryPort mediaQueryPort;
 
     @Override
     public RescueCase report(CreateRescueCaseRequestDto cmd, UUID reporterId) {
@@ -62,8 +64,19 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
                 .provinceName(cmd.getProvinceName())
                 .wardCode(cmd.getWardCode())
                 .wardName(cmd.getWardName())
-                .imagePublicIds(cmd.getImageUrls())
+                .imagePublicIds(resolvePublicIds(cmd.getMediaIds(), cmd.getImageUrls()))
                 .contactPhone(cmd.getContactPhone())
                 .build();
+    }
+
+    private java.util.List<String> resolvePublicIds(java.util.List<java.util.UUID> mediaIds, java.util.List<String> imageUrls) {
+        if (mediaIds != null && !mediaIds.isEmpty()) {
+            return mediaIds.stream()
+                    .map(mediaQueryPort::findById)
+                    .map(media -> media.getPublicId())
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+        }
+        return imageUrls;
     }
 }

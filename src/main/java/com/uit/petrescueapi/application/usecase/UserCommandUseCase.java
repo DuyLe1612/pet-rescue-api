@@ -30,6 +30,11 @@ public class UserCommandUseCase implements UserCommandPort {
     }
 
     @Override
+    public void updatePushToken(UUID userId, String expoPushToken) {
+        domainService.updateExpoPushToken(userId, expoPushToken);
+    }
+
+    @Override
     public void deactivate(UUID userId) {
         log.debug("Command: deactivate user {}", userId);
         User user = domainService.findById(userId);

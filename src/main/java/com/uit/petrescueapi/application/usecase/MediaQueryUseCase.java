@@ -30,6 +30,7 @@ public class MediaQueryUseCase implements MediaQueryPort {
         return MediaFileResponseDto.builder()
                 .mediaId(media.getMediaId())
                 .uploaderId(media.getUploaderId())
+            .publicId(media.getPublicId())
                 .type(media.getResourceType())
                 .createdAt(media.getCreatedAt())
                 .build();

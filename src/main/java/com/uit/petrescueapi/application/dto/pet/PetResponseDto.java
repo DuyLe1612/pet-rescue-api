@@ -49,6 +49,7 @@ public class PetResponseDto {
     private boolean neutered;
     private LocalDate rescueDate;
     private String rescueLocation;
+    private String primaryImageUrl;
     private List<String> imageUrls;
     private UUID shelterId;
     private LocalDateTime createdAt;

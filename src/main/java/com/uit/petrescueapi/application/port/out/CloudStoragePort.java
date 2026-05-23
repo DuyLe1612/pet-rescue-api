@@ -44,6 +44,16 @@ public interface CloudStoragePort {
     String buildUrl(String publicId);
 
     /**
+     * Build an upload URL for signed direct uploads.
+     */
+    String buildUploadUrl();
+
+    /**
+     * Create a signed upload payload for direct client uploads.
+     */
+    SignedUploadResult createSignedUpload(String folder, String publicId);
+
+    /**
      * Result of a cloud upload operation.
      */
     record CloudUploadResult(
@@ -56,4 +66,12 @@ public interface CloudStoragePort {
             Integer bytes,
             String folder
     ) {}
+
+        record SignedUploadResult(
+            String apiKey,
+            String signature,
+            long timestamp,
+            String folder,
+            String publicId
+        ) {}
 }

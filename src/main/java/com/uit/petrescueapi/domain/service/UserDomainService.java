@@ -147,6 +147,13 @@ public class UserDomainService {
         return userRepository.save(user);
     }
 
+    public User updateExpoPushToken(UUID id, String token) {
+        User user = findById(id);
+        user.setExpoPushToken(token);
+        user.setUpdatedAt(LocalDateTime.now());
+        return userRepository.save(user);
+    }
+
     /**
      * Check if a user has a specific role.
      */

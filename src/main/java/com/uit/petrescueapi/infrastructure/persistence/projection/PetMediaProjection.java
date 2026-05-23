@@ -17,6 +17,8 @@ public interface PetMediaProjection {
 
     String getType();
 
+    boolean isPrimaryMedia();
+
     LocalDateTime getCreatedAt();
 
     // From joined media_files table

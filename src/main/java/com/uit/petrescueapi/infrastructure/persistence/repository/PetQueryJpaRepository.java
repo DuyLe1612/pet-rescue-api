@@ -34,7 +34,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.status AS status,
                p.health_status AS healthStatus,
                (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
-                WHERE pm.pet_id = p.pet_id ORDER BY pm.created_at LIMIT 1) AS imagePublicId,
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
@@ -96,7 +96,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.status AS status,
                p.health_status AS healthStatus,
                (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
-                WHERE pm.pet_id = p.pet_id ORDER BY pm.created_at LIMIT 1) AS imagePublicId,
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
@@ -161,7 +161,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.status AS status,
                p.health_status AS healthStatus,
                (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
-                WHERE pm.pet_id = p.pet_id ORDER BY pm.created_at LIMIT 1) AS imagePublicId,
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
@@ -269,7 +269,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.status AS status,
                p.health_status AS healthStatus,
                (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
-                WHERE pm.pet_id = p.pet_id ORDER BY pm.created_at LIMIT 1) AS imagePublicId,
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
@@ -327,7 +327,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.status AS status,
                p.health_status AS healthStatus,
                (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
-                WHERE pm.pet_id = p.pet_id ORDER BY pm.created_at LIMIT 1) AS imagePublicId,
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
@@ -381,7 +381,17 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             JOIN media_files mf ON pm.media_file_id = mf.media_id
             JOIN pets p ON pm.pet_id = p.pet_id
             WHERE p.pet_id = :id AND p.is_deleted = false
-            ORDER BY pm.created_at DESC
+          ORDER BY pm.is_primary DESC, pm.created_at ASC
             """, nativeQuery = true)
     List<String> findImagePublicIdsById(@Param("id") UUID id);
+
+        @Query(value = """
+          SELECT mf.public_id
+          FROM pet_media pm
+          JOIN media_files mf ON pm.media_file_id = mf.media_id
+          JOIN pets p ON pm.pet_id = p.pet_id
+          WHERE p.pet_id = :id AND p.is_deleted = false AND pm.is_primary = TRUE
+          LIMIT 1
+          """, nativeQuery = true)
+        Optional<String> findPrimaryImagePublicIdById(@Param("id") UUID id);
 }

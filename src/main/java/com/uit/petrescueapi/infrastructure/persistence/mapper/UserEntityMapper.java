@@ -14,10 +14,12 @@ import java.util.stream.Collectors;
 public interface UserEntityMapper {
 
     @Mapping(source = "userId", target = "id")
-    User toDomain(UserJpaEntity entity);
+        @Mapping(source = "expoPushToken", target = "expoPushToken")
+        User toDomain(UserJpaEntity entity);
 
-    @Mapping(source = "id", target = "userId")
-    UserJpaEntity toEntity(User domain);
+        @Mapping(source = "id", target = "userId")
+        @Mapping(source = "expoPushToken", target = "expoPushToken")
+        UserJpaEntity toEntity(User domain);
 
     default Set<Role> mapRoles(Set<RoleJpaEntity> entities) {
         if (entities == null) return Set.of();

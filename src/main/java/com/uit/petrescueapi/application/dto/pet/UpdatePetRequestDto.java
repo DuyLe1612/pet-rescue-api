@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Request DTO for updating an existing Pet.
@@ -48,4 +49,7 @@ public class UpdatePetRequestDto {
 
     @Size(max = 10)
     private List<String> imageUrls;
+
+    @Size(max = 10)
+    private List<UUID> mediaIds;
 }

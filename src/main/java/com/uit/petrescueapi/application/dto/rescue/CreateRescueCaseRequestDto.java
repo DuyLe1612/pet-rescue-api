@@ -31,6 +31,10 @@ public class CreateRescueCaseRequestDto {
     private String wardCode;
     private String wardName;
     private List<String> imageUrls;
+
+    @Builder.Default
+    private List<UUID> mediaIds = java.util.Collections.emptyList();
+
     @Phone
     private String contactPhone;
 }
