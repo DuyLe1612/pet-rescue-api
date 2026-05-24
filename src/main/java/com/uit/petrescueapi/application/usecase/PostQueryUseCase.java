@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -40,7 +41,7 @@ public class PostQueryUseCase implements PostQueryPort {
     }
 
     @Override
-    public PostCursorResponseDto findFeedByCursor(java.time.LocalDateTime cursor, int size, UUID viewerId) {
+    public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId) {
         log.debug("Query: find post feed by cursor {}, size {}", cursor, size);
         return queryDataPort.findFeedByCursor(cursor, size, viewerId);
     }

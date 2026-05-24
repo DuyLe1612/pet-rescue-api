@@ -1,5 +1,8 @@
 package com.uit.petrescueapi.application.dto.banner;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,18 +17,24 @@ import java.util.UUID;
 @AllArgsConstructor
 public class UpdateBannerRequestDto {
 
+    @Size(max = 200)
     private String title;
 
+    @Size(max = 500)
     private String subtitle;
 
+    @Size(max = 100)
     private String buttonText;
 
     private UUID mediaId;
 
+    @Size(max = 500)
     private String linkUrl;
 
+    @Size(max = 20)
     private String linkType;
 
+    @Min(0)
     private Integer displayOrder;
 
     private LocalDateTime startDate;

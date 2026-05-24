@@ -14,7 +14,7 @@ public interface PostWebMapper {
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
     @Mapping(target = "authorUsername", ignore = true)
-    @Mapping(target = "media", ignore = true)
+    @Mapping(target = "imageUrls", ignore = true)
     @Mapping(target = "tags", ignore = true)
     PostResponseDto toDto(Post post);
 }

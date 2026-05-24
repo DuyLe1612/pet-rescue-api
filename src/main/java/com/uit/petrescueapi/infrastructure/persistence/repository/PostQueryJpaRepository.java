@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,57 +42,45 @@ public interface PostQueryJpaRepository extends JpaRepository<PostJpaEntity, UUI
     Page<PostSummaryProjection> findAllSummaries(Pageable pageable);
 
     @Query("""
-        SELECT p.postId       AS postId,
-               p.authorId     AS authorId,
-               u.username     AS authorUsername,
-               p.content      AS content,
-               p.likeCount    AS likeCount,
-               p.commentCount AS commentCount,
-               p.createdAt    AS createdAt
-        FROM PostJpaEntity p
-        LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
-        WHERE p.deleted = false
-          AND (:cursor IS NULL OR p.createdAt < :cursor)
-        ORDER BY
-          CASE
-            WHEN :viewerId IS NOT NULL AND EXISTS (
-              SELECT 1 FROM PostLikeJpaEntity pl
-              WHERE pl.postId = p.postId AND pl.userId = :viewerId
-            ) THEN 0
-            ELSE 1
-          END,
-          p.createdAt DESC
-    """)
-    Page<PostSummaryProjection> findFirstFeedPage(
-            @Param("viewerId") UUID viewerId,
-            Pageable pageable);
+    SELECT p.postId       AS postId,
+           p.authorId     AS authorId,
+           u.username     AS authorUsername,
+           p.content      AS content,
+           p.likeCount    AS likeCount,
+           p.commentCount AS commentCount,
+           p.createdAt    AS createdAt
+    FROM PostJpaEntity p
+    LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
+    WHERE p.deleted = false
+    ORDER BY p.createdAt DESC, p.postId DESC
+""")
+    Page<PostSummaryProjection> findFirstFeedPage(Pageable pageable);
 
     @Query("""
-        SELECT p.postId       AS postId,
-               p.authorId     AS authorId,
-               u.username     AS authorUsername,
-               p.content      AS content,
-               p.likeCount    AS likeCount,
-               p.commentCount AS commentCount,
-               p.createdAt    AS createdAt
-        FROM PostJpaEntity p
-        LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
-        WHERE p.deleted = false
-          AND p.createdAt < :cursor
-        ORDER BY
-          CASE
-            WHEN :viewerId IS NOT NULL AND EXISTS (
-              SELECT 1 FROM PostLikeJpaEntity pl
-              WHERE pl.postId = p.postId AND pl.userId = :viewerId
-            ) THEN 0
-            ELSE 1
-          END,
-          p.createdAt DESC
-    """)
+    SELECT p.postId       AS postId,
+           p.authorId     AS authorId,
+           u.username     AS authorUsername,
+           p.content      AS content,
+           p.likeCount    AS likeCount,
+           p.commentCount AS commentCount,
+           p.createdAt    AS createdAt
+    FROM PostJpaEntity p
+    LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
+    WHERE p.deleted = false
+      AND (
+            p.createdAt < :cursorCreatedAt
+            OR (
+                p.createdAt = :cursorCreatedAt
+                AND p.postId < :cursorPostId
+            )
+          )
+    ORDER BY p.createdAt DESC, p.postId DESC
+""")
     Page<PostSummaryProjection> findFeedByCursor(
-            @Param("cursor") java.time.LocalDateTime cursor,
-            @Param("viewerId") UUID viewerId,
-            Pageable pageable);
+            @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+            @Param("cursorPostId") UUID cursorPostId,
+            Pageable pageable
+    );
 
     // ── Detail (single post) ────────────────────
 

@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.user.UpdateUserProfileRequestDto;
 import com.uit.petrescueapi.application.port.command.UserCommandPort;
 import com.uit.petrescueapi.domain.entity.User;
 import com.uit.petrescueapi.domain.repository.UserRepository;
@@ -24,9 +25,21 @@ public class UserCommandUseCase implements UserCommandPort {
     private final UserRepository userRepository;
 
     @Override
-    public User updateProfile(UUID userId, String username, String avatarUrl) {
+    public User updateProfile(UUID userId, UpdateUserProfileRequestDto request) {
         log.debug("Command: update profile for user {}", userId);
-        return domainService.updateProfile(userId, username, avatarUrl);
+        return domainService.updateProfile(
+                userId,
+                request.getUsername(),
+                request.getFullName(),
+                request.getAvatarUrl(),
+                request.getPhone(),
+                request.getGender(),
+                request.getStreetAddress(),
+                request.getWardCode(),
+                request.getWardName(),
+                request.getProvinceCode(),
+                request.getProvinceName()
+        );
     }
 
     @Override

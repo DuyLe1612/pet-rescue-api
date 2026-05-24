@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
+import com.uit.petrescueapi.application.dto.user.UpdateUserProfileRequestDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserSummaryResponseDto;
 import com.uit.petrescueapi.application.port.command.UserCommandPort;
@@ -9,6 +10,7 @@ import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.UserWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -29,14 +31,27 @@ public class UserController {
     private final UserQueryPort queryPort;
     private final UserWebMapper mapper;
 
-    @PatchMapping("/me/profile")
+    @PutMapping("/me/profile")
     @Operation(summary = "Update current user profile")
     public ResponseEntity<ApiResponse<UserResponseDto>> updateProfile(
+            @Valid @RequestBody UpdateUserProfileRequestDto request,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.updateProfile(userId, request))));
+    }
+
+    @PatchMapping("/me/profile")
+    @Operation(summary = "Update current user profile partially")
+    public ResponseEntity<ApiResponse<UserResponseDto>> patchProfile(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String avatarUrl,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.updateProfile(userId, username, avatarUrl))));
+        UpdateUserProfileRequestDto request = UpdateUserProfileRequestDto.builder()
+                .username(username)
+                .avatarUrl(avatarUrl)
+                .build();
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.updateProfile(userId, request))));
     }
 
     @GetMapping("/me")

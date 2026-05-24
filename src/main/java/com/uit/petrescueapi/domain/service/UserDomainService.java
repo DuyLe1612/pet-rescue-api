@@ -127,10 +127,30 @@ public class UserDomainService {
         return userRepository.save(user);
     }
 
-    public User updateProfile(UUID id, String username, String avatarUrl) {
+    public User updateProfile(
+            UUID id,
+            String username,
+            String fullName,
+            String avatarUrl,
+            String phone,
+            String gender,
+            String streetAddress,
+            String wardCode,
+            String wardName,
+            String provinceCode,
+            String provinceName
+    ) {
         User user = findById(id);
         if (username != null) user.setUsername(username);
+        if (fullName != null) user.setFullName(fullName);
         if (avatarUrl != null) user.setAvatarUrl(avatarUrl);
+        if (phone != null) user.setPhone(phone);
+        if (gender != null) user.setGender(gender);
+        if (streetAddress != null) user.setStreetAddress(streetAddress);
+        if (wardCode != null) user.setWardCode(wardCode);
+        if (wardName != null) user.setWardName(wardName);
+        if (provinceCode != null) user.setProvinceCode(provinceCode);
+        if (provinceName != null) user.setProvinceName(provinceName);
         user.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(user);
     }

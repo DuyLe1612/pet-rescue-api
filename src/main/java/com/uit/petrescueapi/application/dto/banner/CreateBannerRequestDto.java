@@ -1,5 +1,8 @@
 package com.uit.petrescueapi.application.dto.banner;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,18 +19,24 @@ import java.util.UUID;
 public class CreateBannerRequestDto {
 
     @NotBlank(message = "Title is required")
+    @Size(max = 200)
     private String title;
 
+    @Size(max = 500)
     private String subtitle;
 
+    @Size(max = 100)
     private String buttonText;
 
     private UUID mediaId;
 
+    @Size(max = 500)
     private String linkUrl;
 
+    @Size(max = 20)
     private String linkType;  // INTERNAL, EXTERNAL, NONE
 
+    @Min(0)
     private Integer displayOrder;
 
     private LocalDateTime startDate;

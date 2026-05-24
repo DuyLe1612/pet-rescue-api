@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.role;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.util.List;
@@ -13,5 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class AssignPermissionsRequestDto {
 
+    @NotEmpty
+    @Size(max = 100)
     private List<Integer> permissionIds;
 }

@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
-import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
@@ -15,6 +14,7 @@ import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaReposit
 import com.uit.petrescueapi.infrastructure.persistence.repository.PostQueryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,8 +52,8 @@ public class PostQueryAdapter implements PostQueryDataPort {
     @Override
     public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId) {
         Page<PostSummaryResponseDto> page = (cursor == null)
-                ? queryRepo.findFirstFeedPage(viewerId, org.springframework.data.domain.PageRequest.of(0, size)).map(this::toSummaryDto)
-                : queryRepo.findFeedByCursor(cursor, viewerId, org.springframework.data.domain.PageRequest.of(0, size)).map(this::toSummaryDto);
+                ? queryRepo.findFirstFeedPage( PageRequest.of(0, size)).map(this::toSummaryDto)
+                : queryRepo.findFeedByCursor(cursor, viewerId, PageRequest.of(0, size)).map(this::toSummaryDto);
 
         List<PostSummaryResponseDto> items = page.getContent();
 
@@ -65,20 +65,13 @@ public class PostQueryAdapter implements PostQueryDataPort {
                     java.util.stream.Collectors.toMap(
                             e -> e.getPostId(),
                             e -> e.getMediaFiles().stream()
-                                    .map(m -> MediaFileResponseDto.builder()
-                                            .mediaId(m.getMediaId())
-                                            .uploaderId(m.getUploaderId())
-                                            .publicId(m.getPublicId())
-                                            .url(cloudStoragePort.buildUrl(m.getPublicId()))
-                                            .type(m.getResourceType())
-                                            .createdAt(m.getCreatedAt())
-                                            .build())
+                                    .map(m -> cloudStoragePort.buildUrl(m.getPublicId()))
                                     .toList()
                     )
             );
 
             for (PostSummaryResponseDto item : items) {
-                item.setMedia(mediaMap.getOrDefault(item.getPostId(), java.util.Collections.emptyList()));
+                item.setImageUrls(mediaMap.getOrDefault(item.getPostId(), java.util.Collections.emptyList()));
             }
         }
         LocalDateTime nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getCreatedAt();
@@ -106,16 +99,11 @@ public class PostQueryAdapter implements PostQueryDataPort {
                 .map(TagJpaEntity::getCode)
                 .toList();
 
-        List<MediaFileResponseDto> media = entity.getMediaFiles().stream()
-                .map(m -> MediaFileResponseDto.builder()
-                        .mediaId(m.getMediaId())
-                        .uploaderId(m.getUploaderId())
-                        .type(m.getResourceType())
-                        .createdAt(m.getCreatedAt())
-                        .build())
+        List<String> mediaUrls = entity.getMediaFiles().stream()
+                .map(m -> cloudStoragePort.buildUrl(m.getPublicId()))
                 .toList();
 
-        return toResponseDto(proj, tags, media);
+        return toResponseDto(proj, tags, mediaUrls);
     }
 
     // ── Projection → DTO mappers ────────────────
@@ -133,16 +121,16 @@ public class PostQueryAdapter implements PostQueryDataPort {
                 .build();
     }
 
-    private PostResponseDto toResponseDto(PostDetailProjection p,
-                                          List<String> tags,
-                                          List<MediaFileResponseDto> media) {
+        private PostResponseDto toResponseDto(PostDetailProjection p,
+                                                                                  List<String> tags,
+                                                                                  List<String> imageUrls) {
         return PostResponseDto.builder()
                 .postId(p.getPostId())
                 .authorId(p.getAuthorId())
                 .authorUsername(p.getAuthorUsername())
                 .rescueCaseId(p.getRescueCaseId())
                 .content(p.getContent())
-                .media(media)
+                                .imageUrls(imageUrls)
                 .tags(tags)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())

@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.dto.pet;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.util.UUID;
@@ -13,5 +14,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AddDiaryMediaRequestDto {
 
+    @NotNull
     private UUID mediaId;
 }

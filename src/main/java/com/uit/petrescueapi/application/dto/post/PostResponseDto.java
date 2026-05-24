@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.application.dto.post;
 
-import com.uit.petrescueapi.application.dto.media.MediaFileResponseDto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -31,7 +30,7 @@ public class PostResponseDto {
     @Schema(example = "Found this little guy near the park, he needs help!")
     private String content;
 
-    private List<MediaFileResponseDto> media;
+    private List<String> imageUrls;
     private List<String> tags;
 
     private LocalDateTime createdAt;
