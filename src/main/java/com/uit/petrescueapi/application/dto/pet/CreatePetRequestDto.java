@@ -34,7 +34,7 @@ public class CreatePetRequestDto {
     @Size(max = 100)
     private String breed;
 
-    @Min(0) @Max(600)
+    @Min(0) @Max(6000)
     private Integer age;
 
     private Gender gender;

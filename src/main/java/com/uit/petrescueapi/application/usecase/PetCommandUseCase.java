@@ -4,6 +4,7 @@ import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.TransferOwnershipRequestDto;
 import com.uit.petrescueapi.application.dto.pet.UpdatePetRequestDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
+import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
@@ -18,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Command (write) use-case for Pet operations.
@@ -32,13 +35,15 @@ public class PetCommandUseCase implements PetCommandPort {
     private final PetDomainService domainService;
     private final OrganizationDomainService organizationDomainService;
     private final UserDomainService userDomainService;
+    private final MediaCommandPort mediaCommandPort;
     private final MediaQueryPort mediaQueryPort;
     private final PetCurrentOwnerRepository currentOwnerRepository;
 
     @Override
     public Pet createForUser(CreatePetRequestDto cmd, UUID userId) {
         log.debug("Command: create pet '{}' for user {}", cmd.getName(), userId);
-        Pet pet = buildPetFromDto(cmd);
+        UUID petId = UUID.randomUUID();
+        Pet pet = buildPetFromDto(cmd, petId);
         return domainService.createForUser(pet, userId);
     }
 
@@ -52,7 +57,8 @@ public class PetCommandUseCase implements PetCommandPort {
                     String.format("User %s is not a member of organization %s", userId, shelterId));
         }
 
-        Pet pet = buildPetFromDto(cmd);
+        UUID petId = UUID.randomUUID();
+        Pet pet = buildPetFromDto(cmd, petId);
         return domainService.createForShelter(pet, shelterId);
     }
 
@@ -69,7 +75,8 @@ public class PetCommandUseCase implements PetCommandPort {
                     String.format("User %s is not a member of organization %s", userId, organizationId));
         }
 
-        Pet pet = buildPetFromDto(cmd);
+        UUID petId = UUID.randomUUID();
+        Pet pet = buildPetFromDto(cmd, petId);
         pet.setShelterId(organizationId);
         Pet created = domainService.createForShelter(pet, organizationId);
 
@@ -83,8 +90,9 @@ public class PetCommandUseCase implements PetCommandPort {
         return created;
     }
 
-    private Pet buildPetFromDto(CreatePetRequestDto cmd) {
+    private Pet buildPetFromDto(CreatePetRequestDto cmd, UUID petId) {
         return Pet.builder()
+                .id(petId)
                 .name(cmd.getName())
                 .species(cmd.getSpecies())
                 .breed(cmd.getBreed())
@@ -97,7 +105,7 @@ public class PetCommandUseCase implements PetCommandPort {
                 .neutered(cmd.isNeutered())
                 .rescueDate(cmd.getRescueDate())
                 .rescueLocation(cmd.getRescueLocation())
-                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls()))
+                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls(), petId))
                 .rescueCaseId(cmd.getRescueCaseId())
                 .build();
     }
@@ -106,6 +114,7 @@ public class PetCommandUseCase implements PetCommandPort {
     public Pet update(UUID id, UpdatePetRequestDto cmd) {
         log.debug("Command: update pet {}", id);
         Pet patch = Pet.builder()
+            .id(id)
                 .name(cmd.getName())
                 .species(cmd.getSpecies())
                 .breed(cmd.getBreed())
@@ -118,18 +127,23 @@ public class PetCommandUseCase implements PetCommandPort {
                 .healthStatus(cmd.getHealthStatus())
                 .vaccinated(cmd.isVaccinated())
                 .neutered(cmd.isNeutered())
-                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls()))
+                .imageUrls(resolveImageUrls(cmd.getMediaIds(), cmd.getImageUrls(), id))
                 .build();
         return domainService.update(id, patch);
     }
 
-    private java.util.List<String> resolveImageUrls(java.util.List<UUID> mediaIds, java.util.List<String> imageUrls) {
+    private java.util.List<String> resolveImageUrls(java.util.List<UUID> mediaIds, java.util.List<String> imageUrls, UUID petId) {
         if (mediaIds != null && !mediaIds.isEmpty()) {
-            return mediaIds.stream()
-                    .map(mediaQueryPort::findById)
-                    .map(media -> media.getUrl())
-                    .filter(java.util.Objects::nonNull)
-                    .toList();
+            List<String> resolved = new ArrayList<>();
+            for (UUID mediaId : mediaIds) {
+                try {
+                    mediaCommandPort.confirmUpload(mediaId, "pets/" + petId);
+                } catch (RuntimeException ignored) {
+                    // Already permanent or otherwise not confirmable; keep using the current record.
+                }
+                resolved.add(mediaQueryPort.findById(mediaId).getUrl());
+            }
+            return resolved;
         }
         return imageUrls;
     }

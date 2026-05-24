@@ -16,6 +16,8 @@ public interface MediaFileRepository {
 
     Optional<MediaFile> findById(UUID mediaId);
 
+    Optional<MediaFile> findByPublicId(String publicId);
+
     Page<MediaFile> findByUploaderId(UUID uploaderId, Pageable pageable);
 
     void delete(UUID mediaId);

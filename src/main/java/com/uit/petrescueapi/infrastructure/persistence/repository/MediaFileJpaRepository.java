@@ -15,4 +15,6 @@ import java.util.UUID;
 public interface MediaFileJpaRepository extends JpaRepository<MediaFileJpaEntity, UUID> {
 
     Optional<MediaFileJpaEntity> findByMediaIdAndDeletedFalse(UUID mediaId);
+
+    Optional<MediaFileJpaEntity> findByPublicIdAndDeletedFalse(String publicId);
 }

@@ -33,6 +33,12 @@ public class MediaFileRepositoryAdapter implements MediaFileRepository {
     }
 
     @Override
+    public Optional<MediaFile> findByPublicId(String publicId) {
+        return jpa.findByPublicIdAndDeletedFalse(publicId)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Page<MediaFile> findByUploaderId(UUID uploaderId, Pageable pageable) {
         // Can be replaced with a dedicated JPA query later
         return jpa.findAll(pageable)

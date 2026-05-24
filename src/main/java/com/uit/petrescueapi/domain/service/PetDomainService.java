@@ -90,7 +90,9 @@ public class PetDomainService {
      */
     public Pet createForUser(Pet pet, UUID userId) {
         log.info("Creating pet '{}' for user {}", pet.getName(), userId);
-        pet.setId(UUID.randomUUID());
+        if (pet.getId() == null) {
+            pet.setId(UUID.randomUUID());
+        }
         pet.setPetCode(visualCodeRepository.nextPetCode());
         pet.setStatus(PetStatus.UNOWNED);
         pet.setCreatedAt(LocalDateTime.now());
@@ -126,7 +128,9 @@ public class PetDomainService {
      */
     public Pet createForShelter(Pet pet, UUID shelterId) {
         log.info("Creating pet '{}' for shelter {}", pet.getName(), shelterId);
-        pet.setId(UUID.randomUUID());
+        if (pet.getId() == null) {
+            pet.setId(UUID.randomUUID());
+        }
         pet.setPetCode(visualCodeRepository.nextPetCode());
         pet.setStatus(PetStatus.UNOWNED);
         pet.setCreatedAt(LocalDateTime.now());

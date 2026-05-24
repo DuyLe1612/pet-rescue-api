@@ -5,6 +5,7 @@ import com.uit.petrescueapi.domain.repository.RescueCaseRepository;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.entity.MediaFile;
 import com.uit.petrescueapi.domain.repository.MediaFileRepository;
+import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.RescueCaseEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.RescueCaseJpaRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,7 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
     private final RescueCaseJpaRepository jpa;
     private final RescueCaseEntityMapper mapper;
     private final MediaFileRepository mediaFileRepository;
+    private final CloudStoragePort cloudStoragePort;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -30,15 +32,28 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
         // Persist rescue case
         var saved = mapper.toDomain(jpa.save(mapper.toEntity(rescueCase)));
 
-        // If FE provided image URLs (public ids), register them in media_files and link via rescue_media
+        // If FE provided image URLs/public IDs, ensure they are permanent and link via rescue_media.
         if (rescueCase.getImagePublicIds() != null && !rescueCase.getImagePublicIds().isEmpty()) {
             for (String publicId : rescueCase.getImagePublicIds()) {
-                MediaFile mf = MediaFile.builder()
-                        .publicId(publicId)
-                        .uploaderId(rescueCase.getReportedBy())
-                        .status("PERMANENT")
-                        .build();
-                MediaFile savedMf = mediaFileRepository.save(mf);
+            MediaFile mf = mediaFileRepository.findByPublicId(publicId)
+                .orElseGet(() -> MediaFile.builder()
+                    .mediaId(UUID.randomUUID())
+                    .publicId(publicId)
+                    .uploaderId(rescueCase.getReportedBy())
+                    .status("PERMANENT")
+                    .build());
+
+            if ("TEMP".equals(mf.getStatus())) {
+                String targetFolder = "rescues/" + saved.getCaseId();
+                String newPublicId = cloudStoragePort.moveToPermament(mf.getPublicId(), targetFolder);
+                mf.setPublicId(newPublicId);
+                mf.setStatus("PERMANENT");
+                mf.setFolder(targetFolder);
+            } else if (mf.getFolder() == null) {
+                mf.setFolder("rescues/" + saved.getCaseId());
+            }
+
+            MediaFile savedMf = mediaFileRepository.save(mf);
                 // Insert link into rescue_media (idempotent)
                 try {
                     jdbcTemplate.update("INSERT INTO rescue_media (case_id, media_id) VALUES (?, ?) ON CONFLICT DO NOTHING",
