@@ -160,11 +160,11 @@ public class AdminController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(dto));
     }
 
-    @PostMapping("/organizations/{organizationId}/users/{userId}/pets")
-    @Operation(summary = "Create pet for a user in an organization context")
+        @PostMapping("/organizations/{organizationId}/pets")
+        @Operation(summary = "Create pet for an organization, optionally assigning a caretaker user")
     public ResponseEntity<ApiResponse<PetResponseDto>> createPetForUserInOrganization(
             @PathVariable UUID organizationId,
-            @PathVariable UUID userId,
+                        @RequestParam(required = false) UUID userId,
             @Valid @RequestBody CreatePetRequestDto cmd) {
 
         Pet created = petCommandPort.createForUserInOrganization(cmd, organizationId, userId);

@@ -64,15 +64,17 @@ public class PetCommandUseCase implements PetCommandPort {
 
     @Override
     public Pet createForUserInOrganization(CreatePetRequestDto cmd, UUID organizationId, UUID userId) {
-        log.debug("Command: create pet '{}' for user {} in organization {}", cmd.getName(), userId, organizationId);
+        log.debug("Command: create pet '{}' in organization {} with user {}", cmd.getName(), organizationId, userId);
 
-        // Ensure target user exists.
-        userDomainService.findById(userId);
+        if (userId != null) {
+            // Ensure target user exists.
+            userDomainService.findById(userId);
 
-        // Ensure user belongs to the organization context.
-        if (!organizationDomainService.isMember(organizationId, userId)) {
-            throw new ForbiddenException(
-                    String.format("User %s is not a member of organization %s", userId, organizationId));
+            // Ensure user belongs to the organization context.
+            if (!organizationDomainService.isMember(organizationId, userId)) {
+                throw new ForbiddenException(
+                        String.format("User %s is not a member of organization %s", userId, organizationId));
+            }
         }
 
         UUID petId = UUID.randomUUID();
@@ -80,12 +82,14 @@ public class PetCommandUseCase implements PetCommandPort {
         pet.setShelterId(organizationId);
         Pet created = domainService.createForShelter(pet, organizationId);
 
-        currentOwnerRepository.upsert(PetCurrentOwner.builder()
+        if (userId != null) {
+            currentOwnerRepository.upsert(PetCurrentOwner.builder()
                 .petId(created.getId())
                 .ownerType("ORGANIZATION")
                 .ownerId(organizationId)
                 .caretakerUserId(userId)
                 .build());
+        }
 
         return created;
     }
