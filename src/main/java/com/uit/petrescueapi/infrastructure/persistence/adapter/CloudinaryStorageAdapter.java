@@ -70,14 +70,24 @@ public class CloudinaryStorageAdapter implements CloudStoragePort {
     }
 
     @Override
-    public String moveToPermament(String publicId, String targetSubFolder) {
+        public String moveToPermament(String publicId, String targetSubFolder, String resourceType) {
         try {
             String targetFolder = permanentFolder + (targetSubFolder != null ? "/" + targetSubFolder : "");
             String newPublicId = targetFolder + "/" + extractFileName(publicId);
 
             log.info("Moving file from {} to {}", publicId, newPublicId);
 
-            cloudinary.uploader().rename(publicId, newPublicId, ObjectUtils.emptyMap());
+            cloudinary.uploader().rename(publicId, newPublicId, ObjectUtils.asMap(
+                "resource_type", resourceType != null ? resourceType : "image",
+                "invalidate", true
+            ));
+
+            cloudinary.uploader().explicit(newPublicId, ObjectUtils.asMap(
+                "resource_type", resourceType != null ? resourceType : "image",
+                    "type", "upload",
+                "asset_folder", targetFolder,
+                "invalidate", true
+            ));
 
             log.info("Successfully moved file to: {}", newPublicId);
             return newPublicId;

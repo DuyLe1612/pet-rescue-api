@@ -26,7 +26,7 @@ public interface CloudStoragePort {
      * @param targetFolder Target folder for permanent storage
      * @return New public ID after move
      */
-    String moveToPermament(String publicId, String targetFolder);
+    String moveToPermament(String publicId, String targetFolder, String resourceType);
 
     /**
      * Delete a file from cloud storage.

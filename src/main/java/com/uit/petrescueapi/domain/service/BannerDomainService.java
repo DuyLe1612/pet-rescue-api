@@ -68,7 +68,9 @@ public class BannerDomainService {
      */
     public Banner create(Banner banner) {
         log.info("Creating banner: {}", banner.getTitle());
-        banner.setBannerId(UUID.randomUUID());
+        if (banner.getBannerId() == null) {
+            banner.setBannerId(UUID.randomUUID());
+        }
         banner.setCreatedAt(LocalDateTime.now());
         
         // Set defaults

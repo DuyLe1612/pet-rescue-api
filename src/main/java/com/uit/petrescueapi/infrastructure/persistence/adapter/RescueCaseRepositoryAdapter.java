@@ -45,7 +45,7 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
 
             if ("TEMP".equals(mf.getStatus())) {
                 String targetFolder = "rescues/" + saved.getCaseId();
-                String newPublicId = cloudStoragePort.moveToPermament(mf.getPublicId(), targetFolder);
+                String newPublicId = cloudStoragePort.moveToPermament(mf.getPublicId(), targetFolder, mf.getResourceType());
                 mf.setPublicId(newPublicId);
                 mf.setStatus("PERMANENT");
                 mf.setFolder(targetFolder);

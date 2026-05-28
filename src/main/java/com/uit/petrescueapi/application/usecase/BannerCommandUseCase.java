@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.usecase;
 import com.uit.petrescueapi.application.dto.banner.CreateBannerRequestDto;
 import com.uit.petrescueapi.application.dto.banner.UpdateBannerRequestDto;
 import com.uit.petrescueapi.application.port.command.BannerCommandPort;
+import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.domain.entity.Banner;
 import com.uit.petrescueapi.domain.service.BannerDomainService;
 import lombok.RequiredArgsConstructor;
@@ -20,15 +21,19 @@ import java.util.UUID;
 public class BannerCommandUseCase implements BannerCommandPort {
 
     private final BannerDomainService domainService;
+    private final MediaCommandPort mediaCommandPort;
 
     @Override
     public Banner create(CreateBannerRequestDto cmd) {
         log.debug("Command: create banner with title {}", cmd.getTitle());
+        UUID bannerId = UUID.randomUUID();
+        UUID mediaId = confirmBannerMedia(cmd.getMediaId(), bannerId);
         Banner banner = Banner.builder()
+                .bannerId(bannerId)
                 .title(cmd.getTitle())
                 .subtitle(cmd.getSubtitle())
                 .buttonText(cmd.getButtonText())
-                .mediaId(cmd.getMediaId())
+                .mediaId(mediaId)
                 .linkUrl(cmd.getLinkUrl())
                 .linkType(cmd.getLinkType())
                 .displayOrder(cmd.getDisplayOrder())
@@ -43,11 +48,12 @@ public class BannerCommandUseCase implements BannerCommandPort {
     @Override
     public Banner update(UUID bannerId, UpdateBannerRequestDto cmd) {
         log.debug("Command: update banner {}", bannerId);
+        UUID mediaId = confirmBannerMedia(cmd.getMediaId(), bannerId);
         Banner updated = Banner.builder()
                 .title(cmd.getTitle())
                 .subtitle(cmd.getSubtitle())
                 .buttonText(cmd.getButtonText())
-                .mediaId(cmd.getMediaId())
+            .mediaId(mediaId)
                 .linkUrl(cmd.getLinkUrl())
                 .linkType(cmd.getLinkType())
                 .displayOrder(cmd.getDisplayOrder())
@@ -69,6 +75,20 @@ public class BannerCommandUseCase implements BannerCommandPort {
     public Banner updateDisplayOrder(UUID bannerId, Integer displayOrder) {
         log.debug("Command: update display order for banner {} to {}", bannerId, displayOrder);
         return domainService.updateDisplayOrder(bannerId, displayOrder);
+    }
+
+    private UUID confirmBannerMedia(UUID mediaId, UUID bannerId) {
+        if (mediaId == null) {
+            return null;
+        }
+
+        try {
+            mediaCommandPort.confirmUpload(mediaId, "banners/" + bannerId);
+        } catch (RuntimeException ignored) {
+            // Already permanent or otherwise not confirmable; keep the existing media reference.
+        }
+
+        return mediaId;
     }
 
     @Override

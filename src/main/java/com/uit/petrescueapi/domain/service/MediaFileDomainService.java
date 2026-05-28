@@ -69,7 +69,7 @@ public class MediaFileDomainService {
         }
         
         // Move file in Cloudinary
-        String newPublicId = cloudStoragePort.moveToPermament(mediaFile.getPublicId(), targetFolder);
+        String newPublicId = cloudStoragePort.moveToPermament(mediaFile.getPublicId(), targetFolder, mediaFile.getResourceType());
         
         // Update database record
         mediaFile.setPublicId(newPublicId);

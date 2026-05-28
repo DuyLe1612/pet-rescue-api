@@ -42,7 +42,7 @@ public class PostRepositoryAdapter implements PostRepository {
 
                 if ("TEMP".equals(mediaEntity.getStatus())) {
                     String targetFolder = "posts/" + post.getPostId();
-                    String newPublicId = cloudStoragePort.moveToPermament(mediaEntity.getPublicId(), targetFolder);
+                    String newPublicId = cloudStoragePort.moveToPermament(mediaEntity.getPublicId(), targetFolder, mediaEntity.getResourceType());
                     mediaEntity.setPublicId(newPublicId);
                     mediaEntity.setStatus("PERMANENT");
                     mediaEntity.setFolder(targetFolder);
