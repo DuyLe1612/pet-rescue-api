@@ -47,9 +47,9 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                o.organization_id AS organizationId,
                o.name AS organizationName,
                o.province_name AS provinceName,
-               CAST(NULLIF(o.province_code) AS INTEGER) AS provinceCode,
+               CAST(NULLIF(o.province_code, '') AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
-               CAST(NULLIF(o.ward_code) AS INTEGER) AS wardCode
+               CAST(NULLIF(o.ward_code, '') AS INTEGER) AS wardCode
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         LEFT JOIN users u ON pco.owner_type = 'USER' AND pco.owner_id = u.user_id
