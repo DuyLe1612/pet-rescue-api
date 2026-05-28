@@ -17,6 +17,12 @@ public interface ChatMessageJpaRepository extends JpaRepository<ChatMessageJpaEn
 
     Page<ChatMessageJpaEntity> findByConversationIdOrderBySentAtDesc(UUID conversationId, Pageable pageable);
 
+        Page<ChatMessageJpaEntity> findByConversationIdAndSentAtBeforeOrderBySentAtDesc(
+            UUID conversationId,
+            LocalDateTime cursor,
+            Pageable pageable
+        );
+
     @Modifying
     @Query("UPDATE ChatMessageJpaEntity m SET m.seen = true WHERE m.conversationId = :conversationId AND m.senderId <> :viewerId AND m.sentAt <= :readAt")
     void markMessagesSeen(@Param("conversationId") UUID conversationId,

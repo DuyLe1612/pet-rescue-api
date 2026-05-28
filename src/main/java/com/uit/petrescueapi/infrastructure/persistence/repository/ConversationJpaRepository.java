@@ -21,7 +21,10 @@ public interface ConversationJpaRepository extends JpaRepository<ConversationJpa
     @Query(value = """
             SELECT c.conversation_id AS id,
                    c.type AS type,
-                   COALESCE(c.name, u.full_name, u.username) AS name,
+           COALESCE(NULLIF(u.full_name, ''), u.username, c.name) AS name,
+           u.user_id AS otherUserId,
+           COALESCE(NULLIF(u.full_name, ''), u.username) AS otherUserName,
+           u.avatar_url AS otherUserAvatarUrl,
                    c.related_info AS relatedInfo,
                    c.related_entity_id AS relatedEntityId,
                    lm.content AS lastMessage,

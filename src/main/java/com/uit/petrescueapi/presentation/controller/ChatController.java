@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.chat.ChatMessageDto;
+import com.uit.petrescueapi.application.dto.chat.ChatMessageCursorResponseDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationCursorResponseDto;
 import com.uit.petrescueapi.application.dto.chat.CreateConversationRequestDto;
 import com.uit.petrescueapi.application.dto.chat.CreateMessageRequestDto;
@@ -9,9 +10,7 @@ import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.command.ChatCommandPort;
 import com.uit.petrescueapi.application.port.query.ChatQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
-import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.ChatWebMapper;
-import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -54,16 +53,14 @@ public class ChatController {
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
-    @Operation(summary = "Get messages in a conversation (paged)")
-    public ResponseEntity<ApiResponse<PageResponse<ChatMessageDto>>> listMessages(
+    @Operation(summary = "Get messages in a conversation (cursor)")
+    public ResponseEntity<ApiResponse<ChatMessageCursorResponseDto>> listMessages(
             @PathVariable UUID conversationId,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) LocalDateTime cursor,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(queryPort.listMessages(conversationId, userId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.listMessagesByCursor(conversationId, userId, cursor, pageSize)));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")

@@ -12,6 +12,9 @@ public class ConversationSummaryDto {
     private UUID id;
     private String type;
     private String name;
+    private UUID otherUserId;
+    private String otherUserName;
+    private String otherUserAvatarUrl;
     private String lastMessage;
     private LocalDateTime lastTime;
     private int unread;

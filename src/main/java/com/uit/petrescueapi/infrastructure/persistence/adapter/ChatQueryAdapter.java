@@ -5,6 +5,7 @@ import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.repository.ConversationParticipantRepository;
+import com.uit.petrescueapi.infrastructure.persistence.entity.ChatMessageJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.ConversationSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.repository.ChatMessageJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.ConversationJpaRepository;
@@ -32,11 +33,15 @@ public class ChatQueryAdapter implements ChatQueryDataPort {
     }
 
     @Override
-    public Page<ChatMessageDto> listMessages(UUID conversationId, UUID userId, Pageable pageable) {
+        public Page<ChatMessageDto> listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Pageable pageable) {
         participantRepository.findByConversationIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new BusinessException("User not in conversation", "CHAT_FORBIDDEN"));
 
-        return messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable)
+        Page<ChatMessageJpaEntity> page = cursor == null
+            ? messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable)
+            : messageRepository.findByConversationIdAndSentAtBeforeOrderBySentAtDesc(conversationId, cursor, pageable);
+
+        return page
                 .map(message -> ChatMessageDto.builder()
                         .id(message.getMessageId())
                         .senderId(message.getSenderId())
@@ -51,6 +56,9 @@ public class ChatQueryAdapter implements ChatQueryDataPort {
                 .id(projection.getId())
                 .type(projection.getType())
                 .name(projection.getName())
+                .otherUserId(projection.getOtherUserId())
+                .otherUserName(projection.getOtherUserName())
+                .otherUserAvatarUrl(projection.getOtherUserAvatarUrl())
                 .lastMessage(projection.getLastMessage())
                 .lastTime(projection.getLastTime())
                 .unread(projection.getUnread() == null ? 0 : projection.getUnread())

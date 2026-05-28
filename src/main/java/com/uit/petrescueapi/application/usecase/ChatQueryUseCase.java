@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.chat.ChatMessageDto;
+import com.uit.petrescueapi.application.dto.chat.ChatMessageCursorResponseDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationCursorResponseDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
@@ -40,8 +41,21 @@ public class ChatQueryUseCase implements ChatQueryPort {
     }
 
     @Override
-    public Page<ChatMessageDto> listMessages(UUID conversationId, UUID userId, Pageable pageable) {
-        log.debug("Query: list messages for conversation {} (user {})", conversationId, userId);
-        return chatQueryDataPort.listMessages(conversationId, userId, pageable);
+    public ChatMessageCursorResponseDto listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, int size) {
+        log.debug("Query: list messages by cursor for conversation {} (user {})", conversationId, userId);
+        Page<ChatMessageDto> page = chatQueryDataPort.listMessagesByCursor(
+                conversationId,
+                userId,
+                cursor,
+                org.springframework.data.domain.PageRequest.of(0, size)
+        );
+        var items = page.getContent();
+        LocalDateTime nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getTime();
+        boolean hasMore = items.size() == size;
+        return ChatMessageCursorResponseDto.builder()
+                .items(items)
+                .nextCursor(nextCursor)
+                .hasMore(hasMore)
+                .build();
     }
 }

@@ -7,6 +7,9 @@ public interface ConversationSummaryProjection {
     UUID getId();
     String getType();
     String getName();
+    UUID getOtherUserId();
+    String getOtherUserName();
+    String getOtherUserAvatarUrl();
     String getRelatedInfo();
     UUID getRelatedEntityId();
     String getLastMessage();
