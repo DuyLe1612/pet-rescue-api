@@ -51,7 +51,6 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     private RescueCase buildFromDto(CreateRescueCaseRequestDto cmd) {
         return RescueCase.builder()
                 .petId(cmd.getPetId())
-                .organizationId(cmd.getOrganizationId())
                 .species(cmd.getSpecies())
                 .color(cmd.getColor())
                 .size(cmd.getSize())

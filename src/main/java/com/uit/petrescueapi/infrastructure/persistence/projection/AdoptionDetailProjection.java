@@ -31,4 +31,6 @@ public interface AdoptionDetailProjection {
     LocalDateTime getDecidedAt();
     UUID getDecidedBy();
     String getDecidedByUsername();
+    String getRejectReason();
+    LocalDateTime getReadyAt();
 }

@@ -41,6 +41,9 @@ public class AdoptionResponseDto {
     @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"})
     private String status;
 
+    @Schema(example = "Please consider my work schedule and home setup.")
+    private String note;
+
     @Schema(example = "I have experience with dogs and a large backyard.")
     private String experience;
 

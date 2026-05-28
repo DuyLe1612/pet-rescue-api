@@ -81,12 +81,15 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .organizationId(p.getOrganizationId())
                 .organizationName(p.getOrganizationName())
                 .status(p.getStatus())
+            .note(p.getNote())
                 .experience(p.getExperience())
                 .liveCondition(p.getLiveCondition())
                 .createdAt(p.getCreatedAt())
                 .decidedAt(p.getDecidedAt())
                 .decidedBy(p.getDecidedBy())
                 .decidedByUsername(p.getDecidedByUsername())
+                .rejectReason(p.getRejectReason())
+                .readyAt(p.getReadyAt())
                 .build();
     }
 

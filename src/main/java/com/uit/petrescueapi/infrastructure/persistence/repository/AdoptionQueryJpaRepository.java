@@ -71,7 +71,9 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.note            AS note,
                a.decidedAt       AS decidedAt,
                a.decidedBy       AS decidedBy,
-               d.username        AS decidedByUsername
+             d.username        AS decidedByUsername,
+             a.rejectReason    AS rejectReason,
+             a.readyAt         AS readyAt
         FROM AdoptionApplicationJpaEntity a
         LEFT JOIN PetJpaEntity p ON a.petId = p.id
         LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
@@ -93,7 +95,8 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.status          AS status,
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
-               a.createdAt       AS createdAt
+               a.createdAt       AS createdAt,
+               a.readyAt         AS readyAt
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
