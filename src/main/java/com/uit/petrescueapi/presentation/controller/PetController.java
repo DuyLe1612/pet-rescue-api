@@ -137,7 +137,7 @@ public class PetController {
                 status.stream().map(this::parsePetStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
-                        species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
+                        species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -154,7 +154,7 @@ public class PetController {
             @RequestParam(required = false) UUID organizationId) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAvailableWithFilters(
-                        species, breed, gender, organizationId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
+                        species, breed, gender, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -171,7 +171,7 @@ public class PetController {
             @RequestParam(required = false) String gender) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findByOrganizationId(
-                        organizationId, species, breed, gender, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
+                        organizationId, species, breed, gender, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -188,7 +188,7 @@ public class PetController {
             @RequestParam(required = false) String gender) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findByUserId(
-                        userId, species, breed, gender, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
+                        userId, species, breed, gender, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

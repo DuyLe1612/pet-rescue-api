@@ -73,7 +73,7 @@ public class RescueCaseController {
             @RequestParam(defaultValue = "reportedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+            PageResponse.from(queryPort.findAll(search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/nearby")
@@ -87,7 +87,7 @@ public class RescueCaseController {
             @RequestParam(defaultValue = "reportedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findNearby(lat, lng, distance, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+            PageResponse.from(queryPort.findNearby(lat, lng, distance, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/map/bounding-box")
@@ -102,7 +102,7 @@ public class RescueCaseController {
             @RequestParam(defaultValue = "reportedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+            PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

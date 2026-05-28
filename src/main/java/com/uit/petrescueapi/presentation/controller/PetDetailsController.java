@@ -20,6 +20,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 import java.util.UUID;
 
 @RestController
@@ -56,11 +59,12 @@ public class PetDetailsController {
     public ResponseEntity<ApiResponse<PageResponse<PetMedicalRecordResponseDto>>> getMedicalRecords(
             @PathVariable UUID petId,
             @RequestParam(defaultValue = "0") int page,
-                        @RequestParam(defaultValue = "20") int pageSize,
-                        @RequestParam(defaultValue = "createdAt") String sortBy,
-                        @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return ResponseEntity.ok(ApiResponse.ok(
-                                PageResponse.from(queryPort.findMedicalRecords(petId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findMedicalRecords(petId, PageRequest.of(page, pageSize, Sort.by(direction, sortBy))))));
     }
 
     @GetMapping("/ownerships")
@@ -69,10 +73,10 @@ public class PetDetailsController {
             @PathVariable UUID petId,
             @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int pageSize,
-                        @RequestParam(defaultValue = "createdAt") String sortBy,
+                        @RequestParam(defaultValue = "fromTime") String sortBy,
                         @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                                PageResponse.from(queryPort.findOwnerships(petId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                                PageResponse.from(queryPort.findOwnerships(petId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/media")
@@ -85,7 +89,7 @@ public class PetDetailsController {
                         @RequestParam(defaultValue = "createdAt") String sortBy,
                         @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                                PageResponse.from(queryPort.findDiaryMedia(petId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                                PageResponse.from(queryPort.findDiaryMedia(petId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
         @PostMapping(value = "/media", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)

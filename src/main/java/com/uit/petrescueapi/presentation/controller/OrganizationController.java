@@ -200,7 +200,7 @@ public class OrganizationController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
-                queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder))
+            queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder))
         )));
     }
 

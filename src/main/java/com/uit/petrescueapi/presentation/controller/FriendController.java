@@ -63,7 +63,7 @@ public class FriendController {
             @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(queryPort.listFriends(userId, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(queryPort.listFriends(userId, search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/requests/pending")

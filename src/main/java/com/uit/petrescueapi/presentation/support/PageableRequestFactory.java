@@ -10,6 +10,12 @@ public final class PageableRequestFactory {
     }
 
     public static Pageable of(int page, int pageSize, String sortBy, String sortOrder) {
+        String resolvedSortBy = (sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy.trim();
+        Sort.Direction direction = "asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC;
+        return PageRequest.of(page, pageSize, Sort.by(direction, resolvedSortBy));
+    }
+
+    public static Pageable ofNative(int page, int pageSize, String sortBy, String sortOrder) {
         String resolvedSortBy = normalizeSortField((sortBy == null || sortBy.isBlank()) ? "createdAt" : sortBy.trim());
         Sort.Direction direction = "asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return PageRequest.of(page, pageSize, Sort.by(direction, resolvedSortBy));
