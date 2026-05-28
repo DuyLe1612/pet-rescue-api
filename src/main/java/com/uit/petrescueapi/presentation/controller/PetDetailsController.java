@@ -63,7 +63,7 @@ public class PetDetailsController {
 
     @GetMapping("/ownerships")
     @Operation(summary = "List ownership history for a pet")
-    public ResponseEntity<ApiResponse<PageResponse<PetOwnershipResponseDto>>> getOwnerships(
+        public ResponseEntity<ApiResponse<PageResponse<PetOwnershipHistoryDisplayDto>>> getOwnerships(
             @PathVariable UUID petId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {

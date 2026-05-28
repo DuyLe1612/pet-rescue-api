@@ -2,24 +2,21 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.media.PetMediaResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetMedicalRecordResponseDto;
-import com.uit.petrescueapi.application.dto.pet.PetOwnershipResponseDto;
+import com.uit.petrescueapi.application.dto.pet.PetOwnershipHistoryDisplayDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.PetDetailsQueryDataPort;
 import com.uit.petrescueapi.infrastructure.persistence.entity.PetMedicalRecordJpaEntity;
-import com.uit.petrescueapi.infrastructure.persistence.entity.PetsCurrentOwnerJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.PetMediaProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.PetOwnershipHistoryProjection;
+import com.uit.petrescueapi.infrastructure.persistence.repository.PetOwnershipJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.PetMediaJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.PetMedicalRecordJpaRepository;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PetsCurrentOwnerJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -37,7 +34,7 @@ import java.util.UUID;
 public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
 
     private final PetMedicalRecordJpaRepository petMedicalRecordJpaRepo;
-    private final PetsCurrentOwnerJpaRepository petsCurrentOwnerJpaRepo;
+    private final PetOwnershipJpaRepository petOwnershipJpaRepo;
     private final PetMediaJpaRepository petMediaJpaRepo;
     private final CloudStoragePort cloudStoragePort;
 
@@ -52,13 +49,9 @@ public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
     // ── Ownerships ──────────────────────────────
 
     @Override
-    public Page<PetOwnershipResponseDto> findOwnerships(UUID petId, Pageable pageable) {
-        // PetsCurrentOwnerJpaEntity uses petId as @Id — single row per pet
-        Optional<PetsCurrentOwnerJpaEntity> opt = petsCurrentOwnerJpaRepo.findById(petId);
-        List<PetOwnershipResponseDto> list = opt
-                .map(e -> List.of(toOwnershipDto(e)))
-                .orElse(List.of());
-        return new PageImpl<>(list, pageable, list.size());
+    public Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable) {
+        return petOwnershipJpaRepo.findHistoryByPetId(petId, pageable)
+                .map(this::toOwnershipHistoryDto);
     }
 
     // ── Diary media ─────────────────────────────
@@ -90,11 +83,11 @@ public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
                 .build();
     }
 
-    private PetOwnershipResponseDto toOwnershipDto(PetsCurrentOwnerJpaEntity e) {
-        return PetOwnershipResponseDto.builder()
-                .petId(e.getPetId())
-                .ownerType(e.getOwnerType())
-                .ownerId(e.getOwnerId())
+    private PetOwnershipHistoryDisplayDto toOwnershipHistoryDto(PetOwnershipHistoryProjection projection) {
+        return PetOwnershipHistoryDisplayDto.builder()
+                .ownerType(projection.getOwnerType())
+                .ownerName(projection.getOwnerName())
+                .timestamp(projection.getHistoryTimestamp())
                 .build();
     }
 

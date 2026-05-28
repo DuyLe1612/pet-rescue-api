@@ -17,7 +17,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class CreateRescueCaseRequestDto {
     private UUID petId;
-    private UUID organizationId;
     private String species;
     private String color;
     private String size;

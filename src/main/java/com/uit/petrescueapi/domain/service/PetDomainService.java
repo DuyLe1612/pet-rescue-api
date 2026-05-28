@@ -94,7 +94,7 @@ public class PetDomainService {
             pet.setId(UUID.randomUUID());
         }
         pet.setPetCode(visualCodeRepository.nextPetCode());
-        pet.setStatus(PetStatus.UNOWNED);
+        pet.setStatus(PetStatus.ADOPTED);
         pet.setCreatedAt(LocalDateTime.now());
         Pet saved = petRepository.save(pet);
 

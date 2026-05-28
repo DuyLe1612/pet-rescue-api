@@ -2,7 +2,7 @@ package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.media.PetMediaResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetMedicalRecordResponseDto;
-import com.uit.petrescueapi.application.dto.pet.PetOwnershipResponseDto;
+import com.uit.petrescueapi.application.dto.pet.PetOwnershipHistoryDisplayDto;
 import com.uit.petrescueapi.application.port.out.PetDetailsQueryDataPort;
 import com.uit.petrescueapi.application.port.query.PetDetailsQueryPort;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class PetDetailsQueryUseCase implements PetDetailsQueryPort {
     }
 
     @Override
-    public Page<PetOwnershipResponseDto> findOwnerships(UUID petId, Pageable pageable) {
+    public Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable) {
         log.debug("Query: find ownerships for pet {}", petId);
         return queryDataPort.findOwnerships(petId, pageable);
     }
