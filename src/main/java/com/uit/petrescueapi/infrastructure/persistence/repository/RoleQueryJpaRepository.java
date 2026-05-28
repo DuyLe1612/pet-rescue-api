@@ -28,8 +28,11 @@ public interface RoleQueryJpaRepository extends JpaRepository<RoleJpaEntity, Int
                r.code    AS code,
                r.name    AS name
         FROM RoleJpaEntity r
+         WHERE (:search IS NULL OR :search = '' OR
+             LOWER(r.code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+             LOWER(r.name) LIKE LOWER(CONCAT('%', :search, '%')))
     """)
-    Page<RoleSummaryProjection> findAllSummary(Pageable pageable);
+        Page<RoleSummaryProjection> findAllSummary(@Param("search") String search, Pageable pageable);
 
     // ── Detail (single role) ────────────────────
 

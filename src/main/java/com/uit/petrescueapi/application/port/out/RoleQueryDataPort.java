@@ -16,7 +16,7 @@ import java.util.List;
  */
 public interface RoleQueryDataPort {
 
-    Page<RoleSummaryResponseDto> findAllSummaries(Pageable pageable);
+    Page<RoleSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 
     RoleResponseDto findById(Integer roleId);
 

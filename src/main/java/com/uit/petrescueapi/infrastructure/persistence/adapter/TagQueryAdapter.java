@@ -26,8 +26,8 @@ public class TagQueryAdapter implements TagQueryDataPort {
     // ── List (summary) queries ──────────────────
 
     @Override
-    public Page<TagSummaryResponseDto> findAllSummaries(Pageable pageable) {
-        return queryRepo.findAllSummary(pageable).map(this::toSummaryDto);
+    public Page<TagSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
+        return queryRepo.findAllSummary(search, pageable).map(this::toSummaryDto);
     }
 
     // ── Projection → DTO mappers ────────────────

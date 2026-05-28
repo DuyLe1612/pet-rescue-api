@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface FriendQueryPort {
 
-    Page<FriendSummaryDto> listFriends(UUID userId, Pageable pageable);
+    Page<FriendSummaryDto> listFriends(UUID userId, String search, Pageable pageable);
 
-    Page<FriendRequestDto> listPendingRequests(UUID userId, Pageable pageable);
+    Page<FriendRequestDto> listPendingRequests(UUID userId, String search, Pageable pageable);
 }

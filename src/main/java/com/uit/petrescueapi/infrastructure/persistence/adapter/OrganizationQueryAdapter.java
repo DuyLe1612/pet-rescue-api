@@ -32,11 +32,11 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     private final OrganizationMemberJpaRepository memberRepo;
 
     @Override
-    public Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, Pageable pageable) {
+    public Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, String search, Pageable pageable) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
                 ? Arrays.stream(OrganizationStatus.values()).toList()
                 : statuses;
-        return queryRepo.findAllSummary(normalizedStatuses, pageable).map(this::toSummaryDto);
+        return queryRepo.findAllSummary(normalizedStatuses, search, pageable).map(this::toSummaryDto);
     }
 
     @Override
@@ -62,12 +62,12 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     }
 
         @Override
-        public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, Pageable pageable) {
+        public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
             ? Arrays.stream(OrganizationStatus.values()).toList()
             : statuses;
         List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
-        return queryRepo.findWithinBoundingBoxSummary(minLat, minLng, maxLat, maxLng, statusNames, pageable)
+        return queryRepo.findWithinBoundingBoxSummary(minLat, minLng, maxLat, maxLng, statusNames, search, pageable)
             .map(this::toSummaryDto);
         }
 

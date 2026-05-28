@@ -20,14 +20,14 @@ public class FriendQueryUseCase implements FriendQueryPort {
     private final FriendQueryDataPort friendQueryDataPort;
 
     @Override
-    public Page<FriendSummaryDto> listFriends(UUID userId, Pageable pageable) {
-        log.debug("Query: list friends for user {}", userId);
-        return friendQueryDataPort.listFriends(userId, pageable);
+    public Page<FriendSummaryDto> listFriends(UUID userId, String search, Pageable pageable) {
+        log.debug("Query: list friends for user {} (search={})", userId, search);
+        return friendQueryDataPort.listFriends(userId, search, pageable);
     }
 
     @Override
-    public Page<FriendRequestDto> listPendingRequests(UUID userId, Pageable pageable) {
-        log.debug("Query: list pending requests for user {}", userId);
-        return friendQueryDataPort.listPendingRequests(userId, pageable);
+    public Page<FriendRequestDto> listPendingRequests(UUID userId, String search, Pageable pageable) {
+        log.debug("Query: list pending requests for user {} (search={})", userId, search);
+        return friendQueryDataPort.listPendingRequests(userId, search, pageable);
     }
 }

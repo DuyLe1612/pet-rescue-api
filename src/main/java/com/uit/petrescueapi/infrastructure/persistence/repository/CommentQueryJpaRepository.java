@@ -32,10 +32,32 @@ public interface CommentQueryJpaRepository extends JpaRepository<CommentJpaEntit
         WHERE c.deleted = false
           AND c.postId = :postId
           AND c.parentCommentId IS NULL
-          AND (:cursor IS NULL OR c.createdAt < :cursor)
         ORDER BY c.createdAt DESC, c.commentId DESC
     """)
     Page<CommentSummaryProjection> findParentCommentsByPostId(
+            @Param("postId") UUID postId,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT c.commentId       AS commentId,
+               c.postId          AS postId,
+               c.parentCommentId AS parentCommentId,
+               c.authorId        AS authorId,
+               u.username        AS authorUsername,
+               c.content         AS content,
+               c.likeCount       AS likeCount,
+               c.replyCount      AS replyCount,
+               c.createdAt       AS createdAt
+        FROM CommentJpaEntity c
+        LEFT JOIN UserJpaEntity u ON c.authorId = u.userId
+        WHERE c.deleted = false
+          AND c.postId = :postId
+          AND c.parentCommentId IS NULL
+          AND c.createdAt < :cursor
+        ORDER BY c.createdAt DESC, c.commentId DESC
+    """)
+    Page<CommentSummaryProjection> findParentCommentsByPostIdBeforeCursor(
             @Param("postId") UUID postId,
             @Param("cursor") LocalDateTime cursor,
             Pageable pageable

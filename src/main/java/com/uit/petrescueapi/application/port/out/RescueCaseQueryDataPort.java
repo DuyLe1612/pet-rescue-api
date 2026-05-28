@@ -21,7 +21,7 @@ public interface RescueCaseQueryDataPort {
 
     RescueCaseResponseDto findById(UUID caseId);
 
-    Page<RescueCaseSummaryResponseDto> findAllSummaries(Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 
     Page<RescueCaseSummaryResponseDto> findNearbySummaries(double lat, double lng, double distanceMeters, Pageable pageable);
 

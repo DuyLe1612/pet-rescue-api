@@ -6,11 +6,11 @@ import com.uit.petrescueapi.application.port.query.PostQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.PostWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -79,10 +79,13 @@ public class PostController {
             description = "Returns paginated post summaries."
     )
     public ResponseEntity<ApiResponse<PageResponse<PostSummaryResponseDto>>> getAll(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/feed")
@@ -92,9 +95,9 @@ public class PostController {
     )
     public ResponseEntity<ApiResponse<PostCursorResponseDto>> getFeed(
             @RequestParam(required = false) LocalDateTime cursor,
-            @RequestParam(defaultValue = "20") int size,
+                        @RequestParam(defaultValue = "20") int pageSize,
             Authentication authentication) {
         UUID viewerId = authentication != null ? UUID.fromString(authentication.getName()) : null;
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, size, viewerId)));
+                return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, pageSize, viewerId)));
     }
 }

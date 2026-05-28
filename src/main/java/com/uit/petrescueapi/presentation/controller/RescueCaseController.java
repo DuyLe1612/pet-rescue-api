@@ -8,11 +8,11 @@ import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -67,10 +67,13 @@ public class RescueCaseController {
     @GetMapping
     @Operation(summary = "List all rescue cases")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getAll(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "reportedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/nearby")
@@ -80,9 +83,11 @@ public class RescueCaseController {
             @RequestParam double lng,
             @RequestParam(defaultValue = "5000") double distance,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "reportedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findNearby(lat, lng, distance, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findNearby(lat, lng, distance, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/map/bounding-box")
@@ -93,9 +98,11 @@ public class RescueCaseController {
             @RequestParam double maxLat,
             @RequestParam double maxLng,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "reportedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -54,10 +54,15 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
       FROM rescue_cases rc
       LEFT JOIN users u ON rc.reported_by = u.user_id
       WHERE rc.is_deleted = false
+         AND (:search IS NULL OR :search = '' OR
+              LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
     """,
-    countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc WHERE rc.is_deleted = false",
+    countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc LEFT JOIN users u ON rc.reported_by = u.user_id WHERE rc.is_deleted = false AND (:search IS NULL OR :search = '' OR LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%'))) ",
     nativeQuery = true)
-    Page<RescueCaseSummaryProjection> findAllSummaries(Pageable pageable);
+    Page<RescueCaseSummaryProjection> findAllSummaries(@Param("search") String search, Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
 

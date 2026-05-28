@@ -36,8 +36,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     // ── List (summary) queries ──────────────────
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAllSummaries(Pageable pageable) {
-        return queryRepo.findAllSummaries(pageable).map(this::toSummaryDto);
+    public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
+        return queryRepo.findAllSummaries(search, pageable).map(this::toSummaryDto);
     }
 
     @Override

@@ -10,6 +10,7 @@ import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.OrganizationWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -141,12 +142,15 @@ public class OrganizationController {
     @Operation(summary = "List organizations (paginated, optional status filter)")
     public ResponseEntity<ApiResponse<PageResponse<OrganizationSummaryResponseDto>>> getAll(
             @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         List<OrganizationStatus> statusList = status == null ? null : 
             status.stream().map(this::parseOrganizationStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(statusList, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAll(statusList, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/{id}/members")
@@ -154,9 +158,11 @@ public class OrganizationController {
     public ResponseEntity<ApiResponse<PageResponse<OrganizationMemberResponseDto>>> getMembers(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findMembers(id, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findMembers(id, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/map/markers")
@@ -187,11 +193,14 @@ public class OrganizationController {
             @RequestParam double maxLat,
             @RequestParam double maxLng,
             @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
-                queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, PageRequest.of(page, size))
+                queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder))
         )));
     }
 

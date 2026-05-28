@@ -34,14 +34,14 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
     }
 
     @Override
-    public Page<AdoptionSummaryResponseDto> findAll(List<String> statuses, Pageable pageable) {
-        log.debug("Query: find all adoption applications (statuses={}, paginated)", statuses);
-        return queryDataPort.findAllSummaries(statuses, pageable);
+    public Page<AdoptionSummaryResponseDto> findAll(List<String> statuses, String search, Pageable pageable) {
+        log.debug("Query: find all adoption applications (statuses={}, search={}, paginated)", statuses, search);
+        return queryDataPort.findAllSummaries(statuses, search, pageable);
     }
 
     @Override
-    public Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, Pageable pageable) {
-        log.debug("Query: find adoption applications by applicant id {} (statuses={}, paginated)", applicantId, statuses);
-        return queryDataPort.findByApplicantIdSummaries(applicantId, statuses, pageable);
+    public Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, String search, Pageable pageable) {
+        log.debug("Query: find adoption applications by applicant id {} (statuses={}, search={}, paginated)", applicantId, statuses, search);
+        return queryDataPort.findByApplicantIdSummaries(applicantId, statuses, search, pageable);
     }
 }

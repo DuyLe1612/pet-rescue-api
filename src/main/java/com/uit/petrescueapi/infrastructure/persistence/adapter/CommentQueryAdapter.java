@@ -25,7 +25,10 @@ public class CommentQueryAdapter implements CommentQueryDataPort {
 
     @Override
     public Page<CommentSummaryDto> findParentCommentsByPostId(UUID postId, LocalDateTime cursor, Pageable pageable) {
-        return queryRepo.findParentCommentsByPostId(postId, cursor, pageable).map(this::toSummaryDto);
+        Page<CommentSummaryProjection> page = cursor == null
+                ? queryRepo.findParentCommentsByPostId(postId, pageable)
+                : queryRepo.findParentCommentsByPostIdBeforeCursor(postId, cursor, pageable);
+        return page.map(this::toSummaryDto);
     }
 
     @Override

@@ -15,13 +15,22 @@ import java.util.UUID;
 @Repository
 public interface BannerJpaRepository extends JpaRepository<BannerJpaEntity, UUID> {
 
-    Page<BannerJpaEntity> findByDeletedFalse(Pageable pageable);
-
-    Page<BannerJpaEntity> findByActiveAndDeletedFalse(boolean active, Pageable pageable);
-
-    Page<BannerJpaEntity> findByTargetPageAndDeletedFalse(String targetPage, Pageable pageable);
-
-    Page<BannerJpaEntity> findByTargetPageAndActiveAndDeletedFalse(String targetPage, boolean active, Pageable pageable);
+        @Query("""
+          SELECT b FROM BannerJpaEntity b
+          WHERE b.deleted = false
+            AND (:targetPage IS NULL OR b.targetPage = :targetPage)
+            AND (:active IS NULL OR b.active = :active)
+            AND (:search IS NULL OR :search = '' OR
+           LOWER(b.title) LIKE LOWER(CONCAT('%', :search, '%')) OR
+           LOWER(b.subtitle) LIKE LOWER(CONCAT('%', :search, '%')) OR
+           LOWER(b.buttonText) LIKE LOWER(CONCAT('%', :search, '%')) OR
+           LOWER(b.linkUrl) LIKE LOWER(CONCAT('%', :search, '%')) OR
+           LOWER(b.targetPage) LIKE LOWER(CONCAT('%', :search, '%')))
+          """)
+        Page<BannerJpaEntity> findAllFiltered(@Param("targetPage") String targetPage,
+                @Param("active") Boolean active,
+                @Param("search") String search,
+                Pageable pageable);
 
     /**
      * Find active banners for a specific target page that are within their display date range.

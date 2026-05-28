@@ -9,12 +9,12 @@ import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.BannerWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -110,11 +110,14 @@ public class BannerController {
     public ResponseEntity<ApiResponse<PageResponse<BannerResponseDto>>> getAll(
             @RequestParam(required = false) String targetPage,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         Boolean activeFilter = parseStatusFilter(status);
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAllFiltered(targetPage, activeFilter, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAllFiltered(targetPage, activeFilter, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     private Boolean parseStatusFilter(String status) {

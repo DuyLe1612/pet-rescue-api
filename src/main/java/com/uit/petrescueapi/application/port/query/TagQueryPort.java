@@ -5,5 +5,5 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface TagQueryPort {
-    Page<TagSummaryResponseDto> findAll(Pageable pageable);
+    Page<TagSummaryResponseDto> findAll(String search, Pageable pageable);
 }

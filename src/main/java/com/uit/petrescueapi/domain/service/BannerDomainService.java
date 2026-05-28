@@ -46,8 +46,8 @@ public class BannerDomainService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Banner> findAllFiltered(String targetPage, Boolean active, Pageable pageable) {
-        return bannerRepository.findAllFiltered(targetPage, active, pageable);
+    public Page<Banner> findAllFiltered(String targetPage, Boolean active, String search, Pageable pageable) {
+        return bannerRepository.findAllFiltered(targetPage, active, search, pageable);
     }
 
     @Transactional(readOnly = true)

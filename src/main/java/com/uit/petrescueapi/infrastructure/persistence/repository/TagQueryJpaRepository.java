@@ -27,6 +27,9 @@ public interface TagQueryJpaRepository extends JpaRepository<TagJpaEntity, UUID>
                t.name   AS name
         FROM TagJpaEntity t
         WHERE t.deleted = false
+          AND (:search IS NULL OR :search = '' OR
+               LOWER(t.code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(t.name) LIKE LOWER(CONCAT('%', :search, '%')))
     """)
-    Page<TagSummaryProjection> findAllSummary(Pageable pageable);
+    Page<TagSummaryProjection> findAllSummary(@org.springframework.data.repository.query.Param("search") String search, Pageable pageable);
 }

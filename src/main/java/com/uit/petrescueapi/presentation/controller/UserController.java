@@ -9,6 +9,7 @@ import com.uit.petrescueapi.application.port.query.UserQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.UserWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -71,10 +72,12 @@ public class UserController {
     @Operation(summary = "List all users")
     public ResponseEntity<ApiResponse<PageResponse<UserSummaryResponseDto>>> getAll(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) String searchName) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(searchName, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/{id}/reputation")

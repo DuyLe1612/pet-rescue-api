@@ -37,9 +37,11 @@ public interface PostQueryJpaRepository extends JpaRepository<PostJpaEntity, UUI
         FROM PostJpaEntity p
         LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
         WHERE p.deleted = false
-        ORDER BY p.createdAt DESC
+          AND (:search IS NULL OR :search = '' OR
+               LOWER(p.content) LIKE LOWER(CONCAT('%', :search, '%')) OR
+               LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
     """)
-    Page<PostSummaryProjection> findAllSummaries(Pageable pageable);
+    Page<PostSummaryProjection> findAllSummaries(@Param("search") String search, Pageable pageable);
 
     @Query("""
     SELECT p.postId       AS postId,

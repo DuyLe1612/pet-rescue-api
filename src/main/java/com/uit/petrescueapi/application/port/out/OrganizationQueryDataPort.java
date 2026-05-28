@@ -17,12 +17,12 @@ import java.util.UUID;
  * Implemented by the infrastructure query adapter.
  */
 public interface OrganizationQueryDataPort {
-    Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, Pageable pageable);
+    Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, String search, Pageable pageable);
     Optional<OrganizationResponseDto> findById(UUID id);
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);
     List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types);
     
-    Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, Pageable pageable);
+    Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable);
 
     List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types);
 }

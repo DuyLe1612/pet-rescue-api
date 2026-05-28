@@ -13,12 +13,12 @@ import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -122,12 +122,14 @@ public class PetController {
     @GetMapping
     @Operation(summary = "List all pets (paginated, with optional filters)")
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getAll(
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String breed,
             @RequestParam(required = false) String gender,
-            @RequestParam(required = false) String searchName,
             @RequestParam(required = false) java.util.List<String> status,
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID organizationId) {
@@ -135,7 +137,7 @@ public class PetController {
                 status.stream().map(this::parsePetStatus).toList();
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
-                        species, breed, gender, searchName, statusList, userId, organizationId, PageRequest.of(page, size)
+                        species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -143,14 +145,16 @@ public class PetController {
     @Operation(summary = "List available pets (paginated, with optional filters)")
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getAvailable(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String breed,
             @RequestParam(required = false) String gender,
             @RequestParam(required = false) UUID organizationId) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAvailableWithFilters(
-                        species, breed, gender, organizationId, PageRequest.of(page, size)
+                        species, breed, gender, organizationId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -159,13 +163,15 @@ public class PetController {
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getByOrganization(
             @PathVariable UUID organizationId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String breed,
             @RequestParam(required = false) String gender) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findByOrganizationId(
-                        organizationId, species, breed, gender, PageRequest.of(page, size)
+                        organizationId, species, breed, gender, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 
@@ -174,13 +180,15 @@ public class PetController {
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getByUser(
             @PathVariable UUID userId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String breed,
             @RequestParam(required = false) String gender) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findByUserId(
-                        userId, species, breed, gender, PageRequest.of(page, size)
+                        userId, species, breed, gender, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

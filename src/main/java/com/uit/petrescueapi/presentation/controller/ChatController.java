@@ -11,11 +11,11 @@ import com.uit.petrescueapi.application.port.query.ChatQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.ChatWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,10 +45,12 @@ public class ChatController {
     @Operation(summary = "List conversations by cursor for current user")
     public ResponseEntity<ApiResponse<ConversationCursorResponseDto>> listConversations(
             @RequestParam(required = false) LocalDateTime cursor,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.listConversationsByCursor(userId, cursor, size)));
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.listConversationsByCursor(userId, cursor, pageSize)));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")
@@ -56,10 +58,12 @@ public class ChatController {
     public ResponseEntity<ApiResponse<PageResponse<ChatMessageDto>>> listMessages(
             @PathVariable UUID conversationId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(queryPort.listMessages(conversationId, userId, PageRequest.of(page, size)))));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(queryPort.listMessages(conversationId, userId, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")

@@ -11,6 +11,6 @@ import java.util.UUID;
 
 public interface PostQueryPort {
     PostResponseDto findById(UUID postId);
-    Page<PostSummaryResponseDto> findAll(Pageable pageable);
+    Page<PostSummaryResponseDto> findAll(String search, Pageable pageable);
     PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId);
 }

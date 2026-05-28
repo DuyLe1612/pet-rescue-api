@@ -25,6 +25,21 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
                                                           @Param("status") FriendRequestStatus status,
                                                           Pageable pageable);
 
+        @Query("""
+          SELECT fr
+          FROM FriendRequestJpaEntity fr
+          JOIN UserJpaEntity requester ON requester.userId = fr.requesterId
+          WHERE fr.addresseeId = :userId
+            AND fr.status = :status
+            AND (:search IS NULL OR :search = '' OR
+           LOWER(requester.username) LIKE LOWER(CONCAT('%', :search, '%')) OR
+           LOWER(requester.fullName) LIKE LOWER(CONCAT('%', :search, '%')))
+          """)
+        Page<FriendRequestJpaEntity> findByAddresseeAndStatus(@Param("userId") UUID userId,
+                    @Param("status") FriendRequestStatus status,
+                    @Param("search") String search,
+                    Pageable pageable);
+
     @Query("SELECT fr FROM FriendRequestJpaEntity fr WHERE fr.requesterId = :userId AND fr.status = :status")
     Page<FriendRequestJpaEntity> findByRequesterAndStatus(@Param("userId") UUID userId,
                                                           @Param("status") FriendRequestStatus status,
@@ -44,15 +59,25 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
             WHERE (fr.requester_id = :userId OR fr.addressee_id = :userId)
               AND fr.status = 'ACCEPTED'
               AND fr.is_deleted = false
-            ORDER BY fr.updated_at DESC NULLS LAST, fr.created_at DESC
+            AND (:search IS NULL OR :search = '' OR
+                 LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
             """,
             countQuery = """
             SELECT COUNT(*)
             FROM friend_requests fr
+            JOIN users u
+              ON u.user_id = CASE
+                  WHEN fr.requester_id = :userId THEN fr.addressee_id
+                  ELSE fr.requester_id
+              END
             WHERE (fr.requester_id = :userId OR fr.addressee_id = :userId)
               AND fr.status = 'ACCEPTED'
               AND fr.is_deleted = false
+              AND (:search IS NULL OR :search = '' OR
+                   LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                   LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
             """,
             nativeQuery = true)
-    Page<FriendSummaryProjection> findFriendsByUser(@Param("userId") UUID userId, Pageable pageable);
+    Page<FriendSummaryProjection> findFriendsByUser(@Param("userId") UUID userId, @Param("search") String search, Pageable pageable);
 }

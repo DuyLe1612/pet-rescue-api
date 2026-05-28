@@ -9,11 +9,11 @@ import com.uit.petrescueapi.application.port.query.CommentQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.CommentWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -56,9 +56,11 @@ public class CommentController {
             @PathVariable UUID postId,
             @RequestParam(required = false) LocalDateTime cursor,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+                        @RequestParam(defaultValue = "20") int pageSize,
+                        @RequestParam(defaultValue = "createdAt") String sortBy,
+                        @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                commentQueryPort.findParentCommentsByPostId(postId, cursor, PageRequest.of(page, size))
+                                commentQueryPort.findParentCommentsByPostId(postId, cursor, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder))
         ));
     }
 
@@ -79,9 +81,11 @@ public class CommentController {
     public ResponseEntity<ApiResponse<PageResponse<CommentSummaryDto>>> getReplies(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+                        @RequestParam(defaultValue = "20") int pageSize,
+                        @RequestParam(defaultValue = "createdAt") String sortBy,
+                        @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(commentQueryPort.findRepliesByParentCommentId(id, PageRequest.of(page, size)))
+                                PageResponse.from(commentQueryPort.findRepliesByParentCommentId(id, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))
         ));
     }
 

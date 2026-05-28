@@ -13,7 +13,7 @@ import java.util.UUID;
 
 public interface RescueCaseQueryPort {
     RescueCaseResponseDto findById(UUID caseId);
-    Page<RescueCaseSummaryResponseDto> findAll(Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findAll(String search, Pageable pageable);
     Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, Pageable pageable);
     Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, Pageable pageable);
 

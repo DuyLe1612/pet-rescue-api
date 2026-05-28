@@ -6,11 +6,11 @@ import com.uit.petrescueapi.application.port.query.AdoptionQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.AdoptionWebMapper;
+import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -86,10 +86,13 @@ public class AdoptionController {
     @Operation(summary = "List all adoption applications")
     public ResponseEntity<ApiResponse<PageResponse<AdoptionSummaryResponseDto>>> getAll(
             @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(status, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findAll(status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/user/{userId}")
@@ -97,9 +100,12 @@ public class AdoptionController {
     public ResponseEntity<ApiResponse<PageResponse<AdoptionSummaryResponseDto>>> getByUserId(
             @PathVariable UUID userId,
             @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findByApplicantId(userId, status, PageRequest.of(page, size)))));
+                PageResponse.from(queryPort.findByApplicantId(userId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 }

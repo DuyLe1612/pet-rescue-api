@@ -9,7 +9,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface RoleQueryPort {
-    Page<RoleSummaryResponseDto> findAll(Pageable pageable);
+    Page<RoleSummaryResponseDto> findAll(String search, Pageable pageable);
     RoleResponseDto findById(Integer roleId);
     List<PermissionResponseDto> getPermissions(Integer roleId);
 }

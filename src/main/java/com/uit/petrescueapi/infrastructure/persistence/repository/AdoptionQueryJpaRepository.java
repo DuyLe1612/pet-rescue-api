@@ -43,10 +43,15 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
          WHERE a.deleted = false
-          AND a.status IN :statuses
+            AND a.status IN :statuses
+            AND (:search IS NULL OR :search = '' OR
+                LOWER(a.adoptionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
      """)
-    Page<AdoptionSummaryProjection> findAllSummaries(
+        Page<AdoptionSummaryProjection> findAllSummaries(
             @Param("statuses") List<String> statuses,
+            @Param("search") String search,
             Pageable pageable);
 
     // ── Detail (single adoption application) ────
@@ -102,10 +107,15 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
          WHERE a.deleted = false
           AND a.applicantId = :applicantId
-          AND a.status IN :statuses
+            AND a.status IN :statuses
+            AND (:search IS NULL OR :search = '' OR
+                LOWER(a.adoptionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
      """)
-    Page<AdoptionSummaryProjection> findByApplicantIdSummaries(
+        Page<AdoptionSummaryProjection> findByApplicantIdSummaries(
             @Param("applicantId") UUID applicantId,
             @Param("statuses") List<String> statuses,
+            @Param("search") String search,
             Pageable pageable);
 }

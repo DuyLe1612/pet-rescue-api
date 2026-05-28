@@ -28,9 +28,9 @@ public class RoleQueryUseCase implements RoleQueryPort {
     private final RoleQueryDataPort queryDataPort;
 
     @Override
-    public Page<RoleSummaryResponseDto> findAll(Pageable pageable) {
-        log.debug("Query: find all roles (paginated)");
-        return queryDataPort.findAllSummaries(pageable);
+    public Page<RoleSummaryResponseDto> findAll(String search, Pageable pageable) {
+        log.debug("Query: find all roles (paginated, search={})", search);
+        return queryDataPort.findAllSummaries(search, pageable);
     }
 
     @Override

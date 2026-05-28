@@ -37,8 +37,8 @@ public class OrganizationQueryUseCase implements OrganizationQueryPort {
     }
 
     @Override
-    public Page<OrganizationSummaryResponseDto> findAll(List<OrganizationStatus> statuses, Pageable pageable) {
-        return queryDataPort.findAllSummary(statuses, pageable);
+    public Page<OrganizationSummaryResponseDto> findAll(List<OrganizationStatus> statuses, String search, Pageable pageable) {
+        return queryDataPort.findAllSummary(statuses, search, pageable);
     }
 
     @Override
@@ -51,8 +51,8 @@ public class OrganizationQueryUseCase implements OrganizationQueryPort {
         return queryDataPort.findMapMarkers(statuses, types);
     }
 
-    public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, Pageable pageable) {
-        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, pageable);
+    public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable) {
+        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search, pageable);
     }
 
     public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types) {

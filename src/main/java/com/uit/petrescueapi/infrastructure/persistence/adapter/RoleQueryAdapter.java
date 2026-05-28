@@ -33,8 +33,8 @@ public class RoleQueryAdapter implements RoleQueryDataPort {
     // ── List (summary) queries ──────────────────
 
     @Override
-    public Page<RoleSummaryResponseDto> findAllSummaries(Pageable pageable) {
-        return queryRepo.findAllSummary(pageable).map(this::toSummaryDto);
+    public Page<RoleSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
+        return queryRepo.findAllSummary(search, pageable).map(this::toSummaryDto);
     }
 
     // ── Detail (single role) query ──────────────

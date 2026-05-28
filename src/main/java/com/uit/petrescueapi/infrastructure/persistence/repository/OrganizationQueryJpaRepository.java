@@ -17,22 +17,30 @@ import java.util.UUID;
 
 public interface OrganizationQueryJpaRepository extends JpaRepository<OrganizationJpaEntity, UUID> {
 
-    @Query("""
-            SELECT o.organizationId AS organizationId,
-                   o.organizationCode AS organizationCode,
-                   o.name           AS name,
-                   o.type           AS type,
-                   o.status         AS status,
-                   o.streetAddress  AS streetAddress,
-                   o.wardName       AS wardName,
-                   o.provinceName   AS provinceName,
-                   o.phone          AS phone,
-                   o.email          AS email,
-                   o.imageUrl       AS imageUrl
+        @Query("""
+             SELECT o.organizationId AS organizationId,
+                     o.organizationCode AS organizationCode,
+                     o.name AS name,
+                     o.type AS type,
+                     o.status AS status,
+                     o.streetAddress AS streetAddress,
+                     o.wardName AS wardName,
+                     o.provinceName AS provinceName,
+                     o.phone AS phone,
+                     o.email AS email,
+                     o.imageUrl AS imageUrl
              FROM OrganizationJpaEntity o
              WHERE o.status IN :statuses
+                AND (:search IS NULL OR :search = '' OR
+                     LOWER(o.organizationCode) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.provinceName) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                     LOWER(o.wardName) LIKE LOWER(CONCAT('%', :search, '%')))
              """)
-    Page<OrganizationSummaryProjection> findAllSummary(@Param("statuses") List<OrganizationStatus> statuses, Pageable pageable);
+    Page<OrganizationSummaryProjection> findAllSummary(@Param("statuses") List<OrganizationStatus> statuses, @Param("search") String search, Pageable pageable);
 
     @Query(value = """
             SELECT o.organization_id      AS organizationId,
@@ -102,15 +110,24 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                         AND ST_Y(o.location) BETWEEN :minLat AND :maxLat
                                                         AND ST_X(o.location) BETWEEN :minLng AND :maxLng
                                                         AND o.status IN (:statuses)
+                                                        AND (:search IS NULL OR :search = '' OR
+                                                             LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                                                             LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%')))
                                                 ORDER BY o.created_at DESC
                                                 """,
-                                                countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Y(o.location) BETWEEN :minLat AND :maxLat AND ST_X(o.location) BETWEEN :minLng AND :maxLng AND o.status IN (:statuses)",
+                                                countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Y(o.location) BETWEEN :minLat AND :maxLat AND ST_X(o.location) BETWEEN :minLng AND :maxLng AND o.status IN (:statuses) AND (:search IS NULL OR :search = '' OR LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%'))) ",
                                                 nativeQuery = true)
                 Page<OrganizationSummaryProjection> findWithinBoundingBoxSummary(@Param("minLat") double minLat,
                                                                                                                                                                                                                                                                                         @Param("minLng") double minLng,
                                                                                                                                                                                                                                                                                         @Param("maxLat") double maxLat,
                                                                                                                                                                                                                                                                                         @Param("maxLng") double maxLng,
-                                                                                                                                                                                                                                                                                        @Param("statuses") List<String> statuses,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @Param("statuses") List<String> statuses,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @Param("search") String search,
                                                                                                                                                                                                                                                                                         Pageable pageable);
 
                 @Query(value = """

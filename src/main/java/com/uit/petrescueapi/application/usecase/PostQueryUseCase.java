@@ -35,9 +35,9 @@ public class PostQueryUseCase implements PostQueryPort {
     }
 
     @Override
-    public Page<PostSummaryResponseDto> findAll(Pageable pageable) {
-        log.debug("Query: find all posts (paginated)");
-        return queryDataPort.findAllSummaries(pageable);
+    public Page<PostSummaryResponseDto> findAll(String search, Pageable pageable) {
+        log.debug("Query: find all posts (paginated, search={})", search);
+        return queryDataPort.findAllSummaries(search, pageable);
     }
 
     @Override

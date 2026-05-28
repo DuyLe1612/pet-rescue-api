@@ -45,8 +45,8 @@ public class PostQueryAdapter implements PostQueryDataPort {
     // ── List (summary) queries ──────────────────
 
     @Override
-    public Page<PostSummaryResponseDto> findAllSummaries(Pageable pageable) {
-        return queryRepo.findAllSummaries(pageable).map(this::toSummaryDto);
+        public Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
+                return queryRepo.findAllSummaries(search, pageable).map(this::toSummaryDto);
     }
 
     @Override

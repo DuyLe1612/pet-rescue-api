@@ -24,8 +24,8 @@ public class TagQueryUseCase implements TagQueryPort {
     private final TagQueryDataPort queryDataPort;
 
     @Override
-    public Page<TagSummaryResponseDto> findAll(Pageable pageable) {
-        log.debug("Query: find all tags (paginated)");
-        return queryDataPort.findAllSummaries(pageable);
+    public Page<TagSummaryResponseDto> findAll(String search, Pageable pageable) {
+        log.debug("Query: find all tags (paginated, search={})", search);
+        return queryDataPort.findAllSummaries(search, pageable);
     }
 }

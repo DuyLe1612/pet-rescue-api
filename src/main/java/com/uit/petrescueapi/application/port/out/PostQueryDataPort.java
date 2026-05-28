@@ -19,7 +19,7 @@ public interface PostQueryDataPort {
 
     PostResponseDto findById(UUID postId);
 
-    Page<PostSummaryResponseDto> findAllSummaries(Pageable pageable);
+    Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 
     PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId);
 }

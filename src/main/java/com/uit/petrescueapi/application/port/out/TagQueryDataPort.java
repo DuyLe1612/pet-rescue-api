@@ -12,5 +12,5 @@ import org.springframework.data.domain.Pageable;
  */
 public interface TagQueryDataPort {
 
-    Page<TagSummaryResponseDto> findAllSummaries(Pageable pageable);
+    Page<TagSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 }

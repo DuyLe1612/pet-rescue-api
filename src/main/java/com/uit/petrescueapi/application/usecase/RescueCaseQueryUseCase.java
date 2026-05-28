@@ -37,9 +37,9 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAll(Pageable pageable) {
-        log.debug("Query: find all rescue cases (paginated)");
-        return queryDataPort.findAllSummaries(pageable);
+    public Page<RescueCaseSummaryResponseDto> findAll(String search, Pageable pageable) {
+        log.debug("Query: find all rescue cases (paginated, search={})", search);
+        return queryDataPort.findAllSummaries(search, pageable);
     }
 
     @Override
