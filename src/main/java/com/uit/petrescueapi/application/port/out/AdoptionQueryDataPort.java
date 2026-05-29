@@ -21,4 +21,6 @@ public interface AdoptionQueryDataPort {
     Page<AdoptionSummaryResponseDto> findAllSummaries(List<String> statuses, String search, Pageable pageable);
 
     Page<AdoptionSummaryResponseDto> findByApplicantIdSummaries(UUID applicantId, List<String> statuses, String search, Pageable pageable);
+
+    Page<AdoptionSummaryResponseDto> findByOrganizationIdSummaries(UUID organizationId, List<String> statuses, String search, Pageable pageable);
 }

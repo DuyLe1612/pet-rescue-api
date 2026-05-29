@@ -6,6 +6,7 @@ import com.uit.petrescueapi.application.port.query.OrganizationQueryPort;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
+import com.uit.petrescueapi.domain.valueobject.OrganizationRole;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
@@ -35,7 +36,7 @@ import java.util.UUID;
 @Tag(name = "Organizations", description = "Organization CRUD and membership management")
 public class OrganizationController {
 
-    private static final Set<String> ORG_ASSIGNABLE_ROLES = Set.of("STAFF", "VET");
+    private static final Set<String> ORG_ASSIGNABLE_ROLES = Set.of("STAFF", "VET","MEMBER");
 
     private final OrganizationCommandPort commandPort;
     private final OrganizationQueryPort queryPort;
@@ -93,7 +94,7 @@ public class OrganizationController {
     }
 
     @PostMapping("/{id}/members")
-    @Operation(summary = "Add STAFF or VET to this organization (OWNER only)")
+    @Operation(summary = "Add member to this organization (OWNER only), STAFF, MEMBER, VET")
     public ResponseEntity<ApiResponse<OrganizationMemberResponseDto>> addMember(
             @PathVariable UUID id,
             @RequestBody AddMemberRequestDto cmd,
@@ -109,7 +110,7 @@ public class OrganizationController {
 
         // Only STAFF or VET may be assigned via this endpoint
         if (!ORG_ASSIGNABLE_ROLES.contains(cmd.getRole())) {
-            throw new BusinessException("Organization can only assign STAFF or VET roles", "INVALID_ORG_ROLE");
+            throw new BusinessException("Organization can only assign MEMBER, STAFF or VET roles", "INVALID_ORG_ROLE");
         }
 
         // Target user must not be an admin account
@@ -119,6 +120,35 @@ public class OrganizationController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(mapper.toMemberDto(commandPort.addMember(id, cmd))));
+    }
+
+    @PatchMapping("/{id}/members/{userId}")
+    @Operation(summary = "Update a member role in this organization (OWNER only)")
+    public ResponseEntity<ApiResponse<OrganizationMemberResponseDto>> updateMemberRole(
+            @PathVariable UUID id,
+            @PathVariable UUID userId,
+            @RequestBody UpdateOrganizationMemberRoleRequestDto cmd,
+            Authentication authentication) {
+
+        UUID callerId = UUID.fromString(authentication.getName());
+        String callerRole = orgDomainService.getMemberRole(id, callerId)
+                .orElseThrow(() -> new AccessDeniedException("You are not a member of this organization"));
+        if (!"OWNER".equals(callerRole)) {
+            throw new AccessDeniedException("Only the organization OWNER can update member roles");
+        }
+
+        OrganizationRole desiredRole = parseOrganizationRole(cmd.getRole());
+        if (!ORG_ASSIGNABLE_ROLES.contains(desiredRole.name())) {
+            throw new BusinessException("Organization can only assign MEMBER, STAFF or VET roles", "INVALID_ORG_ROLE");
+        }
+
+        if (userDomainService.findById(userId).hasRole("ADMIN")) {
+            throw new BusinessException("Cannot assign organization membership to an admin account", "FORBIDDEN_TARGET");
+        }
+
+        OrganizationMemberResponseDto response = mapper.toMemberDto(
+                commandPort.updateMemberRole(id, userId, desiredRole.name()));
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
     @DeleteMapping("/{id}/members/{userId}")
@@ -165,6 +195,17 @@ public class OrganizationController {
                 PageResponse.from(queryPort.findMembers(id, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
+    @GetMapping("/me")
+    @Operation(summary = "Get my organization with my role")
+    public ResponseEntity<ApiResponse<OrganizationWithRoleResponseDto>> getMyOrganization(Authentication authentication) {
+        UUID callerId = UUID.fromString(authentication.getName());
+        OrganizationWithRoleResponseDto result = queryPort.findMyOrganization(callerId);
+        if (result == null) {
+            throw new BusinessException("User does not belong to any organization", "ORG_NOT_FOUND");
+        }
+        return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+
     @GetMapping("/map/markers")
     @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed.")
     public ResponseEntity<ApiResponse<List<OrganizationMapMarkerDto>>> getMapMarkers(
@@ -209,6 +250,14 @@ public class OrganizationController {
             return OrganizationStatus.valueOf(value);
         } catch (IllegalArgumentException ex) {
             throw new BusinessException("Invalid organization status: " + value, "INVALID_ORG_STATUS");
+        }
+    }
+
+    private OrganizationRole parseOrganizationRole(String value) {
+        try {
+            return OrganizationRole.valueOf(value);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException("Invalid organization role: " + value, "INVALID_ORG_ROLE");
         }
     }
 }

@@ -6,6 +6,7 @@ import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMe
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,6 +19,8 @@ public interface OrganizationMemberJpaRepository
         extends JpaRepository<OrganizationMemberJpaEntity, OrganizationMemberId> {
 
     boolean existsByOrganizationIdAndUserId(UUID organizationId, UUID userId);
+
+        Optional<OrganizationMemberJpaEntity> findByOrganizationIdAndUserId(UUID organizationId, UUID userId);
 
     void deleteByOrganizationIdAndUserId(UUID organizationId, UUID userId);
 
@@ -33,6 +36,12 @@ public interface OrganizationMemberJpaRepository
 
     @Query("SELECT m.role FROM OrganizationMemberJpaEntity m WHERE m.organizationId = :organizationId AND m.userId = :userId AND m.status = 'ACTIVE'")
     Optional<String> findRoleByOrgAndUser(@Param("organizationId") UUID organizationId, @Param("userId") UUID userId);
+
+        @Modifying
+        @Query("UPDATE OrganizationMemberJpaEntity m SET m.role = :role WHERE m.organizationId = :organizationId AND m.userId = :userId")
+        void updateRole(@Param("organizationId") UUID organizationId,
+                                        @Param("userId") UUID userId,
+                                        @Param("role") String role);
 
     /**
      * Fetches username from the users table in the same round-trip.

@@ -12,4 +12,5 @@ public interface AdoptionQueryPort {
     AdoptionResponseDto findById(UUID applicationId);
     Page<AdoptionSummaryResponseDto> findAll(List<String> statuses, String search, Pageable pageable);
     Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, String search, Pageable pageable);
+    Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, List<String> statuses, String search, Pageable pageable);
 }

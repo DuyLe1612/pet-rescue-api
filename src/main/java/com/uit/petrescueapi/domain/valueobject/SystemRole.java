@@ -5,11 +5,11 @@ package com.uit.petrescueapi.domain.valueobject;
  * <ul>
  *   <li>{@code USER} – default registered user</li>
  *   <li>{@code ADMIN} – system administrator</li>
- *   <li>{@code MEMBER} – organization member (shelter / vet center)</li>
+ *   <li>{@code MEMBERSHIP} – organization member (shelter / vet center)</li>
  * </ul>
  */
 public enum SystemRole {
     USER,
     ADMIN,
-    MEMBER
+    MEMBERSHIP
 }

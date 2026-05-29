@@ -6,5 +6,6 @@ package com.uit.petrescueapi.domain.valueobject;
 public enum OrganizationRole {
     OWNER,
     STAFF,
+    MEMBER,
     VET
 }

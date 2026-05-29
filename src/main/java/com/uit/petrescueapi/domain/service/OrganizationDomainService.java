@@ -140,6 +140,21 @@ public class OrganizationDomainService {
         return memberRepository.save(member);
     }
 
+    public OrganizationMember updateMemberRole(UUID orgId, UUID userId, String role) {
+        findOrThrow(orgId);
+        OrganizationMember member = memberRepository.findByOrgAndUser(orgId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("OrganizationMember", "userId", userId));
+        if ("OWNER".equals(member.getRole())) {
+            throw new BusinessException("Cannot change role for organization OWNER", "OWNER_ROLE_IMMUTABLE");
+        }
+        if ("OWNER".equals(role)) {
+            throw new BusinessException("Cannot assign OWNER role via this endpoint", "INVALID_ORG_ROLE");
+        }
+        member.setRole(role);
+        memberRepository.updateRole(orgId, userId, role);
+        return member;
+    }
+
     public void removeMember(UUID orgId, UUID userId) {
         log.debug("Removing member {} from organization {}", userId, orgId);
         memberRepository.delete(orgId, userId);

@@ -118,4 +118,35 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
             @Param("statuses") List<String> statuses,
             @Param("search") String search,
             Pageable pageable);
+
+    @Query("""
+        SELECT a.applicationId   AS applicationId,
+               a.adoptionCode    AS adoptionCode,
+               p.name            AS petName,
+               (SELECT MIN(mf.publicId)
+                FROM PetMediaJpaEntity pm
+                JOIN MediaFileJpaEntity mf ON pm.mediaFileId = mf.mediaId
+                WHERE pm.petId = p.id) AS petPrimaryImageUrl,
+               u.username        AS applicantUsername,
+               a.status          AS status,
+               a.experience      AS experience,
+               a.liveCondition   AS liveCondition,
+               a.createdAt       AS createdAt,
+               a.readyAt         AS readyAt
+         FROM AdoptionApplicationJpaEntity a
+         LEFT JOIN PetJpaEntity p ON a.petId = p.id
+         LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
+         WHERE a.deleted = false
+          AND a.organizationId = :organizationId
+            AND a.status IN :statuses
+            AND (:search IS NULL OR :search = '' OR
+                LOWER(a.adoptionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+     """)
+        Page<AdoptionSummaryProjection> findByOrganizationIdSummaries(
+            @Param("organizationId") UUID organizationId,
+            @Param("statuses") List<String> statuses,
+            @Param("search") String search,
+            Pageable pageable);
 }

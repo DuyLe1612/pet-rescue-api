@@ -4,6 +4,7 @@ import com.uit.petrescueapi.application.dto.organization.OrganizationMemberRespo
 import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationWithRoleResponseDto;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -30,4 +31,6 @@ public interface OrganizationQueryPort {
     Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable);
 
     List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types);
+
+    OrganizationWithRoleResponseDto findMyOrganization(UUID userId);
 }

@@ -44,4 +44,10 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
         log.debug("Query: find adoption applications by applicant id {} (statuses={}, search={}, paginated)", applicantId, statuses, search);
         return queryDataPort.findByApplicantIdSummaries(applicantId, statuses, search, pageable);
     }
+
+    @Override
+    public Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, List<String> statuses, String search, Pageable pageable) {
+        log.debug("Query: find adoption applications by organization id {} (statuses={}, search={}, paginated)", organizationId, statuses, search);
+        return queryDataPort.findByOrganizationIdSummaries(organizationId, statuses, search, pageable);
+    }
 }

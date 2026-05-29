@@ -1,10 +1,12 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
-import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationWithRoleResponseDto;
 import com.uit.petrescueapi.application.port.out.OrganizationQueryDataPort;
+import com.uit.petrescueapi.domain.valueobject.OrganizationRole;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMemberProjection;
@@ -83,6 +85,25 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         return queryRepo.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
         }
 
+        @Override
+        public OrganizationWithRoleResponseDto findMyOrganization(UUID userId) {
+            UUID organizationId = memberRepo.findOrganizationIdByUserId(userId);
+            if (organizationId == null) {
+                return null;
+            }
+            OrganizationResponseDto organization = queryRepo.findDetailById(organizationId)
+                    .map(this::toDetailDto)
+                    .orElse(null);
+            if (organization == null) {
+                return null;
+            }
+            OrganizationRole role = toOrganizationRole(memberRepo.findOrgRoleByUserId(userId));
+            return OrganizationWithRoleResponseDto.builder()
+                    .organization(organization)
+                    .role(role)
+                    .build();
+        }
+
     // ── Private mapping helpers ──────────────────────────
 
     private OrganizationSummaryResponseDto toSummaryDto(OrganizationSummaryProjection p) {
@@ -152,5 +173,16 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .build();
+    }
+
+    private OrganizationRole toOrganizationRole(String role) {
+        if (role == null) {
+            return null;
+        }
+        try {
+            return OrganizationRole.valueOf(role);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

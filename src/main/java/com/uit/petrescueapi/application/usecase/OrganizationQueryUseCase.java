@@ -4,6 +4,7 @@ import com.uit.petrescueapi.application.dto.organization.OrganizationMemberRespo
 import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationSummaryResponseDto;
+import com.uit.petrescueapi.application.dto.organization.OrganizationWithRoleResponseDto;
 import com.uit.petrescueapi.application.port.out.OrganizationQueryDataPort;
 import com.uit.petrescueapi.application.port.query.OrganizationQueryPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -57,5 +58,10 @@ public class OrganizationQueryUseCase implements OrganizationQueryPort {
 
     public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types) {
         return queryDataPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, types);
+    }
+
+    @Override
+    public OrganizationWithRoleResponseDto findMyOrganization(UUID userId) {
+        return queryDataPort.findMyOrganization(userId);
     }
 }

@@ -40,5 +40,7 @@ public interface OrganizationCommandPort {
 
     OrganizationMember addMember(UUID organizationId, AddMemberRequestDto cmd);
 
+    OrganizationMember updateMemberRole(UUID organizationId, UUID userId, String role);
+
     void removeMember(UUID organizationId, UUID userId);
 }

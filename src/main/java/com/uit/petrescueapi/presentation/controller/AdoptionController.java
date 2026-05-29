@@ -108,4 +108,18 @@ public class AdoptionController {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findByApplicantId(userId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
+
+    @GetMapping("/organization/{orgId}")
+    @Operation(summary = "Get adoption applications by organization ID")
+    public ResponseEntity<ApiResponse<PageResponse<AdoptionSummaryResponseDto>>> getByOrganizationId(
+            @PathVariable UUID orgId,
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                PageResponse.from(queryPort.findByOrganizationId(orgId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+    }
 }

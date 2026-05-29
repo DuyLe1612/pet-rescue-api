@@ -76,6 +76,12 @@ public class OrganizationCommandUseCase implements OrganizationCommandPort {
     }
 
     @Override
+    public OrganizationMember updateMemberRole(UUID organizationId, UUID userId, String role) {
+        log.debug("Command: update member {} role in organization {}", userId, organizationId);
+        return domainService.updateMemberRole(organizationId, userId, role);
+    }
+
+    @Override
     public void removeMember(UUID organizationId, UUID userId) {
         log.debug("Command: remove member {} from organization {}", userId, organizationId);
         domainService.removeMember(organizationId, userId);

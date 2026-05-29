@@ -44,6 +44,11 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
         return queryRepo.findByApplicantIdSummaries(applicantId, normalizeStatuses(statuses), search, pageable).map(this::toSummaryDto);
     }
 
+    @Override
+    public Page<AdoptionSummaryResponseDto> findByOrganizationIdSummaries(UUID organizationId, List<String> statuses, String search, Pageable pageable) {
+        return queryRepo.findByOrganizationIdSummaries(organizationId, normalizeStatuses(statuses), search, pageable).map(this::toSummaryDto);
+    }
+
     // ── Detail (single adoption application) query ──
 
     @Override
