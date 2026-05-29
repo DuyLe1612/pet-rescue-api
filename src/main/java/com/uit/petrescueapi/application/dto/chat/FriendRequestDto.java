@@ -16,6 +16,8 @@ public class FriendRequestDto {
     private UUID id;
     @NotNull
     private UUID requesterId;
+    private String requesterName;
+    private String requesterAvatarUrl;
     @NotNull
     private UUID addresseeId;
     @NotBlank
