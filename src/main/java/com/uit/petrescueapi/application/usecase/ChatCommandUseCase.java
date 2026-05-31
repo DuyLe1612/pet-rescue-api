@@ -85,12 +85,11 @@ public class ChatCommandUseCase implements ChatCommandPort {
 
         chatRealtimePort.publishMessage(recipients, conversationId, dto);
 
-        java.util.Map<String, Object> convoPayload = java.util.Map.of(
-            "lastMessage", dto.getContent(),
-            "lastTime", dto.getTime(),
-            "lastSenderId", dto.getSenderId(),
-            "lastMessageSeq", dto.getMessageSeq()
-        );
+        java.util.Map<String, Object> convoPayload = new java.util.HashMap<>();
+        convoPayload.put("lastMessage", dto.getContent());
+        convoPayload.put("lastTime", dto.getTime());
+        convoPayload.put("lastSenderId", dto.getSenderId());
+        convoPayload.put("lastMessageSeq", dto.getMessageSeq());
         chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
         chatRealtimePort.publishConversationUpdate(java.util.List.of(senderId), conversationId, convoPayload);
 
@@ -143,12 +142,11 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 .map(ConversationParticipant::getUserId)
                 .toList();
 
-        java.util.Map<String, Object> convoPayload = java.util.Map.of(
-                "lastMessage", conversation.getLastMessagePreview(),
-                "lastTime", conversation.getLastMessageAt(),
-                "lastSenderId", conversation.getLastMessageSenderId(),
-                "lastMessageSeq", conversation.getLastMessageSeq()
-        );
+        java.util.Map<String, Object> convoPayload = new java.util.HashMap<>();
+        convoPayload.put("lastMessage", conversation.getLastMessagePreview());
+        convoPayload.put("lastTime", conversation.getLastMessageAt());
+        convoPayload.put("lastSenderId", conversation.getLastMessageSenderId());
+        convoPayload.put("lastMessageSeq", conversation.getLastMessageSeq());
         chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
 
         recipients.forEach(conversationCachePort::evictUser);
