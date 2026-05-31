@@ -40,6 +40,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public Optional<String> findExpoPushTokenById(UUID id) {
+        return jpa.findExpoPushTokenById(id);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpa.existsByEmail(email);
     }

@@ -3,6 +3,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 import com.uit.petrescueapi.application.dto.chat.ChatMessageDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
+import com.uit.petrescueapi.application.port.out.ChatConversationCachePort;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.repository.ConversationParticipantRepository;
 import com.uit.petrescueapi.infrastructure.persistence.entity.ChatMessageJpaEntity;
@@ -26,20 +27,40 @@ public class ChatQueryAdapter implements ChatQueryDataPort {
     private final ConversationJpaRepository conversationRepository;
     private final ChatMessageJpaRepository messageRepository;
     private final ConversationParticipantRepository participantRepository;
+    private final ChatConversationCachePort conversationCachePort;
 
     @Override
     public Page<ConversationSummaryDto> listConversationsByCursor(UUID userId, LocalDateTime cursor, Pageable pageable) {
-        return conversationRepository.findSummariesByUserCursor(userId, cursor, pageable).map(this::toDto);
+        int size = pageable.getPageSize();
+        var cached = conversationCachePort.getConversations(userId, cursor, size);
+        if (cached.isPresent()) {
+            return new org.springframework.data.domain.PageImpl<>(cached.get(), pageable, cached.get().size());
+        }
+        Page<ConversationSummaryDto> page = conversationRepository.findSummariesByUserCursor(userId, cursor, pageable).map(this::toDto);
+        conversationCachePort.cacheConversations(userId, page.getContent());
+        return page;
     }
 
     @Override
-        public Page<ChatMessageDto> listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Pageable pageable) {
+        public Page<ChatMessageDto> listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Long cursorSeq, String direction, Pageable pageable) {
         participantRepository.findByConversationIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new BusinessException("User not in conversation", "CHAT_FORBIDDEN"));
 
-        Page<ChatMessageJpaEntity> page = cursor == null
-            ? messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable)
-            : messageRepository.findByConversationIdAndSentAtBeforeOrderBySentAtDesc(conversationId, cursor, pageable);
+            boolean isAfter = direction != null && direction.equalsIgnoreCase("after");
+            Page<ChatMessageJpaEntity> page;
+            if (isAfter) {
+                if (cursorSeq == null) {
+                    page = messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable);
+                } else {
+                    page = messageRepository.findByConversationIdAfterSeq(conversationId, cursorSeq, pageable);
+                }
+            } else {
+                if (cursorSeq == null) {
+                    page = messageRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable);
+                } else {
+                    page = messageRepository.findByConversationIdBeforeSeq(conversationId, cursorSeq, pageable);
+                }
+            }
 
         return page
                 .map(message -> ChatMessageDto.builder()
@@ -47,6 +68,7 @@ public class ChatQueryAdapter implements ChatQueryDataPort {
                         .senderId(message.getSenderId())
                         .content(message.getContent())
                         .time(message.getSentAt())
+                .messageSeq(message.getMessageSeq())
                         .seen(message.isSeen())
                         .build());
     }

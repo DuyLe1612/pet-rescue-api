@@ -12,5 +12,5 @@ public interface ChatQueryDataPort {
 
     Page<ConversationSummaryDto> listConversationsByCursor(UUID userId, LocalDateTime cursor, Pageable pageable);
 
-    Page<ChatMessageDto> listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Pageable pageable);
+    Page<ChatMessageDto> listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Long cursorSeq, String direction, Pageable pageable);
 }

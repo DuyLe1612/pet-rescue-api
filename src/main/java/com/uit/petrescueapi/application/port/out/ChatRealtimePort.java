@@ -14,4 +14,6 @@ public interface ChatRealtimePort {
     void publishTyping(List<UUID> recipientIds, UUID conversationId, UUID senderId, boolean typing);
 
     void publishPresence(List<UUID> recipientIds, UUID userId, String status);
+
+    void publishConversationUpdate(List<UUID> recipientIds, UUID conversationId, java.util.Map<String, Object> payload);
 }

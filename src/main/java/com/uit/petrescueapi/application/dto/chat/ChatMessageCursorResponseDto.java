@@ -15,5 +15,6 @@ import java.util.List;
 public class ChatMessageCursorResponseDto {
     private List<ChatMessageDto> items;
     private LocalDateTime nextCursor;
+    private Long nextCursorSeq;
     private boolean hasMore;
 }

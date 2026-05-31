@@ -25,8 +25,18 @@ public class ChatMessageRepositoryAdapter implements ChatMessageRepository {
     }
 
     @Override
+    public java.util.Optional<ChatMessage> findById(UUID messageId) {
+        return jpaRepository.findById(messageId).map(mapper::toDomain);
+    }
+
+    @Override
     public Page<ChatMessage> findByConversationId(UUID conversationId, Pageable pageable) {
         return jpaRepository.findByConversationIdOrderBySentAtDesc(conversationId, pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public java.util.Optional<ChatMessage> findLatestByConversationId(UUID conversationId) {
+        return jpaRepository.findLatestByConversationId(conversationId).map(mapper::toDomain);
     }
 
     @Override

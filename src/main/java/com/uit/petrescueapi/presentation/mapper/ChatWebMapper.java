@@ -32,6 +32,7 @@ public interface ChatWebMapper {
                 .senderId(message.getSenderId())
                 .content(message.getContent())
                 .time(message.getSentAt())
+            .messageSeq(message.getMessageSeq())
                 .seen(message.isSeen())
                 .build();
     }

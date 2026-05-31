@@ -34,6 +34,9 @@ public class ChatMessageJpaEntity extends BaseJpaEntity {
     @Column(name = "sent_at", nullable = false)
     private LocalDateTime sentAt;
 
+    @Column(name = "message_seq", insertable = false, updatable = false)
+    private Long messageSeq;
+
     @Column(name = "seen", nullable = false)
     private boolean seen;
 }

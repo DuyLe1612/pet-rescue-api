@@ -5,6 +5,7 @@ import com.uit.petrescueapi.application.dto.chat.CreateConversationRequestDto;
 import com.uit.petrescueapi.application.dto.chat.CreateMessageRequestDto;
 import com.uit.petrescueapi.application.dto.chat.MarkReadRequestDto;
 import com.uit.petrescueapi.application.port.command.ChatCommandPort;
+import com.uit.petrescueapi.application.port.out.ChatConversationCachePort;
 import com.uit.petrescueapi.application.port.out.ChatRealtimePort;
 import com.uit.petrescueapi.domain.entity.ChatMessage;
 import com.uit.petrescueapi.domain.entity.Conversation;
@@ -28,6 +29,7 @@ public class ChatCommandUseCase implements ChatCommandPort {
     private final ChatDomainService chatDomainService;
     private final ConversationParticipantRepository participantRepository;
     private final ChatRealtimePort chatRealtimePort;
+    private final ChatConversationCachePort conversationCachePort;
     private final com.uit.petrescueapi.application.port.out.PushNotificationPort pushNotificationPort;
     private final com.uit.petrescueapi.domain.repository.UserRepository userRepository;
 
@@ -45,7 +47,7 @@ public class ChatCommandUseCase implements ChatCommandPort {
         } catch (Exception ex) {
             throw new BusinessException("Invalid conversation type", "CHAT_TYPE_INVALID");
         }
-        return chatDomainService.createDirectConversation(
+        Conversation conversation = chatDomainService.createDirectConversation(
                 requesterId,
                 request.getParticipantId(),
                 type,
@@ -53,6 +55,9 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 request.getName(),
                 request.getRelatedInfo()
         );
+        conversationCachePort.evictUser(requesterId);
+        conversationCachePort.evictUser(request.getParticipantId());
+        return conversation;
     }
 
     @Override
@@ -74,27 +79,42 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 .senderId(message.getSenderId())
                 .content(message.getContent())
                 .time(message.getSentAt())
+            .messageSeq(message.getMessageSeq())
                 .seen(message.isSeen())
                 .build();
 
         chatRealtimePort.publishMessage(recipients, conversationId, dto);
 
+        java.util.Map<String, Object> convoPayload = java.util.Map.of(
+            "lastMessage", dto.getContent(),
+            "lastTime", dto.getTime(),
+            "lastSenderId", dto.getSenderId(),
+            "lastMessageSeq", dto.getMessageSeq()
+        );
+        chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
+        chatRealtimePort.publishConversationUpdate(java.util.List.of(senderId), conversationId, convoPayload);
+
+        recipients.forEach(conversationCachePort::evictUser);
+        conversationCachePort.evictUser(senderId);
+
         // collect expo push tokens and send push
-        try {
-            List<String> tokens = recipients.stream()
-                    .map(id -> userRepository.findById(id).orElse(null))
-                    .filter(u -> u != null && u.getExpoPushToken() != null && !u.getExpoPushToken().isBlank())
-                    .map(u -> u.getExpoPushToken())
-                    .toList();
-            if (!tokens.isEmpty()) {
-                String title = "New message";
-                String body = dto.getContent();
-                java.util.Map<String, Object> data = java.util.Map.of("conversationId", conversationId.toString());
-                pushNotificationPort.sendPushToTokens(tokens, title, body, data);
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                List<String> tokens = recipients.stream()
+                        .map(userRepository::findExpoPushTokenById)
+                        .flatMap(java.util.Optional::stream)
+                        .filter(token -> token != null && !token.isBlank())
+                        .toList();
+                if (!tokens.isEmpty()) {
+                    String title = "New message";
+                    String body = dto.getContent();
+                    java.util.Map<String, Object> data = java.util.Map.of("conversationId", conversationId.toString());
+                    pushNotificationPort.sendPushToTokens(tokens, title, body, data);
+                }
+            } catch (Exception ex) {
+                log.warn("Failed to send push notifications", ex);
             }
-        } catch (Exception ex) {
-            log.warn("Failed to send push notifications", ex);
-        }
+        });
         return message;
     }
 
@@ -109,5 +129,28 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 .toList();
 
         chatRealtimePort.publishReadReceipt(recipients, conversationId, userId);
+
+        recipients.forEach(conversationCachePort::evictUser);
+        conversationCachePort.evictUser(userId);
+    }
+
+    @Override
+    public void deleteMessage(UUID conversationId, UUID messageId, UUID userId) {
+        Conversation conversation = chatDomainService.deleteMessage(conversationId, messageId, userId);
+
+        List<ConversationParticipant> participants = participantRepository.findByConversationId(conversationId);
+        List<UUID> recipients = participants.stream()
+                .map(ConversationParticipant::getUserId)
+                .toList();
+
+        java.util.Map<String, Object> convoPayload = java.util.Map.of(
+                "lastMessage", conversation.getLastMessagePreview(),
+                "lastTime", conversation.getLastMessageAt(),
+                "lastSenderId", conversation.getLastMessageSenderId(),
+                "lastMessageSeq", conversation.getLastMessageSeq()
+        );
+        chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
+
+        recipients.forEach(conversationCachePort::evictUser);
     }
 }

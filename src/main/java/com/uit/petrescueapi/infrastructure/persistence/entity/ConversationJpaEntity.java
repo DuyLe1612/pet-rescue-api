@@ -34,4 +34,16 @@ public class ConversationJpaEntity extends BaseJpaEntity {
 
     @Column(name = "related_info", columnDefinition = "TEXT")
     private String relatedInfo;
+
+    @Column(name = "last_message_at", nullable = false)
+    private java.time.LocalDateTime lastMessageAt;
+
+    @Column(name = "last_message_preview", columnDefinition = "TEXT")
+    private String lastMessagePreview;
+
+    @Column(name = "last_message_sender_id")
+    private UUID lastMessageSenderId;
+
+    @Column(name = "last_message_seq")
+    private Long lastMessageSeq;
 }

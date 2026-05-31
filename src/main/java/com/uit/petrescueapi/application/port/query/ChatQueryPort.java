@@ -14,5 +14,5 @@ public interface ChatQueryPort {
 
     ConversationCursorResponseDto listConversationsByCursor(UUID userId, LocalDateTime cursor, int size);
 
-    ChatMessageCursorResponseDto listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, int size);
+    ChatMessageCursorResponseDto listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Long cursorSeq, int size, String direction);
 }

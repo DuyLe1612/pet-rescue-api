@@ -13,5 +13,6 @@ public class ChatMessageDto {
     private UUID senderId;
     private String content;
     private LocalDateTime time;
+    private Long messageSeq;
     private boolean seen;
 }

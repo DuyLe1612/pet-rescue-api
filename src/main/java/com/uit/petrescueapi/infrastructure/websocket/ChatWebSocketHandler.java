@@ -115,6 +115,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 .senderId(saved.getSenderId())
                 .content(saved.getContent())
                 .time(saved.getSentAt())
+            .messageSeq(saved.getMessageSeq())
                 .seen(saved.isSeen())
                 .build();
 

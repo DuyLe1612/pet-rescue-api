@@ -45,8 +45,6 @@ public class ChatController {
     public ResponseEntity<ApiResponse<ConversationCursorResponseDto>> listConversations(
             @RequestParam(required = false) LocalDateTime cursor,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(queryPort.listConversationsByCursor(userId, cursor, pageSize)));
@@ -57,10 +55,12 @@ public class ChatController {
     public ResponseEntity<ApiResponse<ChatMessageCursorResponseDto>> listMessages(
             @PathVariable UUID conversationId,
             @RequestParam(required = false) LocalDateTime cursor,
+            @RequestParam(required = false) Long cursorSeq,
             @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "before") String direction,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.listMessagesByCursor(conversationId, userId, cursor, pageSize)));
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.listMessagesByCursor(conversationId, userId, cursor, cursorSeq, pageSize, direction)));
     }
 
     @PostMapping("/conversations/{conversationId}/messages")
@@ -81,6 +81,17 @@ public class ChatController {
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
         commandPort.markRead(conversationId, request == null ? new MarkReadRequestDto() : request, userId);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @DeleteMapping("/conversations/{conversationId}/messages/{messageId}")
+    @Operation(summary = "Delete a message in a conversation")
+    public ResponseEntity<ApiResponse<Void>> deleteMessage(
+            @PathVariable UUID conversationId,
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        commandPort.deleteMessage(conversationId, messageId, userId);
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 }

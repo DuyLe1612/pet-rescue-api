@@ -17,6 +17,10 @@ public class Conversation {
     private String name;
     private UUID relatedEntityId;
     private String relatedInfo;
+    private LocalDateTime lastMessageAt;
+    private String lastMessagePreview;
+    private UUID lastMessageSenderId;
+    private Long lastMessageSeq;
 
     private LocalDateTime createdAt;
     private UUID createdBy;

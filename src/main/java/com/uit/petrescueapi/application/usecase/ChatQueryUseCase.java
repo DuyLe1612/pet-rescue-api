@@ -41,20 +41,24 @@ public class ChatQueryUseCase implements ChatQueryPort {
     }
 
     @Override
-    public ChatMessageCursorResponseDto listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, int size) {
-        log.debug("Query: list messages by cursor for conversation {} (user {})", conversationId, userId);
-        Page<ChatMessageDto> page = chatQueryDataPort.listMessagesByCursor(
-                conversationId,
-                userId,
-                cursor,
-                org.springframework.data.domain.PageRequest.of(0, size)
-        );
+        public ChatMessageCursorResponseDto listMessagesByCursor(UUID conversationId, UUID userId, LocalDateTime cursor, Long cursorSeq, int size, String direction) {
+                log.debug("Query: list messages by cursor for conversation {} (user {})", conversationId, userId);
+                Page<ChatMessageDto> page = chatQueryDataPort.listMessagesByCursor(
+                                conversationId,
+                                userId,
+                                cursor,
+                                cursorSeq,
+                                direction,
+                                org.springframework.data.domain.PageRequest.of(0, size)
+                );
         var items = page.getContent();
-        LocalDateTime nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getTime();
+                LocalDateTime nextCursor = items.isEmpty() ? null : items.get(items.size() - 1).getTime();
+                Long nextCursorSeq = items.isEmpty() ? null : items.get(items.size() - 1).getMessageSeq();
         boolean hasMore = items.size() == size;
         return ChatMessageCursorResponseDto.builder()
                 .items(items)
                 .nextCursor(nextCursor)
+                .nextCursorSeq(nextCursorSeq)
                 .hasMore(hasMore)
                 .build();
     }

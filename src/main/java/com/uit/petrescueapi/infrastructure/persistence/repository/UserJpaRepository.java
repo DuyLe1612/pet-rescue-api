@@ -26,4 +26,7 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
 
     @Query("SELECT u FROM UserJpaEntity u LEFT JOIN FETCH u.roles WHERE u.userId = :id")
     Optional<UserJpaEntity> findByIdWithRoles(@Param("id") UUID id);
+
+    @Query("SELECT u.expoPushToken FROM UserJpaEntity u WHERE u.userId = :id")
+    Optional<String> findExpoPushTokenById(@Param("id") UUID id);
 }

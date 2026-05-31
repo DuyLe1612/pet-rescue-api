@@ -60,6 +60,10 @@ public class ChatDomainService {
                 .name(name)
                 .relatedEntityId(relatedEntityId)
                 .relatedInfo(relatedInfo)
+            .lastMessageAt(now)
+            .lastMessagePreview(null)
+            .lastMessageSenderId(null)
+            .lastMessageSeq(null)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -106,6 +110,12 @@ public class ChatDomainService {
 
         ChatMessage saved = messageRepository.save(message);
 
+        conversation.setLastMessageAt(saved.getSentAt());
+        conversation.setLastMessagePreview(toPreview(saved.getContent()));
+        conversation.setLastMessageSenderId(saved.getSenderId());
+        conversation.setLastMessageSeq(saved.getMessageSeq());
+        conversationRepository.save(conversation);
+
         List<ConversationParticipant> participants = participantRepository.findByConversationId(conversationId);
         for (ConversationParticipant participant : participants) {
             if (participant.getUserId().equals(senderId)) {
@@ -119,11 +129,67 @@ public class ChatDomainService {
         return saved;
     }
 
+    public void refreshLastMessage(UUID conversationId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", conversationId));
+        ChatMessage latest = messageRepository.findLatestByConversationId(conversationId).orElse(null);
+        if (latest == null) {
+            conversation.setLastMessageAt(conversation.getCreatedAt());
+            conversation.setLastMessagePreview(null);
+            conversation.setLastMessageSenderId(null);
+            conversation.setLastMessageSeq(null);
+        } else {
+            conversation.setLastMessageAt(latest.getSentAt());
+            conversation.setLastMessagePreview(toPreview(latest.getContent()));
+            conversation.setLastMessageSenderId(latest.getSenderId());
+            conversation.setLastMessageSeq(latest.getMessageSeq());
+        }
+        conversationRepository.save(conversation);
+    }
+
+    private String toPreview(String content) {
+        if (content == null) {
+            return null;
+        }
+        String trimmed = content.trim();
+        if (trimmed.length() <= 200) {
+            return trimmed;
+        }
+        return trimmed.substring(0, 200);
+    }
+
     public void markRead(UUID conversationId, UUID userId) {
         ConversationParticipant participant = participantRepository.findByConversationIdAndUserId(conversationId, userId)
                 .orElseThrow(() -> new BusinessException("User not in conversation", "CHAT_FORBIDDEN"));
         LocalDateTime now = LocalDateTime.now();
         participantRepository.updateUnreadCount(conversationId, userId, 0, now);
         messageRepository.markMessagesSeen(conversationId, userId, now);
+    }
+
+    public Conversation deleteMessage(UUID conversationId, UUID messageId, UUID userId) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation", "id", conversationId));
+        ChatMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("ChatMessage", "id", messageId));
+
+        if (!conversationId.equals(message.getConversationId())) {
+            throw new BusinessException("Message does not belong to this conversation", "CHAT_INVALID_MESSAGE");
+        }
+        if (!userId.equals(message.getSenderId())) {
+            throw new BusinessException("Not allowed to delete this message", "CHAT_FORBIDDEN");
+        }
+
+        message.setDeleted(true);
+        message.setDeletedAt(LocalDateTime.now());
+        message.setDeletedBy(userId);
+        messageRepository.save(message);
+
+        if (conversation.getLastMessageSeq() != null
+                && conversation.getLastMessageSeq().equals(message.getMessageSeq())) {
+            refreshLastMessage(conversationId);
+            return conversationRepository.findById(conversationId).orElse(conversation);
+        }
+
+        return conversation;
     }
 }

@@ -16,6 +16,7 @@ public class ChatMessage {
     private UUID senderId;
     private String content;
     private LocalDateTime sentAt;
+    private Long messageSeq;
     private boolean seen;
 
     private LocalDateTime createdAt;

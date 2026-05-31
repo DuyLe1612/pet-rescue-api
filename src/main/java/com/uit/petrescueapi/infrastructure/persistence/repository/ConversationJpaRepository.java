@@ -27,8 +27,8 @@ public interface ConversationJpaRepository extends JpaRepository<ConversationJpa
            u.avatar_url AS otherUserAvatarUrl,
                    c.related_info AS relatedInfo,
                    c.related_entity_id AS relatedEntityId,
-                   lm.content AS lastMessage,
-                   COALESCE(lm.sent_at, c.created_at) AS lastTime,
+                       c.last_message_preview AS lastMessage,
+                       c.last_message_at AS lastTime,
                    cp.unread_count AS unread
             FROM conversation_participants cp
             JOIN conversations c ON c.conversation_id = cp.conversation_id
@@ -36,32 +36,18 @@ public interface ConversationJpaRepository extends JpaRepository<ConversationJpa
                    ON cp_other.conversation_id = cp.conversation_id
                   AND cp_other.user_id <> :userId
             LEFT JOIN users u ON u.user_id = cp_other.user_id
-            LEFT JOIN LATERAL (
-                SELECT m.content, m.sent_at
-                FROM chat_messages m
-                WHERE m.conversation_id = c.conversation_id
-                ORDER BY m.sent_at DESC
-                LIMIT 1
-            ) lm ON true
             WHERE cp.user_id = :userId
               AND c.is_deleted = false
-              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR COALESCE(lm.sent_at, c.created_at) < CAST(:cursor AS TIMESTAMP))
-            ORDER BY COALESCE(lm.sent_at, c.created_at) DESC
+              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR c.last_message_at < CAST(:cursor AS TIMESTAMP))
+            ORDER BY c.last_message_at DESC, c.last_message_seq DESC
             """,
             countQuery = """
             SELECT COUNT(*)
             FROM conversation_participants cp
             JOIN conversations c ON c.conversation_id = cp.conversation_id
-            LEFT JOIN LATERAL (
-                SELECT m.sent_at
-                FROM chat_messages m
-                WHERE m.conversation_id = c.conversation_id
-                ORDER BY m.sent_at DESC
-                LIMIT 1
-            ) lm ON true
             WHERE cp.user_id = :userId
               AND c.is_deleted = false
-              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR COALESCE(lm.sent_at, c.created_at) < CAST(:cursor AS TIMESTAMP))
+              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR c.last_message_at < CAST(:cursor AS TIMESTAMP))
             """,
             nativeQuery = true)
     Page<ConversationSummaryProjection> findSummariesByUserCursor(@Param("userId") UUID userId,

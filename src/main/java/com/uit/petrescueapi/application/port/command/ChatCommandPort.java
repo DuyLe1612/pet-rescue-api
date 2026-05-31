@@ -15,4 +15,6 @@ public interface ChatCommandPort {
     ChatMessage sendMessage(UUID conversationId, CreateMessageRequestDto request, UUID senderId);
 
     void markRead(UUID conversationId, MarkReadRequestDto request, UUID userId);
+
+    void deleteMessage(UUID conversationId, UUID messageId, UUID userId);
 }
