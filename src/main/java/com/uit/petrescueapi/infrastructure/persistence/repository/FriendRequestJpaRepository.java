@@ -122,8 +122,8 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
             """,
             nativeQuery = true)
     Page<FriendRequestProjection> findPendingByAddresseeCursor(@Param("userId") UUID userId,
-                                                               @Param("status") FriendRequestStatus status,
-                                                               @Param("cursor") java.time.LocalDateTime cursor,
-                                                               @Param("search") String search,
-                                                               Pageable pageable);
+                                   @Param("status") String status,
+                                   @Param("cursor") java.time.LocalDateTime cursor,
+                                   @Param("search") String search,
+                                   Pageable pageable);
 }

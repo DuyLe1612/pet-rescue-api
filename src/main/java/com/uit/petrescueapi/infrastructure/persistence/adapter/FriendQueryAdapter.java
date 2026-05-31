@@ -35,7 +35,7 @@ public class FriendQueryAdapter implements FriendQueryDataPort {
 
     @Override
     public Page<FriendRequestDto> listPendingRequests(UUID userId, String search, Pageable pageable) {
-        return friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING, null, search, pageable)
+        return friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING.name(), null, search, pageable)
             .map(this::toRequestDto);
     }
 
@@ -53,7 +53,7 @@ public class FriendQueryAdapter implements FriendQueryDataPort {
 
         @Override
         public Page<FriendRequestDto> listPendingRequestsByCursor(UUID userId, java.time.LocalDateTime cursor, String search, Pageable pageable) {
-        return friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING, cursor, search, pageable)
+        return friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING.name(), cursor, search, pageable)
             .map(this::toRequestDto);
         }
 
