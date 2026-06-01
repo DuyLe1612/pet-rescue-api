@@ -8,6 +8,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.uit.petrescueapi.infrastructure.config.FlexibleLocalDateTimeDeserializer;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -37,8 +40,10 @@ public class UpdateBannerRequestDto {
     @Min(0)
     private Integer displayOrder;
 
+    @JsonDeserialize(using = FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime startDate;
 
+    @JsonDeserialize(using = FlexibleLocalDateTimeDeserializer.class)
     private LocalDateTime endDate;
 
     private Boolean active;
