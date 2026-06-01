@@ -1,7 +1,9 @@
 package com.uit.petrescueapi.presentation.mapper;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.domain.entity.RescueCase;
+import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -20,4 +22,6 @@ public interface RescueCaseWebMapper {
     @Mapping(target = "imageUrls", source = "imagePublicIds")
     @Mapping(target = "contactPhone", source = "contactPhone")
     RescueCaseResponseDto toDto(RescueCase rc);
+
+    RescueCaseCompletionResponseDto toDto(RescueCaseCompletion rc);
 }

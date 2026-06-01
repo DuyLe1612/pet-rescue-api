@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.port.query;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueMapMarkerDto;
@@ -29,4 +30,8 @@ public interface RescueCaseQueryPort {
      * Global map feed (no bounding box). Filters optional; limited to 500 markers.
      */
     List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
+
+    RescueCaseCompletionResponseDto getCompletionDetails(UUID caseId);
+    Page<RescueCaseCompletionResponseDto> findAllCompletions(boolean isResolved,Pageable pageable);
 }
+

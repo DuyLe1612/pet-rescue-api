@@ -1,16 +1,23 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.rescue.CreateRescueCaseRequestDto;
+import com.uit.petrescueapi.application.dto.rescue.CreateRescueCompletionRequestDto;
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.UpdateRescueCaseStatusRequestDto;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.RescueCase;
+import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
+import com.uit.petrescueapi.domain.entity.RescueCompletionMedia;
+import com.uit.petrescueapi.domain.repository.RescueCaseCompletionRepository;
 import com.uit.petrescueapi.domain.service.RescueCaseDomainService;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -48,6 +55,18 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
         return domainService.changeStatus(caseId, newStatus);
     }
 
+    @Override
+    public RescueCaseCompletion complete(UUID caseId, CreateRescueCompletionRequestDto cmd, UUID userId) {
+        log.debug("Command: complete rescue case by user {}", userId);
+        RescueCaseCompletion rescueCaseCompletion = buildCompletionFromDto(cmd);
+        return domainService.reportCompletion(rescueCaseCompletion);
+    }
+
+    public RescueCaseCompletion approveCompletion(UUID completionId, UUID userId) {
+        log.debug("Command: approve rescue case by user {}", userId);
+        return domainService.approveCompletion(completionId,userId);
+    }
+
     private RescueCase buildFromDto(CreateRescueCaseRequestDto cmd) {
         return RescueCase.builder()
                 .petId(cmd.getPetId())
@@ -68,12 +87,22 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
                 .build();
     }
 
-    private java.util.List<String> resolvePublicIds(java.util.List<java.util.UUID> mediaIds, java.util.List<String> imageUrls) {
+    private RescueCaseCompletion buildCompletionFromDto(CreateRescueCompletionRequestDto cmd) {
+        return RescueCaseCompletion.builder()
+                .caseId(cmd.getCaseId())
+                .mediaId(cmd.getVerificationImageIds())
+                .rescuedAt(cmd.getRescuedAt())
+                .rescueNote(cmd.getRescueNote())
+                .locationNote(cmd.getLocationNote())
+                .build();
+    }
+
+    private List<String> resolvePublicIds(List<UUID> mediaIds, List<String> imageUrls) {
         if (mediaIds != null && !mediaIds.isEmpty()) {
             return mediaIds.stream()
                     .map(mediaQueryPort::findById)
                     .map(media -> media.getPublicId())
-                    .filter(java.util.Objects::nonNull)
+                    .filter(Objects::nonNull)
                     .toList();
         }
         return imageUrls;

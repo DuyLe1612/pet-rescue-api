@@ -3,6 +3,7 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.rescue.*;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.query.RescueCaseQueryPort;
+import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
@@ -138,4 +139,47 @@ public class RescueCaseController {
 
         return ResponseEntity.ok(ApiResponse.ok(markers));
     }
+    // ══════════════════════════════════════════════════════════════════════════
+    // RESCUE COMPLETION FLOW ENDPOINTS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/{id}/complete")
+    @Operation(summary = "Submit rescue completion")
+    public ResponseEntity<ApiResponse<RescueCaseCompletion>> complete(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateRescueCompletionRequestDto cmd,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created(commandPort.complete(id, cmd, userId)));
+    }
+
+    @GetMapping("completions/{id}")
+    @Operation(summary = "Get rescue completion details")
+    public ResponseEntity<ApiResponse<RescueCaseCompletionResponseDto>> getCompletionDetails(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.getCompletionDetails(id)));
+    }
+
+    @PostMapping("/completions/{id}/approve")
+    @Operation(summary = "Approve rescue completion")
+    public ResponseEntity<ApiResponse<RescueCaseCompletion>> approveCompletion(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok( commandPort.approveCompletion(id, userId)));
+    }
+
+    @GetMapping("/completions")
+    @Operation(summary = "List all rescue completions (paginated)")
+    public ResponseEntity<ApiResponse<PageResponse<RescueCaseCompletionResponseDto>>> getAllCompletions(
+            @RequestParam(defaultValue = "false") boolean isResolved,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        return ResponseEntity.ok(ApiResponse.ok(
+            PageResponse.from(queryPort.findAllCompletions(isResolved,PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+    }
 }
+

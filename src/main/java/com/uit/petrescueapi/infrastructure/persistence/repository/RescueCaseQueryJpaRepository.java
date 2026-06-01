@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.infrastructure.persistence.entity.RescueCaseJpaEntity;
+import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseCompletionProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueMapMarkerProjection;
@@ -60,8 +61,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
     """,
-    countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc LEFT JOIN users u ON rc.reported_by = u.user_id WHERE rc.is_deleted = false AND (:search IS NULL OR :search = '' OR LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%'))) ",
-    nativeQuery = true)
+            countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc LEFT JOIN users u ON rc.reported_by = u.user_id WHERE rc.is_deleted = false AND (:search IS NULL OR :search = '' OR LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%'))) ",
+            nativeQuery = true)
     Page<RescueCaseSummaryProjection> findAllSummaries(@Param("search") String search, Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
@@ -118,13 +119,13 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
         ORDER BY distance
     """,
-    countQuery = """
-        SELECT COUNT(rc.case_id)
-        FROM rescue_cases rc
-        WHERE rc.is_deleted = false
-          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
-    """,
-    nativeQuery = true)
+            countQuery = """
+                        SELECT COUNT(rc.case_id)
+                        FROM rescue_cases rc
+                        WHERE rc.is_deleted = false
+                          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+                    """,
+            nativeQuery = true)
     Page<RescueCaseSummaryProjection> findNearby(
             @Param("lng") double lng,
             @Param("lat") double lat,
@@ -147,13 +148,13 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         WHERE rc.is_deleted = false
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
     """,
-    countQuery = """
-        SELECT COUNT(rc.case_id)
-        FROM rescue_cases rc
-        WHERE rc.is_deleted = false
-          AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
-    """,
-    nativeQuery = true)
+            countQuery = """
+                        SELECT COUNT(rc.case_id)
+                        FROM rescue_cases rc
+                        WHERE rc.is_deleted = false
+                          AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
+                    """,
+            nativeQuery = true)
     Page<RescueCaseSummaryProjection> findWithinBoundingBox(
             @Param("minLng") double minLng,
             @Param("minLat") double minLat,
@@ -224,13 +225,13 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           rc.reported_at DESC
         LIMIT 500
     """, nativeQuery = true)
-        List<RescueMapMarkerProjection> findMarkersWithFilters(
+    List<RescueMapMarkerProjection> findMarkersWithFilters(
             @Param("minLng") double minLng,
             @Param("minLat") double minLat,
             @Param("maxLng") double maxLng,
             @Param("maxLat") double maxLat,
-          @Param("status") java.util.List<String> status,
-          @Param("priority") java.util.List<String> priority,
+            @Param("status") java.util.List<String> status,
+            @Param("priority") java.util.List<String> priority,
             @Param("species") String species);
 
     @Query(value = """
@@ -255,4 +256,74 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("status") java.util.List<String> status,
             @Param("priority") java.util.List<String> priority,
             @Param("species") String species);
+
+    @Query(value = """
+    SELECT
+        rcc.completion_id AS completionId,
+        rcc.case_id AS caseId,
+        rc.case_code AS caseCode,
+        rcc.rescued_at AS rescuedAt,
+        rcc.rescue_note AS rescueNote,
+        rcc.location_note AS locationNote,
+        rcc.verified_by AS verifiedBy,
+        u.username AS verifiedByName,
+        rcc.verified_at AS verifiedAt
+    FROM rescue_case_completions rcc
+    JOIN rescue_cases rc
+        ON rc.case_id = rcc.case_id
+    LEFT JOIN users u
+        ON u.user_id = rcc.verified_by
+    WHERE
+        (
+            (:isResolved = true AND rcc.verified_at IS NOT NULL)
+            OR
+            (:isResolved = false AND rcc.verified_at IS NULL)
+        )
+    ORDER BY rcc.created_at DESC
+    """,
+            countQuery = """
+    SELECT COUNT(*)
+    FROM rescue_case_completions rcc
+    WHERE
+        (
+            (:isResolved = true AND rcc.verified_at IS NOT NULL)
+            OR
+            (:isResolved = false AND rcc.verified_at IS NULL)
+        )
+    """,
+            nativeQuery = true)
+    Page<RescueCaseCompletionProjection> findAllCompletion(
+            @Param("isResolved") boolean isResolved,
+            Pageable pageable);
+
+    @Query(value = """
+    SELECT
+        rcc.completion_id AS completionId,
+        rcc.case_id AS caseId,
+        rc.case_code AS caseCode,
+        rcc.rescued_at AS rescuedAt,
+        rcc.rescue_note AS rescueNote,
+        rcc.location_note AS locationNote,
+        rcc.verified_by AS verifiedBy,
+        u.username AS verifiedByName,
+        rcc.verified_at AS verifiedAt
+    FROM rescue_case_completions rcc
+    JOIN rescue_cases rc
+        ON rc.case_id = rcc.case_id
+    LEFT JOIN users u
+        ON u.user_id = rcc.verified_by
+    WHERE completion_id = :caseId 
+        AND rcc.is_deleted = false
+    """,
+            nativeQuery = true)
+    Optional<RescueCaseCompletionProjection> findCompletionById(
+            @Param("completionId") UUID completionId);
+
+    @Query(value = "SELECT mf.public_id FROM media_files mf " +
+            "JOIN rescue_completion_media rm ON rm.media_id = mf.media_id " +
+            "WHERE rm.completion_id = :completionId " +
+            "ORDER BY mf.created_at",
+            nativeQuery = true)
+
+    List<String> FindMediaPublicIdsByCompletionId(@Param("completionId")UUID completionId);
 }

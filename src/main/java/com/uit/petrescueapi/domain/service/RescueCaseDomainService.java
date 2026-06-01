@@ -1,9 +1,10 @@
 package com.uit.petrescueapi.domain.service;
 
 import com.uit.petrescueapi.domain.entity.RescueCase;
+import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
+import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
-import com.uit.petrescueapi.domain.repository.RescueCaseRepository;
-import com.uit.petrescueapi.domain.repository.VisualCodeRepository;
+import com.uit.petrescueapi.domain.repository.*;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,11 +36,13 @@ import java.util.UUID;
 public class RescueCaseDomainService {
 
     private final RescueCaseRepository rescueCaseRepository;
+    private final RescueCaseCompletionRepository rescueCaseCompletionRepository;
     private final VisualCodeRepository visualCodeRepository;
+    private final UserRepository userRepository;
 
     // ── Status-transition matrix ───────────────────
     private static final Map<RescueCaseStatus, Set<RescueCaseStatus>> ALLOWED_TRANSITIONS = Map.of(
-            RescueCaseStatus.REPORTED,    Set.of(RescueCaseStatus.IN_PROGRESS, RescueCaseStatus.CLOSED),
+            RescueCaseStatus.REPORTED,    Set.of(RescueCaseStatus.IN_PROGRESS, RescueCaseStatus.RESCUED, RescueCaseStatus.CLOSED),
             RescueCaseStatus.IN_PROGRESS, Set.of(RescueCaseStatus.RESCUED, RescueCaseStatus.CLOSED),
             RescueCaseStatus.RESCUED,     Set.of(RescueCaseStatus.CLOSED),
             RescueCaseStatus.CLOSED,      Set.of()
@@ -53,10 +57,19 @@ public class RescueCaseDomainService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<RescueCaseCompletion> findCompletionById(UUID completionId) {
+        return rescueCaseCompletionRepository.findById(completionId);
+    }
+
+    @Transactional(readOnly = true)
     public Page<RescueCase> findAll(Pageable pageable) {
         return rescueCaseRepository.findAll(pageable);
     }
 
+    @Transactional(readOnly = true)
+    public Page<RescueCaseCompletion> findAllCompletions(Pageable pageable) {
+        return rescueCaseCompletionRepository.findAll(pageable);
+    }
     // ── Commands ────────────────────────────────────
 
     /**
@@ -72,6 +85,18 @@ public class RescueCaseDomainService {
         rescueCase.setCreatedAt(LocalDateTime.now());
         return rescueCaseRepository.save(rescueCase);
     }
+
+    /**
+     * Report
+     */
+    public RescueCaseCompletion reportCompletion(RescueCaseCompletion rescueCaseCompletion) {
+        log.info("Reporting new rescue case completion");
+        rescueCaseCompletion.setCompletionId(UUID.randomUUID());
+        rescueCaseCompletion.setRescuedAt(LocalDateTime.now());
+        rescueCaseCompletion.setCreatedAt(LocalDateTime.now());
+        return rescueCaseCompletionRepository.Save(rescueCaseCompletion);
+    }
+
 
     /**
      * Partial update of an existing rescue case.
@@ -107,6 +132,34 @@ public class RescueCaseDomainService {
 
         return rescueCaseRepository.save(rescueCase);
     }
+    public RescueCaseCompletion approveCompletion(UUID completionId, UUID userId) {
+        log.debug("Approving rescue case completion {} by user {}", completionId,userId);
+
+        Optional<RescueCaseCompletion> completion = findCompletionById(completionId);
+        if (completion.get().getVerifiedAt() != null) {
+            throw new BusinessException(
+                    "Completion already approved"
+            );
+        }
+
+        RescueCase rescueCase = findById(completion.get().getCaseId());
+
+        if (rescueCase.getStatus()
+                != RescueCaseStatus.REPORTED) {
+
+            throw new BusinessException(
+                    "Case is not awaiting approval"
+            );
+        }
+        if  (completion.isPresent()) {
+            rescueCase.setStatus(RescueCaseStatus.RESCUED);
+            completion.get().setUpdatedAt(LocalDateTime.now());
+            completion.get().setVerifiedAt(LocalDateTime.now());
+            completion.get().setVerifiedBy(userId);
+        }
+        rescueCaseRepository.save(rescueCase);
+        return  rescueCaseCompletionRepository.Save(completion.get());
+    }
 
     // ── Private helpers ─────────────────────────────
 
@@ -124,4 +177,6 @@ public class RescueCaseDomainService {
         if (source.getOrganizationId() != null) target.setOrganizationId(source.getOrganizationId());
         if (source.getPetId() != null)        target.setPetId(source.getPetId());
     }
+
+
 }

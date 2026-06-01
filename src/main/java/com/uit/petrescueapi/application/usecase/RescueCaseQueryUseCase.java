@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueMapMarkerDto;
@@ -29,7 +30,6 @@ import java.util.UUID;
 public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
     private final RescueCaseQueryDataPort queryDataPort;
-
     @Override
     public RescueCaseResponseDto findById(UUID caseId) {
         log.debug("Query: find rescue case by id {}", caseId);
@@ -75,5 +75,17 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
         log.debug("Query: find global map markers (no bbox), status={}, priority={}, species={}", status, priority, species);
         return queryDataPort.findMapMarkers(status, priority, species);
+    }
+
+    @Override
+    public RescueCaseCompletionResponseDto getCompletionDetails(UUID completionId) {
+        log.debug("Query: get completion details for rescue case completions {}", completionId);
+        return queryDataPort.findCompletionById(completionId);
+    }
+
+    @Override
+    public Page<RescueCaseCompletionResponseDto> findAllCompletions(boolean isResolved,Pageable pageable) {
+        log.debug("Query: find all completions");
+        return queryDataPort.findAllCompletion(isResolved,pageable);
     }
 }

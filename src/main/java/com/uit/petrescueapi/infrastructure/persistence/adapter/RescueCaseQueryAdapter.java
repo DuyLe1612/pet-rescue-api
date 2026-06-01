@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueMapMarkerDto;
@@ -7,6 +8,7 @@ import com.uit.petrescueapi.application.port.out.RescueCaseQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
+import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseCompletionProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueMapMarkerProjection;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -38,6 +41,12 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     @Override
     public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
         return queryRepo.findAllSummaries(search, pageable).map(this::toSummaryDto);
+    }
+
+
+    @Override
+    public Page<RescueCaseCompletionResponseDto> findAllCompletion(boolean isResolved, Pageable pageable) {
+        return queryRepo.findAllCompletion(isResolved,pageable).map(this::toDto);
     }
 
     @Override
@@ -63,6 +72,12 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
         RescueCaseDetailProjection proj = queryRepo.findDetailById(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("RescueCase", "caseId", caseId));
         return toResponseDto(proj, queryRepo.findMediaPublicIdsByCaseId(caseId));
+    }
+
+    @Override
+    public RescueCaseCompletionResponseDto findCompletionById(UUID completionId) {
+        Optional<RescueCaseCompletionProjection> proj = queryRepo.findCompletionById(completionId);
+        return toCompletionDto(proj,queryRepo.FindMediaPublicIdsByCompletionId(completionId));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -129,7 +144,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .build();
     }
 
-    private RescueCaseResponseDto toResponseDto(RescueCaseDetailProjection p, java.util.List<String> imagePublicIds) {
+    private RescueCaseResponseDto toResponseDto(RescueCaseDetailProjection p, List<String> imagePublicIds) {
         return RescueCaseResponseDto.builder()
                 .caseId(p.getCaseId())
                 .caseCode(p.getCaseCode())
@@ -156,6 +171,19 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .contactPhone(p.getContactPhone())
                 .build();
     }
+    private RescueCaseCompletionResponseDto toCompletionDto(Optional<RescueCaseCompletionProjection> p, List<String> imagePublicIds) {
+        return RescueCaseCompletionResponseDto.builder()
+                .completionId(p.get().getCompletionId())
+                .caseId(p.get().getCaseId())
+                .rescuedAt(p.get().getRescuedAt())
+                .rescueNote(p.get().getRescueNote())
+                .locationNote(p.get().getLocationNote())
+                .verifiedBy(p.get().getVerifiedBy())
+                .verifiedByName(p.get().getVerifiedByName())
+                .verifiedAt(p.get().getVerifiedAt())
+                .verificationImagesUrl(imagePublicIds)
+                .build();
+    }
 
     private RescueMapMarkerDto toMarkerDto(RescueMapMarkerProjection p) {
         return RescueMapMarkerDto.builder()
@@ -168,5 +196,18 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .species(p.getSpecies())
                 .reportedAt(p.getReportedAt())
                 .build();
+    }
+    private RescueCaseCompletionResponseDto toDto(RescueCaseCompletionProjection p) {
+        return RescueCaseCompletionResponseDto.builder()
+                .completionId(p.getCompletionId())
+                .caseId(p.getCaseId())
+                .rescuedAt(p.getRescuedAt())
+                .rescueNote(p.getRescueNote())
+                .locationNote(p.getLocationNote())
+                .verifiedBy(p.getVerifiedBy())
+                .verifiedByName(p.getVerifiedByName())
+                .verifiedAt(p.getVerifiedAt())
+                .build();
+
     }
 }
