@@ -38,7 +38,7 @@ public class AdoptionResponseDto {
     private UUID organizationId;
     private String organizationName;
 
-    @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"})
+    @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELLED","COMPLETE"})
     private String status;
 
     @Schema(example = "Please consider my work schedule and home setup.")

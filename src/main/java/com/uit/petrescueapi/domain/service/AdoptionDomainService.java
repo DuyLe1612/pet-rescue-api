@@ -107,10 +107,16 @@ public class AdoptionDomainService {
     public AdoptionApplication cancel(UUID applicationId) {
         log.info("Canceling adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
-        validateStatus(app, "PENDING", "CANCELED");
+
+        if (!"PENDING".equals(app.getStatus())
+                && !"APPROVED".equals(app.getStatus())) {
+            throw new IllegalStateException(
+                    "Only PENDING or APPROVED applications can be canceled");
+        }
 
         app.setStatus("CANCELED");
         app.setUpdatedAt(LocalDateTime.now());
+
         return applicationRepository.save(app);
     }
 
