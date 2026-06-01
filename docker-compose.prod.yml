@@ -20,22 +20,22 @@ services:
       retries: 5
     restart: unless-stopped
 
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    container_name: petrescue-rabbitmq
-    ports:
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-petrescue}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-petrescue}
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
+#  rabbitmq:
+#    image: rabbitmq:3.13-management-alpine
+#    container_name: petrescue-rabbitmq
+#    ports:
+#      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+#    environment:
+#      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-petrescue}
+#      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-petrescue}
+#    volumes:
+#      - rabbitmq-data:/var/lib/rabbitmq
+#    healthcheck:
+#      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    restart: unless-stopped
 
   app:
     image: ${IMAGE_TAG:-petrescue-api:latest}
@@ -74,12 +74,12 @@ services:
       REDIS_SSL_ENABLED: "false"
 
       # ── RabbitMQ (Docker service) ────────────────
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-petrescue}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-petrescue}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:/}
-      RABBITMQ_SSL_ENABLED: "false"
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: ${RABBITMQ_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST}
+      RABBITMQ_SSL_ENABLED: ${RABBITMQ_SSL_ENABLED}
 
       # ── Email verification ─────────────────────
       EMAIL_FROM: ${EMAIL_FROM}
@@ -106,4 +106,4 @@ services:
 
 volumes:
   redis-data:
-  rabbitmq-data:
+#  rabbitmq-data:
