@@ -43,8 +43,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
     ports:
       - "${PORT:-8080}:8080"
     environment:
@@ -70,7 +70,7 @@ services:
       # ── Redis (Docker service) ───────────────────
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       REDIS_SSL_ENABLED: "false"
 
       # ── RabbitMQ (Docker service) ────────────────
