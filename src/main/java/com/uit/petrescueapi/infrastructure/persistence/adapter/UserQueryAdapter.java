@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
+import com.uit.petrescueapi.application.dto.user.UserPublicSearchDto;
 import com.uit.petrescueapi.application.dto.user.UserSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.UserSearchPort;
 import com.uit.petrescueapi.application.port.out.UserQueryDataPort;
@@ -10,6 +11,7 @@ import com.uit.petrescueapi.infrastructure.persistence.entity.RoleJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.entity.UserJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.entity.UserReputationJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.UserDetailProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.UserPublicSearchProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.UserSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.repository.UserJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.UserQueryJpaRepository;
@@ -53,6 +55,11 @@ public class UserQueryAdapter implements UserQueryDataPort {
         return queryRepo.findAllSummary(pageable).map(this::toSummaryDto);
     }
 
+        @Override
+        public Page<UserPublicSearchDto> searchPublicUsers(String searchName, Pageable pageable) {
+                return queryRepo.findPublicSearch(searchName, pageable).map(this::toPublicSearchDto);
+        }
+
     // ── Detail (single user) query ──────────────
 
     @Override
@@ -91,6 +98,15 @@ public class UserQueryAdapter implements UserQueryDataPort {
                 .status(p.getStatus())
                 .build();
     }
+
+        private UserPublicSearchDto toPublicSearchDto(UserPublicSearchProjection p) {
+                return UserPublicSearchDto.builder()
+                                .userId(p.getUserId())
+                                .username(p.getUsername())
+                                .fullName(p.getFullName())
+                                .avatarUrl(p.getAvatarUrl())
+                                .build();
+        }
 
     private UserResponseDto toResponseDto(UserDetailProjection p, List<String> roles) {
         UserReputationResponseDto reputation = userReputationJpaRepo.findById(p.getUserId())

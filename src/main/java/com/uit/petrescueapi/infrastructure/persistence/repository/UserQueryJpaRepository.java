@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.infrastructure.persistence.entity.UserJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.UserDetailProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.UserPublicSearchProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.UserSummaryProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -49,6 +50,20 @@ public interface UserQueryJpaRepository extends JpaRepository<UserJpaEntity, UUI
              LOWER(u.userCode) LIKE LOWER(CONCAT('%', :searchName, '%')))
         """)
         Page<UserSummaryProjection> findAllSummaryWithSearch(@Param("searchName") String searchName, Pageable pageable);
+
+        @Query("""
+                SELECT u.userId   AS userId,
+                             u.username AS username,
+                             u.fullName AS fullName,
+                             u.avatarUrl AS avatarUrl
+                FROM UserJpaEntity u
+                WHERE u.status = 'ACTIVE'
+                    AND (:searchName IS NOT NULL AND :searchName <> '' AND (
+                             LOWER(u.username) LIKE LOWER(CONCAT('%', :searchName, '%')) OR
+                             LOWER(u.fullName) LIKE LOWER(CONCAT('%', :searchName, '%'))
+                    ))
+        """)
+        Page<UserPublicSearchProjection> findPublicSearch(@Param("searchName") String searchName, Pageable pageable);
 
     // ── Detail (single user) ────────────────────
 

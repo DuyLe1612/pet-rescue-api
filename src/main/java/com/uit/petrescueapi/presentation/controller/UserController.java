@@ -2,6 +2,7 @@ package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.dto.user.UpdateUserProfileRequestDto;
+import com.uit.petrescueapi.application.dto.user.UserPublicSearchDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserSummaryResponseDto;
 import com.uit.petrescueapi.application.port.command.UserCommandPort;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -78,6 +80,21 @@ public class UserController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search users for friend discovery")
+    public ResponseEntity<ApiResponse<PageResponse<UserPublicSearchDto>>> searchPublicUsers(
+            @RequestParam String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        Page<UserPublicSearchDto> result;
+        if (search == null || search.isBlank()) {
+            result = Page.empty(PageRequest.of(page, pageSize));
+        } else {
+            result = queryPort.searchPublicUsers(search, PageRequest.of(page, pageSize));
+        }
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(result)));
     }
 
     @GetMapping("/{id}/reputation")

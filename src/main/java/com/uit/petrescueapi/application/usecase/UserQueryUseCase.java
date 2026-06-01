@@ -2,6 +2,7 @@ package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
+import com.uit.petrescueapi.application.dto.user.UserPublicSearchDto;
 import com.uit.petrescueapi.application.dto.user.UserSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.UserQueryDataPort;
 import com.uit.petrescueapi.application.port.query.UserQueryPort;
@@ -37,6 +38,12 @@ public class UserQueryUseCase implements UserQueryPort {
     public Page<UserSummaryResponseDto> findAll(String searchName, Pageable pageable) {
         log.debug("Query: find all users (paginated, searchName={})", searchName);
         return queryDataPort.findAllSummaries(searchName, pageable);
+    }
+
+    @Override
+    public Page<UserPublicSearchDto> searchPublicUsers(String searchName, Pageable pageable) {
+        log.debug("Query: search public users (searchName={})", searchName);
+        return queryDataPort.searchPublicUsers(searchName, pageable);
     }
 
     @Override
