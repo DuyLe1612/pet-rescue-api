@@ -312,7 +312,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         ON rc.case_id = rcc.case_id
     LEFT JOIN users u
         ON u.user_id = rcc.verified_by
-    WHERE completion_id = :caseId 
+    WHERE completion_id = :completionId 
         AND rcc.is_deleted = false
     """,
             nativeQuery = true)
