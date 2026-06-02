@@ -1,6 +1,8 @@
 package com.uit.petrescueapi.infrastructure.persistence.repository;
 
+import com.uit.petrescueapi.application.dto.admin.OrganizationStatsDto;
 import com.uit.petrescueapi.infrastructure.persistence.entity.OrganizationJpaEntity;
+import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationStatsProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,4 +21,11 @@ public interface OrganizationJpaRepository extends JpaRepository<OrganizationJpa
      */
     @Query("SELECT o FROM OrganizationJpaEntity o WHERE o.organizationId IN :ids")
     List<OrganizationJpaEntity> findAllByOrganizationIdIn(@Param("ids") Set<UUID> ids);
+
+    @Query("""
+SELECT
+    COALESCE(COUNT(o),0) as total
+FROM OrganizationJpaEntity o
+""")
+    OrganizationStatsProjection getStats();
 }

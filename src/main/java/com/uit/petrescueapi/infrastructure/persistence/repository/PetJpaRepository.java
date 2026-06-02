@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import com.uit.petrescueapi.infrastructure.persistence.entity.PetJpaEntity;
+import com.uit.petrescueapi.infrastructure.persistence.projection.PetStatsProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -36,4 +37,17 @@ public interface PetJpaRepository extends JpaRepository<PetJpaEntity, UUID> {
 
     @Query("SELECT p FROM PetJpaEntity p WHERE p.deleted = false AND p.status = :status")
     Page<PetJpaEntity> findByStatus(@Param("status") PetStatus status, Pageable pageable);
+
+    @Query("""
+
+            SELECT
+    COALESCE(COUNT(p), 0) as total,
+    COALESCE(SUM(CASE WHEN p.status = 'UNOWNED' THEN 1 ELSE 0 END), 0) as available,
+    COALESCE(SUM(CASE WHEN p.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending,
+    COALESCE(SUM(CASE WHEN p.status = 'ADOPTED' THEN 1 ELSE 0 END), 0) as adopted
+FROM PetJpaEntity p
+WHERE p.deleted = false
+""")
+    PetStatsProjection getStats();
+
 }

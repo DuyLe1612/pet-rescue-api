@@ -3,16 +3,19 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.admin.AssignOrgRoleRequestDto;
 import com.uit.petrescueapi.application.dto.admin.CreateAdminAccountRequestDto;
 import com.uit.petrescueapi.application.dto.admin.CreateOrganizationAccountRequestDto;
+import com.uit.petrescueapi.application.dto.admin.DashboardOverviewDto;
 import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
+import com.uit.petrescueapi.application.port.query.AdminDashboardQueryPort;
 import com.uit.petrescueapi.domain.entity.OrganizationMember;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.User;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
+import com.uit.petrescueapi.domain.service.PetDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
@@ -40,9 +43,16 @@ public class AdminController {
 
     private final UserDomainService userDomainService;
     private final OrganizationDomainService organizationDomainService;
+    private final AdminDashboardQueryPort adminDashboardQueryPort;
     private final PetCommandPort petCommandPort;
     private final PetWebMapper petWebMapper;
     private final PasswordEncoder passwordEncoder;
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Get admin dashboard stats")
+    public ResponseEntity<DashboardOverviewDto> getDashboardOverview() {
+        return ResponseEntity.ok(adminDashboardQueryPort.getOverview());
+    }
 
     @PostMapping("/accounts")
     @Operation(summary = "Create a fully custom account (default ACTIVE)")
@@ -190,6 +200,7 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
+
     @PatchMapping("/users/{userId}/unlock")
     @Operation(summary = "Unlock user account")
     public ResponseEntity<ApiResponse<UserResponseDto>> unlockUser(@PathVariable UUID userId) {
@@ -208,4 +219,6 @@ public class AdminController {
                 .build();
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
+
+
 }

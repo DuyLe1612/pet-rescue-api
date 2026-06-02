@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.infrastructure.persistence.entity.UserJpaEntity;
+import com.uit.petrescueapi.infrastructure.persistence.projection.UserStatsProjection;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -29,4 +30,14 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
 
     @Query("SELECT u.expoPushToken FROM UserJpaEntity u WHERE u.userId = :id")
     Optional<String> findExpoPushTokenById(@Param("id") UUID id);
+
+    @Query("""
+SELECT
+    COALESCE(COUNT(u),0) as totalUsers,
+    COALESCE(SUM(CASE WHEN u.status = 'ACTIVE' THEN 1 ELSE 0 END),0) as activeUsers,
+    COALESCE(SUM(CASE WHEN u.status = 'PENDING' THEN 1 ELSE 0 END),0) as pendingUsers,
+    COALESCE(SUM(CASE WHEN u.status = 'BANNED' THEN 1 ELSE 0 END),0) as bannedUsers
+FROM UserJpaEntity u
+""")
+    UserStatsProjection getStats();
 }
