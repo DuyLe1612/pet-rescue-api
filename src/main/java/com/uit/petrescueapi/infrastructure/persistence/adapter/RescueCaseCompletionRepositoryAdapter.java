@@ -40,8 +40,8 @@ public class RescueCaseCompletionRepositoryAdapter implements RescueCaseCompleti
     }
 
     @Override
-    public Page<RescueCaseCompletion> findByCaseId(UUID caseId, Pageable pageable) {
-        return jpa.findByCaseIdAndDeletedFalse(caseId, pageable)
+    public Optional<RescueCaseCompletion> findByCaseId(UUID caseId) {
+        return jpa.findByCaseIdAndDeletedFalse(caseId)
                 .map(mapper::toDomain);
     }
 }

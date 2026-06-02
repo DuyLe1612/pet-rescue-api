@@ -41,10 +41,6 @@ public class Pet extends BaseEntity {
     private boolean neutered;
     private LocalDate rescueDate;
     private String rescueLocation;
-
-    @Builder.Default
-    private List<String> imageUrls = new ArrayList<>();
-
     private UUID shelterId;
     private UUID rescueCaseId;
 }

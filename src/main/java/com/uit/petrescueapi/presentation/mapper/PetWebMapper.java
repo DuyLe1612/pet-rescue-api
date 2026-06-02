@@ -26,7 +26,7 @@ public interface PetWebMapper {
 
     // ── Summary response (list views) ───────────
 
-    @Mapping(target = "imageUrl", expression = "java(firstImage(pet.getImageUrls()))")
+
     PetSummaryResponseDto toSummaryDto(Pet pet);
 
     List<PetSummaryResponseDto> toSummaryDtoList(List<Pet> pets);

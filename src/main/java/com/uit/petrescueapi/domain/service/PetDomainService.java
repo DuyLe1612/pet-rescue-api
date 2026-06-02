@@ -241,6 +241,5 @@ public class PetDomainService {
         if (source.getHealthStatus() != null)target.setHealthStatus(source.getHealthStatus());
         target.setVaccinated(source.isVaccinated());
         target.setNeutered(source.isNeutered());
-        if (source.getImageUrls() != null)   target.setImageUrls(source.getImageUrls());
     }
 }

@@ -14,5 +14,5 @@ public interface RescueCaseCompletionRepository {
     RescueCaseCompletion Save(RescueCaseCompletion rescueCaseCompletion);
     Optional<RescueCaseCompletion> findById(UUID id);
     Page<RescueCaseCompletion> findAll(Pageable pageable);
-    Page<RescueCaseCompletion> findByCaseId(UUID caseId, Pageable pageable);
+    Optional<RescueCaseCompletion> findByCaseId(UUID caseId);
 }

@@ -91,6 +91,11 @@ public class RescueCaseDomainService {
      */
     public RescueCaseCompletion reportCompletion(RescueCaseCompletion rescueCaseCompletion) {
         log.info("Reporting new rescue case completion");
+
+        Optional<RescueCaseCompletion> rescueCaseCompletion1 = rescueCaseCompletionRepository.findByCaseId(rescueCaseCompletion.getCaseId());
+        if  (rescueCaseCompletion1.isPresent()) {
+            throw new BusinessException("RescueCaseCompletion already exists");
+        }
         rescueCaseCompletion.setCompletionId(UUID.randomUUID());
         rescueCaseCompletion.setRescuedAt(LocalDateTime.now());
         rescueCaseCompletion.setCreatedAt(LocalDateTime.now());
