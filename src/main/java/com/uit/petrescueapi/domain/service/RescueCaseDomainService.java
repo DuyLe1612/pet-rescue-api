@@ -78,7 +78,7 @@ public class RescueCaseDomainService {
      */
     public RescueCase report(RescueCase rescueCase) {
         log.info("Reporting new rescue case");
-        rescueCase.setCaseId(UUID.randomUUID());
+//        rescueCase.setCaseId(UUID.randomUUID());
         rescueCase.setCaseCode(visualCodeRepository.nextRescueCaseCode());
         rescueCase.setStatus(RescueCaseStatus.REPORTED);
         rescueCase.setReportedAt(LocalDateTime.now());
@@ -96,10 +96,10 @@ public class RescueCaseDomainService {
         if  (rescueCaseCompletion1.isPresent()) {
             throw new BusinessException("RescueCaseCompletion already exists");
         }
-        rescueCaseCompletion.setCompletionId(UUID.randomUUID());
+//        rescueCaseCompletion.setCompletionId(UUID.randomUUID());
         rescueCaseCompletion.setRescuedAt(LocalDateTime.now());
         rescueCaseCompletion.setCreatedAt(LocalDateTime.now());
-        return rescueCaseCompletionRepository.Save(rescueCaseCompletion);
+        return rescueCaseCompletionRepository.save(rescueCaseCompletion);
     }
 
 
@@ -163,7 +163,7 @@ public class RescueCaseDomainService {
             completion.get().setVerifiedBy(userId);
         }
         rescueCaseRepository.save(rescueCase);
-        return  rescueCaseCompletionRepository.Save(completion.get());
+        return  rescueCaseCompletionRepository.save(completion.get());
     }
 
     // ── Private helpers ─────────────────────────────

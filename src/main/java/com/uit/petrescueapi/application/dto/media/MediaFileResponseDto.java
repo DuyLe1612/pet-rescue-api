@@ -30,5 +30,7 @@ public class MediaFileResponseDto {
     @Schema(example = "IMAGE", allowableValues = {"IMAGE", "VIDEO"})
     private String type;
 
+    private String status;
+
     private LocalDateTime createdAt;
 }

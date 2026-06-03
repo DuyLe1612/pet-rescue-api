@@ -11,7 +11,7 @@ import java.util.UUID;
  * Domain repository contract for the RescueCaseCompletion aggregate.
  */
 public interface RescueCaseCompletionRepository {
-    RescueCaseCompletion Save(RescueCaseCompletion rescueCaseCompletion);
+    RescueCaseCompletion save(RescueCaseCompletion rescueCaseCompletion);
     Optional<RescueCaseCompletion> findById(UUID id);
     Page<RescueCaseCompletion> findAll(Pageable pageable);
     Optional<RescueCaseCompletion> findByCaseId(UUID caseId);
