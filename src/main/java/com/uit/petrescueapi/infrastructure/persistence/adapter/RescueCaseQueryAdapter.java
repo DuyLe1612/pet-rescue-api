@@ -1,17 +1,12 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
-import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
-import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
-import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
-import com.uit.petrescueapi.application.dto.rescue.RescueMapMarkerDto;
+import com.uit.petrescueapi.application.dto.rescue.*;
+import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.RescueCaseQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
-import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseCompletionProjection;
-import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseDetailProjection;
-import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseSummaryProjection;
-import com.uit.petrescueapi.infrastructure.persistence.projection.RescueMapMarkerProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.*;
 import com.uit.petrescueapi.infrastructure.persistence.repository.RescueCaseQueryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,75 +14,92 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
-/**
- * Query-side adapter (CQRS read path) for RescueCase.
- *
- * <p>Executes optimized JOIN queries via {@link RescueCaseQueryJpaRepository},
- * maps infrastructure projections to application DTOs.</p>
- */
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     private final RescueCaseQueryJpaRepository queryRepo;
+    private final CloudStoragePort cloudStoragePort;
 
-    // ── List (summary) queries ──────────────────
+    // ======================================================
+    // LIST QUERIES
+    // ======================================================
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
-        return queryRepo.findAllSummaries(search, pageable).map(this::toSummaryDto);
+        return queryRepo.findAllSummaries(search, pageable)
+                .map(this::toSummaryDto);
     }
-
 
     @Override
     public Page<RescueCaseCompletionResponseDto> findAllCompletion(boolean isResolved, Pageable pageable) {
-        return queryRepo.findAllCompletion(isResolved,pageable).map(this::toDto);
+        return queryRepo.findAllCompletion(isResolved, pageable)
+                .map(p -> toCompletionDto(
+                        p,
+                        buildMediaUrls(queryRepo.findMediaPublicIdsByCompletionId(p.getCompletionId()))
+                ));
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findNearbySummaries(double lat, double lng,
-                                                                   double distanceMeters,
-                                                                   Pageable pageable) {
-        // Port passes (lat, lng) but JPA repo expects (lng, lat) — swap parameters
-        return queryRepo.findNearby(lng, lat, distanceMeters, pageable).map(this::toSummaryDto);
+    public Page<RescueCaseSummaryResponseDto> findNearbySummaries(
+            double lat, double lng, double distanceMeters, Pageable pageable) {
+
+        return queryRepo.findNearby(lng, lat, distanceMeters, pageable)
+                .map(this::toSummaryDto);
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng,
-                                                                             double maxLat, double maxLng,
-                                                                             Pageable pageable) {
-        // Port passes (minLat, minLng, maxLat, maxLng) but JPA repo expects (minLng, minLat, maxLng, maxLat)
-        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, pageable).map(this::toSummaryDto);
+    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(
+            double minLat, double minLng, double maxLat, double maxLng, Pageable pageable) {
+
+        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, pageable)
+                .map(this::toSummaryDto);
     }
 
-    // ── Detail (single rescue case) query ───────
+    // ======================================================
+    // DETAIL QUERY
+    // ======================================================
 
     @Override
     public RescueCaseResponseDto findById(UUID caseId) {
+
         RescueCaseDetailProjection proj = queryRepo.findDetailById(caseId)
-                .orElseThrow(() -> new ResourceNotFoundException("RescueCase", "caseId", caseId));
-        return toResponseDto(proj, queryRepo.findMediaPublicIdsByCaseId(caseId));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("RescueCase", "caseId", caseId)
+                );
+
+        List<String> mediaUrls =
+                buildMediaUrls(queryRepo.findMediaPublicIdsByCaseId(caseId));
+
+        return toResponseDto(proj, mediaUrls);
     }
 
     @Override
     public RescueCaseCompletionResponseDto findCompletionById(UUID completionId) {
-        Optional<RescueCaseCompletionProjection> proj = queryRepo.findCompletionById(completionId);
-        return toCompletionDto(proj,queryRepo.FindMediaPublicIdsByCompletionId(completionId));
+
+        RescueCaseCompletionProjection proj = queryRepo.findCompletionById(completionId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("RescueCaseCompletion", "completionId", completionId)
+                );
+
+        List<String> mediaUrls =
+                buildMediaUrls(queryRepo.findMediaPublicIdsByCompletionId(completionId));
+
+        return toCompletionDto(proj, mediaUrls);
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // MAP MARKER QUERIES - Ultra-optimized for fast map rendering
-    // ══════════════════════════════════════════════════════════════════════════
+    // ======================================================
+    // MAP MARKERS
+    // ======================================================
 
     @Override
-    public List<RescueMapMarkerDto> findMarkersInBounds(double minLat, double minLng,
-                                                         double maxLat, double maxLng) {
-        // Port passes (minLat, minLng, maxLat, maxLng) but repo expects (minLng, minLat, maxLng, maxLat)
+    public List<RescueMapMarkerDto> findMarkersInBounds(
+            double minLat, double minLng, double maxLat, double maxLng) {
+
         return queryRepo.findMarkersInBounds(minLng, minLat, maxLng, maxLat)
                 .stream()
                 .map(this::toMarkerDto)
@@ -95,56 +107,96 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     }
 
     @Override
-    public List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng,
-                                                            double maxLat, double maxLng,
-                                                            List<RescueCaseStatus> status,
-                                                            List<RescuePriority> priority,
-                                                            String species) {
-        List<String> statusNames = (status == null || status.isEmpty())
-            ? java.util.Arrays.stream(RescueCaseStatus.values()).map(Enum::name).toList()
-            : status.stream().map(Enum::name).toList();
-        List<String> priorityNames = (priority == null || priority.isEmpty())
-            ? java.util.Arrays.stream(RescuePriority.values()).map(Enum::name).toList()
-            : priority.stream().map(Enum::name).toList();
+    public List<RescueMapMarkerDto> findMarkersWithFilters(
+            double minLat, double minLng,
+            double maxLat, double maxLng,
+            List<RescueCaseStatus> status,
+            List<RescuePriority> priority,
+            String species) {
 
-        return queryRepo.findMarkersWithFilters(minLng, minLat, maxLng, maxLat, statusNames, priorityNames, species)
+        List<String> statusNames = normalizeStatuses(status);
+        List<String> priorityNames = normalizePriorities(priority);
+
+        return queryRepo.findMarkersWithFilters(
+                        minLng, minLat, maxLng, maxLat,
+                        statusNames, priorityNames, species)
                 .stream()
                 .map(this::toMarkerDto)
                 .toList();
     }
 
     @Override
-    public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
-        List<String> statusNames = (status == null || status.isEmpty())
-            ? java.util.Arrays.stream(RescueCaseStatus.values()).map(Enum::name).toList()
-            : status.stream().map(Enum::name).toList();
-        List<String> priorityNames = (priority == null || priority.isEmpty())
-            ? java.util.Arrays.stream(RescuePriority.values()).map(Enum::name).toList()
-            : priority.stream().map(Enum::name).toList();
+    public List<RescueMapMarkerDto> findMapMarkers(
+            List<RescueCaseStatus> status,
+            List<RescuePriority> priority,
+            String species) {
 
-        return queryRepo.findMapMarkers(statusNames, priorityNames, species)
+        return queryRepo.findMapMarkers(
+                        normalizeStatuses(status),
+                        normalizePriorities(priority),
+                        species)
                 .stream()
                 .map(this::toMarkerDto)
                 .toList();
     }
 
-    // ── Projection → DTO mappers ────────────────
+    // ======================================================
+    // COMMON HELPERS
+    // ======================================================
+
+    private List<String> buildMediaUrls(List<String> publicIds) {
+        if (publicIds == null || publicIds.isEmpty()) {
+            return List.of();
+        }
+
+        return publicIds.stream()
+                .filter(Objects::nonNull)
+                .map(cloudStoragePort::buildUrl)
+                .toList();
+    }
+
+    private List<String> normalizeStatuses(List<RescueCaseStatus> status) {
+        if (status == null || status.isEmpty()) {
+            return Arrays.stream(RescueCaseStatus.values())
+                    .map(Enum::name)
+                    .toList();
+        }
+        return status.stream().map(Enum::name).toList();
+    }
+
+    private List<String> normalizePriorities(List<RescuePriority> priority) {
+        if (priority == null || priority.isEmpty()) {
+            return Arrays.stream(RescuePriority.values())
+                    .map(Enum::name)
+                    .toList();
+        }
+        return priority.stream().map(Enum::name).toList();
+    }
+
+    // ======================================================
+    // MAPPERS
+    // ======================================================
 
     private RescueCaseSummaryResponseDto toSummaryDto(RescueCaseSummaryProjection p) {
         return RescueCaseSummaryResponseDto.builder()
                 .caseId(p.getCaseId())
                 .caseCode(p.getCaseCode())
                 .species(p.getSpecies())
-                .priority(p.getPriority() != null ? RescuePriority.valueOf(p.getPriority()) : null)
+                .priority(p.getPriority() != null
+                        ? RescuePriority.valueOf(p.getPriority())
+                        : null)
                 .status(p.getStatus())
                 .reporterUsername(p.getReporterUsername())
                 .locationText(p.getLocationText())
                 .reportedAt(p.getReportedAt())
-            .firstImageUrl(p.getFirstImageUrl())
+                .firstImageUrl(p.getFirstImageUrl())
                 .build();
     }
 
-    private RescueCaseResponseDto toResponseDto(RescueCaseDetailProjection p, List<String> imagePublicIds) {
+    private RescueCaseResponseDto toResponseDto(
+            RescueCaseDetailProjection p,
+            List<String> imageUrls) {
+
         return RescueCaseResponseDto.builder()
                 .caseId(p.getCaseId())
                 .caseCode(p.getCaseCode())
@@ -157,7 +209,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .species(p.getSpecies())
                 .color(p.getColor())
                 .size(p.getSize())
-                .priority(p.getPriority() != null ? RescuePriority.valueOf(p.getPriority()) : null)
+                .priority(p.getPriority() != null
+                        ? RescuePriority.valueOf(p.getPriority())
+                        : null)
                 .description(p.getDescription())
                 .status(p.getStatus())
                 .latitude(p.getLocationLat())
@@ -167,37 +221,15 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .provinceName(p.getProvinceName())
                 .reportedAt(p.getReportedAt())
                 .resolvedAt(p.getResolvedAt())
-                .imageUrls(imagePublicIds)
+                .imageUrls(imageUrls)
                 .contactPhone(p.getContactPhone())
                 .build();
     }
-    private RescueCaseCompletionResponseDto toCompletionDto(Optional<RescueCaseCompletionProjection> p, List<String> imagePublicIds) {
-        return RescueCaseCompletionResponseDto.builder()
-                .completionId(p.get().getCompletionId())
-                .caseId(p.get().getCaseId())
-                .rescuedAt(p.get().getRescuedAt())
-                .rescueNote(p.get().getRescueNote())
-                .locationNote(p.get().getLocationNote())
-                .verifiedBy(p.get().getVerifiedBy())
-                .verifiedByName(p.get().getVerifiedByName())
-                .verifiedAt(p.get().getVerifiedAt())
-                .verificationImagesUrl(imagePublicIds)
-                .build();
-    }
 
-    private RescueMapMarkerDto toMarkerDto(RescueMapMarkerProjection p) {
-        return RescueMapMarkerDto.builder()
-                .caseId(p.getCaseId())
-                .caseCode(p.getCaseCode())
-                .latitude(p.getLatitude())
-                .longitude(p.getLongitude())
-                .priority(p.getPriority() != null ? RescuePriority.valueOf(p.getPriority()) : null)
-                .status(p.getStatus() != null ? RescueCaseStatus.valueOf(p.getStatus()) : null)
-                .species(p.getSpecies())
-                .reportedAt(p.getReportedAt())
-                .build();
-    }
-    private RescueCaseCompletionResponseDto toDto(RescueCaseCompletionProjection p) {
+    private RescueCaseCompletionResponseDto toCompletionDto(
+            RescueCaseCompletionProjection p,
+            List<String> imageUrls) {
+
         return RescueCaseCompletionResponseDto.builder()
                 .completionId(p.getCompletionId())
                 .caseId(p.getCaseId())
@@ -207,7 +239,24 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .verifiedBy(p.getVerifiedBy())
                 .verifiedByName(p.getVerifiedByName())
                 .verifiedAt(p.getVerifiedAt())
+                .verificationImagesUrl(imageUrls)
                 .build();
+    }
 
+    private RescueMapMarkerDto toMarkerDto(RescueMapMarkerProjection p) {
+        return RescueMapMarkerDto.builder()
+                .caseId(p.getCaseId())
+                .caseCode(p.getCaseCode())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .priority(p.getPriority() != null
+                        ? RescuePriority.valueOf(p.getPriority())
+                        : null)
+                .status(p.getStatus() != null
+                        ? RescueCaseStatus.valueOf(p.getStatus())
+                        : null)
+                .species(p.getSpecies())
+                .reportedAt(p.getReportedAt())
+                .build();
     }
 }

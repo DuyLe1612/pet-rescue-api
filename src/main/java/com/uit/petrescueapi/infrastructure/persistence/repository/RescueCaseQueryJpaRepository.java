@@ -325,5 +325,5 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             "ORDER BY mf.created_at",
             nativeQuery = true)
 
-    List<String> FindMediaPublicIdsByCompletionId(@Param("completionId")UUID completionId);
+    List<String> findMediaPublicIdsByCompletionId(@Param("completionId")UUID completionId);
 }
