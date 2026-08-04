@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.presentation.mapper;
 
+import com.uit.petrescueapi.application.dto.pet.PetAdminResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto;
 import com.uit.petrescueapi.domain.entity.Pet;
@@ -11,7 +12,8 @@ import java.util.List;
 /**
  * MapStruct mapper: domain {@link Pet} → presentation DTOs.
  * <ul>
- *   <li>{@link PetResponseDto} — full detail / write response</li>
+ *   <li>{@link PetResponseDto} — full detail / write response for regular users</li>
+ *   <li>{@link PetAdminResponseDto} — full detail for admin/org-owner with all fields</li>
  *   <li>{@link PetSummaryResponseDto} — lightweight list response</li>
  * </ul>
  */
@@ -23,6 +25,10 @@ public interface PetWebMapper {
     PetResponseDto toDto(Pet pet);
 
     List<PetResponseDto> toDtoList(List<Pet> pets);
+
+    // ── Admin response (all fields) ──────────
+
+    PetAdminResponseDto toAdminDto(Pet pet);
 
     // ── Summary response (list views) ───────────
 

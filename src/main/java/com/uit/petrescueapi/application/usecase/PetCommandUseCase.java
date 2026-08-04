@@ -18,6 +18,8 @@ import com.uit.petrescueapi.domain.service.PetDomainService;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
+import com.uit.petrescueapi.infrastructure.persistence.repository.PetBreedJpaRepository;
+import com.uit.petrescueapi.infrastructure.persistence.repository.PetSpeciesJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.crossstore.ChangeSetPersister;
@@ -49,6 +51,8 @@ public class PetCommandUseCase implements PetCommandPort {
 
     private final PetMediaRepository petMediaRepository;
     private final PetCurrentOwnerRepository currentOwnerRepository;
+    private final PetSpeciesJpaRepository speciesRepository;
+    private final PetBreedJpaRepository breedRepository;
 
     @Override
     public Pet createForUser(CreatePetRequestDto cmd, UUID userId) {
@@ -58,6 +62,7 @@ public class PetCommandUseCase implements PetCommandPort {
         UUID petId = UUID.randomUUID();
 
         Pet pet = buildPetFromDto(cmd, petId);
+        validateSpeciesAndBreed(pet);
 
         Pet created = petDomainService.createForUser(
                 pet,
@@ -85,13 +90,10 @@ public class PetCommandUseCase implements PetCommandPort {
                 userId
         );
 
-        if (!organizationDomainService.isMember(
-                shelterId,
-                userId
-        )) {
+        if (!canCreatePetsForOrganization(shelterId, userId)) {
             throw new ForbiddenException(
                     String.format(
-                            "User %s is not a member of organization %s",
+                            "User %s is not allowed to create pets for organization %s",
                             userId,
                             shelterId
                     )
@@ -101,6 +103,7 @@ public class PetCommandUseCase implements PetCommandPort {
         UUID petId = UUID.randomUUID();
 
         Pet pet = buildPetFromDto(cmd, petId);
+        validateSpeciesAndBreed(pet);
 
         Pet created = petDomainService.createForShelter(
                 pet,
@@ -132,13 +135,10 @@ public class PetCommandUseCase implements PetCommandPort {
 
             userDomainService.findById(userId);
 
-            if (!organizationDomainService.isMember(
-                    organizationId,
-                    userId
-            )) {
+            if (!canCreatePetsForOrganization(organizationId, userId)) {
                 throw new ForbiddenException(
                         String.format(
-                                "User %s is not a member of organization %s",
+                                "User %s is not allowed to create pets for organization %s",
                                 userId,
                                 organizationId
                         )
@@ -150,6 +150,7 @@ public class PetCommandUseCase implements PetCommandPort {
 
         Pet pet = buildPetFromDto(cmd, petId);
         pet.setShelterId(organizationId);
+        validateSpeciesAndBreed(pet);
 
         Pet created = petDomainService.createForShelter(
                 pet,
@@ -221,8 +222,8 @@ public class PetCommandUseCase implements PetCommandPort {
         return Pet.builder()
                 .id(petId)
                 .name(cmd.getName())
-                .species(cmd.getSpecies())
-                .breed(cmd.getBreed())
+                .speciesId(cmd.getSpeciesId())
+                .breedId(cmd.getBreedId())
                 .age(cmd.getAge())
                 .gender(cmd.getGender())
                 .color(cmd.getColor())
@@ -231,8 +232,6 @@ public class PetCommandUseCase implements PetCommandPort {
                 .vaccinated(cmd.isVaccinated())
                 .neutered(cmd.isNeutered())
                 .healthStatus(cmd.getHealthStatus())
-                .rescueDate(cmd.getRescueDate())
-                .rescueLocation(cmd.getRescueLocation())
                 .rescueCaseId(cmd.getRescueCaseId())
                 .build();
     }
@@ -245,8 +244,8 @@ public class PetCommandUseCase implements PetCommandPort {
         Pet patch = Pet.builder()
                 .id(id)
                 .name(cmd.getName())
-                .species(cmd.getSpecies())
-                .breed(cmd.getBreed())
+                .speciesId(cmd.getSpeciesId())
+                .breedId(cmd.getBreedId())
                 .age(cmd.getAge())
                 .gender(cmd.getGender())
                 .color(cmd.getColor())
@@ -257,6 +256,10 @@ public class PetCommandUseCase implements PetCommandPort {
                 .vaccinated(cmd.isVaccinated())
                 .neutered(cmd.isNeutered())
                 .build();
+
+        if (patch.getSpeciesId() != null) {
+            validateSpeciesAndBreed(patch);
+        }
 
         return petDomainService.update(
                 id,
@@ -340,5 +343,25 @@ public class PetCommandUseCase implements PetCommandPort {
                 cmd.getNewOwnerType(),
                 cmd.getNewOwnerId()
         );
+    }
+
+    private void validateSpeciesAndBreed(Pet pet) {
+        speciesRepository.findById(pet.getSpeciesId())
+                .filter(species -> !species.isDeleted())
+                .orElseThrow(() -> new BusinessException("Species not found: " + pet.getSpeciesId(), "SPECIES_NOT_FOUND"));
+
+        if (pet.getBreedId() != null) {
+            breedRepository.findByBreedIdAndSpeciesIdAndDeletedFalse(pet.getBreedId(), pet.getSpeciesId())
+                    .orElseThrow(() -> new BusinessException("Breed does not belong to species", "INVALID_BREED_FOR_SPECIES"));
+        }
+    }
+
+    private boolean canCreatePetsForOrganization(UUID organizationId, UUID userId) {
+        if (userDomainService.hasRole(userId, "ADMIN")) {
+            return true;
+        }
+        return organizationDomainService.getMemberRole(organizationId, userId)
+                .map(role -> "OWNER".equals(role) || "STAFF".equals(role) || "VET".equals(role))
+                .orElse(false);
     }
 }

@@ -47,11 +47,11 @@ public class PetDomainService {
 
     // ── Status-transition matrix ───────────────────
     private static final Map<PetStatus, Set<PetStatus>> ALLOWED_TRANSITIONS = Map.of(
-            PetStatus.UNOWNED,   Set.of(PetStatus.PENDING, PetStatus.FOSTERED, PetStatus.UNAVAILABLE, PetStatus.ADOPTED),
-            PetStatus.PENDING,     Set.of(PetStatus.ADOPTED, PetStatus.UNOWNED),
-            PetStatus.ADOPTED,     Set.of(PetStatus.UNOWNED),
-            PetStatus.FOSTERED,    Set.of(PetStatus.UNOWNED, PetStatus.PENDING, PetStatus.ADOPTED),
-            PetStatus.UNAVAILABLE, Set.of(PetStatus.UNOWNED, PetStatus.FOSTERED)
+            PetStatus.AVAILABLE, Set.of(PetStatus.FOSTERING, PetStatus.ADOPTED, PetStatus.LOST, PetStatus.DECEASED),
+            PetStatus.FOSTERING, Set.of(PetStatus.AVAILABLE, PetStatus.ADOPTED, PetStatus.LOST, PetStatus.DECEASED),
+            PetStatus.ADOPTED, Set.of(PetStatus.AVAILABLE, PetStatus.FOSTERING, PetStatus.LOST, PetStatus.DECEASED),
+            PetStatus.LOST, Set.of(PetStatus.AVAILABLE, PetStatus.FOSTERING, PetStatus.DECEASED),
+            PetStatus.DECEASED, Set.of()
     );
 
     // ── Queries ─────────────────────────────────────
@@ -74,12 +74,12 @@ public class PetDomainService {
 
     @Transactional(readOnly = true)
     public List<Pet> findAvailable() {
-        return petRepository.findByStatus(PetStatus.UNOWNED);
+        return petRepository.findByStatus(PetStatus.AVAILABLE);
     }
 
     @Transactional(readOnly = true)
     public Page<Pet> findAvailable(Pageable pageable) {
-        return petRepository.findByStatus(PetStatus.UNOWNED, pageable);
+        return petRepository.findByStatus(PetStatus.AVAILABLE, pageable);
     }
 
     // ── Commands ────────────────────────────────────
@@ -132,7 +132,7 @@ public class PetDomainService {
             pet.setId(UUID.randomUUID());
         }
         pet.setPetCode(visualCodeRepository.nextPetCode());
-        pet.setStatus(PetStatus.UNOWNED);
+        pet.setStatus(PetStatus.AVAILABLE);
         pet.setCreatedAt(LocalDateTime.now());
         Pet saved = petRepository.save(pet);
 
@@ -215,6 +215,10 @@ public class PetDomainService {
         Pet pet = findById(id);
         PetStatus current = pet.getStatus();
 
+        if (current == PetStatus.DECEASED) {
+            throw new IllegalStateException("Cannot transition pet status from DECEASED");
+        }
+
         Set<PetStatus> allowed = ALLOWED_TRANSITIONS.getOrDefault(current, Set.of());
         if (!allowed.contains(newStatus)) {
             throw new IllegalStateException(
@@ -230,8 +234,8 @@ public class PetDomainService {
 
     private void applyUpdates(Pet target, Pet source) {
         if (source.getName() != null)        target.setName(source.getName());
-        if (source.getSpecies() != null)     target.setSpecies(source.getSpecies());
-        if (source.getBreed() != null)       target.setBreed(source.getBreed());
+        if (source.getSpeciesId() != null)   target.setSpeciesId(source.getSpeciesId());
+        if (source.getBreedId() != null)     target.setBreedId(source.getBreedId());
         if (source.getAge() != null)         target.setAge(source.getAge());
         if (source.getGender() != null)      target.setGender(source.getGender());
         if (source.getColor() != null)       target.setColor(source.getColor());

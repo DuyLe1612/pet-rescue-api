@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.application.dto.user.UserAdminResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserPublicSearchDto;
@@ -78,6 +79,27 @@ public class UserQueryAdapter implements UserQueryDataPort {
         return toResponseDto(proj, roles);
     }
 
+    @Override
+    public UserAdminResponseDto findByIdForAdmin(UUID userId) {
+        UserDetailProjection proj = queryRepo.findDetailById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "userId", userId));
+
+        // Load entity to get roles and other fields
+        UserJpaEntity userEntity = userJpaRepo.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "userId", userId));
+
+        List<String> roles = userEntity.getRoles().stream()
+                .map(RoleJpaEntity::getCode)
+                .toList();
+
+        // Load reputation
+        UserReputationResponseDto reputation = userReputationJpaRepo.findById(userId)
+                .map(this::toReputationDto)
+                .orElse(null);
+
+        return toAdminResponseDto(proj, roles, reputation, userEntity);
+    }
+
     // ── Reputation query ────────────────────────
 
     @Override
@@ -109,11 +131,31 @@ public class UserQueryAdapter implements UserQueryDataPort {
         }
 
     private UserResponseDto toResponseDto(UserDetailProjection p, List<String> roles) {
-        UserReputationResponseDto reputation = userReputationJpaRepo.findById(p.getUserId())
-                .map(this::toReputationDto)
-                .orElse(null);
-
         return UserResponseDto.builder()
+                .userId(p.getUserId())
+                .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
+                .organizationRole(p.getOrganizationRole())
+                .username(p.getUsername())
+                .email(p.getEmail())
+                .fullName(p.getFullName())
+                .avatarUrl(p.getAvatarUrl())
+                .phone(p.getPhone())
+                .gender(p.getGender())
+                .streetAddress(p.getStreetAddress())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
+                .status(p.getStatus())
+                .emailVerified(p.getEmailVerified())
+                .roles(roles)
+                .createdAt(p.getCreatedAt())
+                .updatedAt(p.getUpdatedAt())
+                .build();
+    }
+
+    private UserAdminResponseDto toAdminResponseDto(UserDetailProjection p, List<String> roles, 
+            UserReputationResponseDto reputation, UserJpaEntity userEntity) {
+        return UserAdminResponseDto.builder()
                 .userId(p.getUserId())
                 .userCode(p.getUserCode())
                 .organizationId(p.getOrganizationId())
@@ -126,7 +168,9 @@ public class UserQueryAdapter implements UserQueryDataPort {
                 .phone(p.getPhone())
                 .gender(p.getGender())
                 .streetAddress(p.getStreetAddress())
+                .wardCode(userEntity.getWardCode())
                 .wardName(p.getWardName())
+                .provinceCode(userEntity.getProvinceCode())
                 .provinceName(p.getProvinceName())
                 .status(p.getStatus())
                 .emailVerified(p.getEmailVerified())

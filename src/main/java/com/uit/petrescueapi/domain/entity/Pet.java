@@ -28,6 +28,8 @@ public class Pet extends BaseEntity {
     private UUID id;
     private String petCode;
     private String name;
+    private UUID speciesId;
+    private UUID breedId;
     private String species;
     private String breed;
     private Integer age;          // months
@@ -39,8 +41,6 @@ public class Pet extends BaseEntity {
     private HealthStatus healthStatus;
     private boolean vaccinated;
     private boolean neutered;
-    private LocalDate rescueDate;
-    private String rescueLocation;
     private UUID shelterId;
     private UUID rescueCaseId;
 }

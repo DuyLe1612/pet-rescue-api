@@ -17,7 +17,6 @@ public interface UserWebMapper {
     @Mapping(target = "organizationId", ignore = true)
     @Mapping(target = "organizationName", ignore = true)
     @Mapping(target = "organizationRole", ignore = true)
-    @Mapping(target = "reputation", ignore = true)
     UserResponseDto toDto(User user);
 
     @Named("rolesToCodes")

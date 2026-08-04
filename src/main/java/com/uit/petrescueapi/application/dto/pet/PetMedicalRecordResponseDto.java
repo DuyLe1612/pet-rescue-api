@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.dto.pet;
 
+import com.uit.petrescueapi.domain.valueobject.MedicalRecordType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 
@@ -20,6 +21,7 @@ public class PetMedicalRecordResponseDto {
     private UUID recordId;
 
     private UUID petId;
+    private MedicalRecordType recordType;
 
     @Schema(example = "Annual checkup — all healthy")
     private String description;

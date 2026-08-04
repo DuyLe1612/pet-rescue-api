@@ -3,13 +3,15 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.admin.AssignOrgRoleRequestDto;
 import com.uit.petrescueapi.application.dto.admin.CreateAdminAccountRequestDto;
 import com.uit.petrescueapi.application.dto.admin.CreateOrganizationAccountRequestDto;
-import com.uit.petrescueapi.application.dto.admin.DashboardOverviewDto;
+
 import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
-import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
+import com.uit.petrescueapi.application.dto.pet.PetAdminResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
-import com.uit.petrescueapi.application.dto.user.UserResponseDto;
+import com.uit.petrescueapi.application.dto.user.UserAdminResponseDto;
+import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
-import com.uit.petrescueapi.application.port.query.AdminDashboardQueryPort;
+import com.uit.petrescueapi.application.port.out.PetQueryDataPort;
+
 import com.uit.petrescueapi.domain.entity.OrganizationMember;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.User;
@@ -17,8 +19,9 @@ import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.PetDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
+import com.uit.petrescueapi.infrastructure.persistence.entity.UserReputationJpaEntity;
+import com.uit.petrescueapi.infrastructure.persistence.repository.UserReputationJpaRepository;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
-import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,20 +46,16 @@ public class AdminController {
 
     private final UserDomainService userDomainService;
     private final OrganizationDomainService organizationDomainService;
-    private final AdminDashboardQueryPort adminDashboardQueryPort;
-    private final PetCommandPort petCommandPort;
-    private final PetWebMapper petWebMapper;
-    private final PasswordEncoder passwordEncoder;
 
-    @GetMapping("/dashboard")
-    @Operation(summary = "Get admin dashboard stats")
-    public ResponseEntity<DashboardOverviewDto> getDashboardOverview() {
-        return ResponseEntity.ok(adminDashboardQueryPort.getOverview());
-    }
+    private final PetCommandPort petCommandPort;
+    private final PetQueryDataPort petQueryDataPort;
+    private final PasswordEncoder passwordEncoder;
+    private final UserReputationJpaRepository userReputationJpaRepo;
+
 
     @PostMapping("/accounts")
     @Operation(summary = "Create a fully custom account (default ACTIVE)")
-    public ResponseEntity<ApiResponse<UserResponseDto>> createAccount(
+    public ResponseEntity<ApiResponse<UserAdminResponseDto>> createAccount(
             @Valid @RequestBody CreateAdminAccountRequestDto cmd) {
 
         String systemRole = (cmd.getSystemRole() == null || cmd.getSystemRole().isBlank())
@@ -81,31 +80,13 @@ public class AdminController {
                 cmd.getProvinceName()
         );
 
-        UserResponseDto dto = UserResponseDto.builder()
-                .userId(user.getId())
-                .userCode(user.getUserCode())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
-                .phone(user.getPhone())
-                .gender(user.getGender())
-                .streetAddress(user.getStreetAddress())
-                .wardName(user.getWardName())
-                .provinceName(user.getProvinceName())
-                .status(user.getStatus().name())
-                .emailVerified(user.isEmailVerified())
-                .roles(user.getRoles().stream().map(r -> r.getCode()).toList())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
-
+        UserAdminResponseDto dto = toAdminResponseDto(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(dto));
     }
 
     @PostMapping("/organizations/{organizationId}/accounts")
     @Operation(summary = "Create a new user account and assign an organization role")
-    public ResponseEntity<ApiResponse<UserResponseDto>> createOrganizationAccount(
+    public ResponseEntity<ApiResponse<UserAdminResponseDto>> createOrganizationAccount(
             @PathVariable UUID organizationId,
             @Valid @RequestBody CreateOrganizationAccountRequestDto cmd) {
 
@@ -124,15 +105,13 @@ public class AdminController {
 
         organizationDomainService.addMember(organizationId, user.getId(), cmd.getOrganizationRole());
 
-        UserResponseDto dto = UserResponseDto.builder()
+        UserAdminResponseDto dto = UserAdminResponseDto.builder()
                 .userId(user.getId())
                 .userCode(user.getUserCode())
                 .organizationId(organizationId)
-                .organizationName(null)
                 .organizationRole(cmd.getOrganizationRole())
                 .username(user.getUsername())
                 .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus().name())
                 .emailVerified(user.isEmailVerified())
                 .roles(user.getRoles().stream().map(r -> r.getCode()).toList())
@@ -172,53 +151,64 @@ public class AdminController {
 
         @PostMapping("/organizations/{organizationId}/pets")
         @Operation(summary = "Create pet for an organization, optionally assigning a caretaker user")
-    public ResponseEntity<ApiResponse<PetResponseDto>> createPetForUserInOrganization(
+    public ResponseEntity<ApiResponse<PetAdminResponseDto>> createPetForUserInOrganization(
             @PathVariable UUID organizationId,
                         @RequestParam(required = false) UUID userId,
             @Valid @RequestBody CreatePetRequestDto cmd) {
 
         Pet created = petCommandPort.createForUserInOrganization(cmd, organizationId, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(petWebMapper.toDto(created)));
+        PetAdminResponseDto dto = petQueryDataPort.findByIdForAdmin(created.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(dto));
     }
 
     @PatchMapping("/users/{userId}/lock")
     @Operation(summary = "Lock user account")
-    public ResponseEntity<ApiResponse<UserResponseDto>> lockUser(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<UserAdminResponseDto>> lockUser(@PathVariable UUID userId) {
         User user = userDomainService.lockAccount(userId);
-        UserResponseDto dto = UserResponseDto.builder()
-                .userId(user.getId())
-                .userCode(user.getUserCode())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
-                .status(user.getStatus().name())
-                .emailVerified(user.isEmailVerified())
-                .roles(user.getRoles().stream().map(r -> r.getCode()).toList())
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .build();
+        UserAdminResponseDto dto = toAdminResponseDto(user);
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
 
     @PatchMapping("/users/{userId}/unlock")
     @Operation(summary = "Unlock user account")
-    public ResponseEntity<ApiResponse<UserResponseDto>> unlockUser(@PathVariable UUID userId) {
+    public ResponseEntity<ApiResponse<UserAdminResponseDto>> unlockUser(@PathVariable UUID userId) {
         User user = userDomainService.unlockAccount(userId);
-        UserResponseDto dto = UserResponseDto.builder()
+        UserAdminResponseDto dto = toAdminResponseDto(user);
+        return ResponseEntity.ok(ApiResponse.ok(dto));
+    }
+
+    private UserAdminResponseDto toAdminResponseDto(User user) {
+        UserReputationResponseDto reputation = userReputationJpaRepo.findById(user.getId())
+                .map(e -> UserReputationResponseDto.builder()
+                        .userId(e.getUserId())
+                        .score(e.getScore())
+                        .level(e.getLevel())
+                        .updatedAt(e.getUpdatedAt())
+                        .build())
+                .orElse(null);
+
+        return UserAdminResponseDto.builder()
                 .userId(user.getId())
                 .userCode(user.getUserCode())
                 .username(user.getUsername())
                 .email(user.getEmail())
+                .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
+                .phone(user.getPhone())
+                .gender(user.getGender())
+                .streetAddress(user.getStreetAddress())
+                .wardCode(user.getWardCode())
+                .wardName(user.getWardName())
+                .provinceCode(user.getProvinceCode())
+                .provinceName(user.getProvinceName())
                 .status(user.getStatus().name())
                 .emailVerified(user.isEmailVerified())
+                .reputation(reputation)
                 .roles(user.getRoles().stream().map(r -> r.getCode()).toList())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
-        return ResponseEntity.ok(ApiResponse.ok(dto));
     }
-
 
 }

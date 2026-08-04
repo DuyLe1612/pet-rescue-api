@@ -67,7 +67,7 @@ public class PetQueryUseCase implements PetQueryPort {
             Pageable pageable
     ) {
         log.debug("Query: find available pets with filters (species={}, breed={}, gender={}, status={}, ownerOrganizationId={})",
-                species, breed, gender, PetStatus.UNOWNED, ownerOrganizationId);
+                species, breed, gender, PetStatus.AVAILABLE, ownerOrganizationId);
         return queryDataPort.findAvailableWithFilters(species, breed, gender, ownerOrganizationId, pageable);
     }
 

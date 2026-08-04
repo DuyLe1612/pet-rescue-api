@@ -18,7 +18,9 @@ public interface PetDetailProjection {
     UUID getId();
     String getPetCode();
     String getName();
+    UUID getSpeciesId();
     String getSpecies();
+    UUID getBreedId();
     String getBreed();
     Integer getAge();
     Gender getGender();
@@ -31,6 +33,7 @@ public interface PetDetailProjection {
     boolean getNeutered();
     LocalDate getRescueDate();
     String getRescueLocation();
+    UUID getRescueCaseId();
     UUID getShelterId();
     LocalDateTime getCreatedAt();
     LocalDateTime getUpdatedAt();
@@ -47,6 +50,7 @@ public interface PetDetailProjection {
     // ── Organization fields (for nested OrganizationMinimalDto) ─
     UUID getOrganizationId();
     String getOrganizationName();
+    String getOrganizationUrl();
 
     // ── Location fields (from organization) ─
     String getProvinceName();

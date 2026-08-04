@@ -3,6 +3,7 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.adoption.*;
 import com.uit.petrescueapi.application.port.command.AdoptionCommandPort;
 import com.uit.petrescueapi.application.port.query.AdoptionQueryPort;
+import com.uit.petrescueapi.domain.repository.ReclaimLogRepository;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.AdoptionWebMapper;
@@ -29,6 +30,7 @@ public class AdoptionController {
     private final AdoptionCommandPort commandPort;
     private final AdoptionQueryPort queryPort;
     private final AdoptionWebMapper mapper;
+    private final ReclaimLogRepository reclaimLogRepository;
 
     @PostMapping
     @Operation(summary = "Submit an adoption application")
@@ -76,6 +78,17 @@ public class AdoptionController {
         return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.complete(id, completedBy))));
     }
 
+    @PostMapping("/{id}/reclaim")
+    @Operation(summary = "Reclaim an adopted pet")
+    public ResponseEntity<ApiResponse<ReclaimLogResponseDto>> reclaim(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReclaimPetRequestDto request,
+            Authentication authentication) {
+        UUID reclaimedBy = UUID.fromString(authentication.getName());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created(toDto(commandPort.reclaim(id, request, reclaimedBy))));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get adoption application by ID")
     public ResponseEntity<ApiResponse<AdoptionResponseDto>> getById(@PathVariable UUID id) {
@@ -121,5 +134,36 @@ public class AdoptionController {
             @RequestParam(defaultValue = "desc") String sortOrder) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findByOrganizationId(orgId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+    }
+
+    @GetMapping("/reclaims")
+    @Operation(summary = "List reclaim logs")
+    public ResponseEntity<ApiResponse<PageResponse<ReclaimLogResponseDto>>> getReclaimLogs(
+            @RequestParam(required = false) UUID organizationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "reclaimedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder);
+        var logs = (organizationId == null
+                ? reclaimLogRepository.findAll(pageable)
+                : reclaimLogRepository.findByOrganizationId(organizationId, pageable))
+                .map(this::toDto);
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(logs)));
+    }
+
+    private ReclaimLogResponseDto toDto(com.uit.petrescueapi.domain.entity.ReclaimLog log) {
+        return ReclaimLogResponseDto.builder()
+                .reclaimId(log.getReclaimId())
+                .applicationId(log.getApplicationId())
+                .petId(log.getPetId())
+                .organizationId(log.getOrganizationId())
+                .userId(log.getUserId())
+                .reclaimedBy(log.getReclaimedBy())
+                .reason(log.getReason())
+                .proofId(log.getProofId())
+                .reputationDelta(log.getReputationDelta())
+                .reclaimedAt(log.getReclaimedAt())
+                .build();
     }
 }

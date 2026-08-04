@@ -8,6 +8,7 @@ import java.util.UUID;
 
 /**
  * Lightweight response DTO for adoption application list views.
+ * Optimized: excludes applicantUsername (not used by FE).
  */
 @Data
 @Builder
@@ -27,9 +28,6 @@ public class AdoptionSummaryResponseDto {
 
     @Schema(example = "https://cdn.example.com/pets/buddy-primary.jpg")
     private String petPrimaryImageUrl;
-
-    @Schema(example = "johndoe")
-    private String applicantUsername;
 
     @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"})
     private String status;

@@ -45,6 +45,7 @@ public class PetDetailsController {
         PetMedicalRecordResponseDto dto = PetMedicalRecordResponseDto.builder()
                 .recordId(record.getRecordId())
                 .petId(record.getPetId())
+                .recordType(record.getRecordType())
                 .description(record.getDescription())
                 .vaccine(record.getVaccine())
                 .diagnosis(record.getDiagnosis())

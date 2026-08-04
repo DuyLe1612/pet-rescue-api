@@ -10,7 +10,8 @@ import java.util.UUID;
 
 /**
  * Response DTO for rescue case.
- * Contains names (wardName, provinceName) - codes are not exposed.
+ * Optimized: excludes unused fields (petId, petName, reportedBy, organizationId, 
+ * organizationName, size, locationText, wardName, provinceName, resolvedAt, createdAt).
  */
 @Data
 @Builder
@@ -20,15 +21,9 @@ import java.util.UUID;
 public class RescueCaseResponseDto {
     private UUID caseId;
     private String caseCode;
-    private UUID petId;
-    private String petName;
-    private UUID reportedBy;
     private String reporterUsername;
-    private UUID organizationId;
-    private String organizationName;
     private String species;
     private String color;
-    private String size;
     @Schema(description = "Priority level", example = "HIGH")
     private RescuePriority priority;
     private String description;
@@ -36,12 +31,7 @@ public class RescueCaseResponseDto {
     private String status;
     private Double latitude;
     private Double longitude;
-    private String locationText;
-    private String wardName;
-    private String provinceName;
     private LocalDateTime reportedAt;
-    private LocalDateTime resolvedAt;
-    private LocalDateTime createdAt;
     private List<String> imageUrls;
     private String contactPhone;
 }

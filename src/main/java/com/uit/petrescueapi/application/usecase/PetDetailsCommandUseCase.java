@@ -47,6 +47,7 @@ public class PetDetailsCommandUseCase implements PetDetailsCommandPort {
         PetMedicalRecord record = PetMedicalRecord.builder()
                 .recordId(UUID.randomUUID())
                 .petId(petId)
+                .recordType(cmd.getRecordType())
                 .description(cmd.getDescription())
                 .vaccine(cmd.getVaccine())
                 .diagnosis(cmd.getDiagnosis())

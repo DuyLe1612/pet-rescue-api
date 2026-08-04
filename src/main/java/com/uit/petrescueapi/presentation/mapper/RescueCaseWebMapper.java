@@ -12,13 +12,8 @@ public interface RescueCaseWebMapper {
     @Mapping(target = "caseId", source = "caseId")
     @Mapping(target = "status", expression = "java(rc.getStatus() != null ? rc.getStatus().name() : null)")
     @Mapping(target = "priority", source = "priority")
-    @Mapping(target = "reportedBy", source = "reportedBy")
-    @Mapping(target = "petId", source = "petId")
-    @Mapping(target = "organizationId", source = "organizationId")
     @Mapping(target = "reportedAt", source = "reportedAt")
-    @Mapping(target = "petName", ignore = true)
     @Mapping(target = "reporterUsername", ignore = true)
-    @Mapping(target = "organizationName", ignore = true)
     @Mapping(target = "imageUrls", source = "imagePublicIds")
     @Mapping(target = "contactPhone", source = "contactPhone")
     RescueCaseResponseDto toDto(RescueCase rc);

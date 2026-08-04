@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.port.out;
 
+import com.uit.petrescueapi.application.dto.organization.OrganizationAdminResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
@@ -20,6 +21,9 @@ import java.util.UUID;
 public interface OrganizationQueryDataPort {
     Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, String search, Pageable pageable);
     Optional<OrganizationResponseDto> findById(UUID id);
+
+    Optional<OrganizationAdminResponseDto> findByIdForAdmin(UUID id);
+
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);
     List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types);
     

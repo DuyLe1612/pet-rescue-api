@@ -7,6 +7,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Lightweight DTO for rescue case list views.
+ * Optimized: excludes unused fields (locationText).
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,7 +25,6 @@ public class RescueCaseSummaryResponseDto {
     @Schema(example = "IN_PROGRESS", allowableValues = {"REPORTED", "IN_PROGRESS", "RESCUED", "CLOSED"})
     private String status;
     private String reporterUsername;
-    private String locationText;
     private LocalDateTime reportedAt;
     private String firstImageUrl;
 }

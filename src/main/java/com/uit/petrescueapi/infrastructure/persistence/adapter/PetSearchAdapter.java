@@ -51,9 +51,10 @@ public class PetSearchAdapter implements PetSearchPort {
 
         return PetSummaryResponseDto.builder()
                 .petId(p.getId())
-                .petCode(p.getPetCode())
                 .name(p.getName())
+                .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .breedId(p.getBreedId())
                 .breed(p.getBreed())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
@@ -66,21 +67,16 @@ public class PetSearchAdapter implements PetSearchPort {
                         p.getOwnerId(),
                         p.getOwnerName(),
                         p.getOwnerAvatarUrl(),
-                        p.getOwnerPhone(),
-                        p.getCaretakerUserId(),
-                        p.getCaretakerName(),
-                        p.getCaretakerAvatarUrl(),
-                        p.getCaretakerPhone()
+                        p.getOwnerPhone()
                 ))
                 .imageUrl(imageUrl)
                 .organization(p.getOrganizationId() != null ? OrganizationMinimalDto.builder()
                         .organizationId(p.getOrganizationId())
                         .name(p.getOrganizationName())
+                        .url(p.getOrganizationUrl())
                         .build() : null)
                 .province(p.getProvinceName())
-                .provinceCode(p.getProvinceCode())
                 .ward(p.getWardName())
-                .wardCode(p.getWardCode())
                 .build();
     }
 
@@ -89,11 +85,7 @@ public class PetSearchAdapter implements PetSearchPort {
             UUID ownerId,
             String ownerName,
             String ownerAvatarUrl,
-            String ownerPhone,
-            UUID caretakerUserId,
-            String caretakerName,
-            String caretakerAvatarUrl,
-            String caretakerPhone
+            String ownerPhone
     ) {
         if (ownerId == null && ownerType == null) {
             return null;
@@ -105,10 +97,6 @@ public class PetSearchAdapter implements PetSearchPort {
                 .name(ownerName)
                 .avatarUrl(ownerAvatarUrl)
                 .phone(ownerPhone)
-                .caretakerUserId(caretakerUserId)
-                .caretakerName(caretakerName)
-                .caretakerAvatarUrl(caretakerAvatarUrl)
-                .caretakerPhone(caretakerPhone)
                 .build();
     }
 

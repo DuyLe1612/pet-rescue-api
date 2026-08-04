@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.application.dto.organization.OrganizationAdminResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMapMarkerDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationMemberResponseDto;
 import com.uit.petrescueapi.application.dto.organization.OrganizationResponseDto;
@@ -44,6 +45,11 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     @Override
     public Optional<OrganizationResponseDto> findById(UUID id) {
         return queryRepo.findDetailById(id).map(this::toDetailDto);
+    }
+
+    @Override
+    public Optional<OrganizationAdminResponseDto> findByIdForAdmin(UUID id) {
+        return queryRepo.findDetailById(id).map(this::toAdminDetailDto);
     }
 
     @Override
@@ -109,21 +115,29 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     private OrganizationSummaryResponseDto toSummaryDto(OrganizationSummaryProjection p) {
         return OrganizationSummaryResponseDto.builder()
                 .organizationId(p.getOrganizationId())
-                .organizationCode(p.getOrganizationCode())
                 .name(p.getName())
                 .type(p.getType())
                 .status(p.getStatus())
-                .streetAddress(p.getStreetAddress())
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
-                .phone(p.getPhone())
-                .email(p.getEmail())
-                .imageUrl(p.getImageUrl())
                 .build();
     }
 
     private OrganizationResponseDto toDetailDto(OrganizationDetailProjection p) {
         return OrganizationResponseDto.builder()
+                .organizationId(p.getOrganizationId())
+                .name(p.getName())
+                .type(p.getType())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .status(p.getStatus())
+                .build();
+    }
+
+    private OrganizationAdminResponseDto toAdminDetailDto(OrganizationDetailProjection p) {
+        return OrganizationAdminResponseDto.builder()
                 .organizationId(p.getOrganizationId())
                 .organizationCode(p.getOrganizationCode())
                 .name(p.getName())
@@ -162,14 +176,11 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     private OrganizationMapMarkerDto toMarkerDto(OrganizationMapMarkerProjection p) {
         return OrganizationMapMarkerDto.builder()
                 .organizationId(p.getOrganizationId())
-                .organizationCode(p.getOrganizationCode())
                 .name(p.getName())
                 .type(p.getType())
                 .status(p.getStatus())
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
-                .phone(p.getPhone())
-                .imageUrl(p.getImageUrl())
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .build();

@@ -12,6 +12,7 @@ import java.util.UUID;
 /**
  * Lightweight response DTO for pet list / search results.
  * Matches FE GetAllPetsResponse type.
+ * Optimized: excludes unused fields (petCode, provinceCode, wardCode).
  */
 @Data
 @Builder
@@ -23,16 +24,15 @@ public class PetSummaryResponseDto {
     @Schema(example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID petId;
 
-    @Schema(example = "P-0001")
-    private String petCode;
-
     @Schema(example = "Buddy")
     private String name;
 
     @Schema(example = "Dog")
+    private UUID speciesId;
     private String species;
 
     @Schema(example = "Golden Retriever")
+    private UUID breedId;
     private String breed;
 
     @Schema(example = "24", description = "Age in months")
@@ -54,14 +54,8 @@ public class PetSummaryResponseDto {
     @Schema(example = "Hồ Chí Minh")
     private String province;
 
-    @Schema(example = "79")
-    private Integer provinceCode;
-
     @Schema(example = "Phường 1")
     private String ward;
-
-    @Schema(example = "00001")
-    private Integer wardCode;
 
     @Schema(description = "Thumbnail image URL (first image)", example = "https://storage.example.com/pets/buddy-01.jpg")
     private String imageUrl;

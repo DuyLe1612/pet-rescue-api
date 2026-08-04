@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.domain.entity;
 
+import com.uit.petrescueapi.domain.valueobject.MedicalRecordType;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 
@@ -19,6 +20,7 @@ public class PetMedicalRecord extends BaseEntity {
 
     private UUID recordId;
     private UUID petId;
+    private MedicalRecordType recordType;
     private String description;
     private String vaccine;
     private String diagnosis;

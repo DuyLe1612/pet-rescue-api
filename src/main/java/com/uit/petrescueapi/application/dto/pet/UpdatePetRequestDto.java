@@ -22,11 +22,9 @@ public class UpdatePetRequestDto {
     @Size(max = 100)
     private String name;
 
-    @Size(max = 50)
-    private String species;
+    private UUID speciesId;
 
-    @Size(max = 100)
-    private String breed;
+    private UUID breedId;
 
     @Min(0) @Max(600)
     private Integer age;
@@ -46,9 +44,6 @@ public class UpdatePetRequestDto {
     private HealthStatus healthStatus;
     private boolean vaccinated;
     private boolean neutered;
-
-    @Size(max = 10)
-    private List<String> imageUrls;
 
     @Size(max = 10)
     private List<UUID> mediaIds;

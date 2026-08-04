@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.dto.auth;
 
+import com.uit.petrescueapi.validation.Password;
 import com.uit.petrescueapi.validation.Phone;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
@@ -28,8 +29,9 @@ public class RegisterRequestDto {
     private String email;
 
     @NotBlank(message = "Password is required")
+    @Password(message = "Password must be at least 8 characters and contain uppercase, lowercase, digit")
     @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
-    @Schema(example = "P@ssw0rd123")
+    @Schema(example = "P@ssw0rd123", description = "Password (min 8 chars, must contain uppercase, lowercase, digit)")
     private String password;
 
     @Schema(example = "John Doe")

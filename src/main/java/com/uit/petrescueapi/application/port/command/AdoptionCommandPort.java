@@ -2,7 +2,9 @@ package com.uit.petrescueapi.application.port.command;
 
 import com.uit.petrescueapi.application.dto.adoption.CreateAdoptionRequestDto;
 import com.uit.petrescueapi.application.dto.adoption.DecisionRequestDto;
+import com.uit.petrescueapi.application.dto.adoption.ReclaimPetRequestDto;
 import com.uit.petrescueapi.domain.entity.AdoptionApplication;
+import com.uit.petrescueapi.domain.entity.ReclaimLog;
 
 import java.util.UUID;
 
@@ -18,4 +20,6 @@ public interface AdoptionCommandPort {
      * Only APPROVED applications can be completed.
      */
     AdoptionApplication complete(UUID applicationId, UUID completedBy);
+
+    ReclaimLog reclaim(UUID applicationId, ReclaimPetRequestDto request, UUID reclaimedBy);
 }

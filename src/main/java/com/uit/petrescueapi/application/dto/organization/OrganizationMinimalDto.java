@@ -21,4 +21,7 @@ public class OrganizationMinimalDto {
 
     @Schema(example = "Happy Paws Shelter")
     private String name;
+
+    @Schema(example = "https://happypaws.example")
+    private String url;
 }

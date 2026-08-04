@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.port.out;
 
+import com.uit.petrescueapi.application.dto.pet.PetAdminResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto;
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
@@ -15,6 +16,8 @@ import java.util.UUID;
 public interface PetQueryDataPort {
 
     PetResponseDto findById(UUID id);
+
+    PetAdminResponseDto findByIdForAdmin(UUID id);
 
     Page<PetSummaryResponseDto> findAllSummaries(Pageable pageable);
 

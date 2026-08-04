@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.repository;
 
+import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.entity.AdoptionApplicationJpaEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,6 @@ import java.util.UUID;
 public interface AdoptionApplicationJpaRepository extends JpaRepository<AdoptionApplicationJpaEntity, UUID> {
 
     Optional<AdoptionApplicationJpaEntity> findByApplicationIdAndDeletedFalse(UUID applicationId);
+
+    long countByApplicantIdAndStatusAndDeletedFalse(UUID applicantId, AdoptionApplicationStatus status);
 }

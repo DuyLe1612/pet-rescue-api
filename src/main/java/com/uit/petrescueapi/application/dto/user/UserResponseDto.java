@@ -9,6 +9,7 @@ import java.util.UUID;
 
 /**
  * Response DTO for user information.
+ * Optimized: excludes unused fields (userCode, wardCode, provinceCode, reputation).
  */
 @Data
 @Builder
@@ -19,9 +20,6 @@ public class UserResponseDto {
 
     @Schema(example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID userId;
-
-    @Schema(example = "U-0001")
-    private String userCode;
 
     @Schema(example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID organizationId;
@@ -53,14 +51,8 @@ public class UserResponseDto {
     @Schema(example = "123 Nguyen Trai Street")
     private String streetAddress;
 
-    @Schema(example = "00001")
-    private String wardCode;
-
     @Schema(example = "Ward 1")
     private String wardName;
-
-    @Schema(example = "79")
-    private String provinceCode;
 
     @Schema(example = "Ho Chi Minh City")
     private String provinceName;
@@ -71,7 +63,6 @@ public class UserResponseDto {
     @Schema(example = "true")
     private boolean emailVerified;
 
-    private UserReputationResponseDto reputation;
     private List<String> roles;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

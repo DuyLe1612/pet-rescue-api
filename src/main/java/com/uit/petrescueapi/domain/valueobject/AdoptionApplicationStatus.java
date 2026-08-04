@@ -7,6 +7,7 @@ package com.uit.petrescueapi.domain.valueobject;
 public enum AdoptionApplicationStatus {
     PENDING,
     APPROVED,
+    COMPLETED,
     CANCELED,
     REJECTED
 }

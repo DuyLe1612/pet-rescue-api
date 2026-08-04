@@ -8,13 +8,13 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Response DTO for Pet detail.
  * Matches FE Pet interface.
+ * Optimized: excludes unused fields (petCode, shelterId, createdAt, updatedAt).
  */
 @Data
 @Builder
@@ -23,9 +23,10 @@ import java.util.UUID;
 public class PetResponseDto {
 
     private UUID petId;
-    private String petCode;
     private String name;
+    private UUID speciesId;
     private String species;
+    private UUID breedId;
     private String breed;
     private Integer age;
     private String ageDisplay;
@@ -38,9 +39,7 @@ public class PetResponseDto {
     private OrganizationMinimalDto organization;
 
     private String province;
-    private Integer provinceCode;
     private String ward;
-    private Integer wardCode;
 
     // Detail fields
     private String color;
@@ -49,9 +48,7 @@ public class PetResponseDto {
     private boolean neutered;
     private LocalDate rescueDate;
     private String rescueLocation;
+    private UUID rescueCaseId;
     private String primaryImageUrl;
     private List<String> imageUrls;
-    private UUID shelterId;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

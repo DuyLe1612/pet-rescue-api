@@ -21,7 +21,7 @@ public class GeoPresenceCleanupJob {
     @Value("${app.geo.inactive-after-seconds:60}")
     private long inactiveAfterSeconds;
 
-    @Scheduled(fixedDelayString = "${app.geo.cleanup-interval-ms:10000}")
+//    @Scheduled(fixedDelayString = "${app.geo.cleanup-interval-ms:10000}")
     @Transactional
     public void markStaleUsersInactive() {
         OffsetDateTime threshold = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(inactiveAfterSeconds);

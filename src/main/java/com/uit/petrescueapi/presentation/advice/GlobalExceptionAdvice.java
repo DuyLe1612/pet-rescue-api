@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.presentation.advice;
 
+import com.uit.petrescueapi.domain.exception.AccountBannedException;
+import com.uit.petrescueapi.domain.exception.AccountLockedException;
 import com.uit.petrescueapi.domain.exception.BaseException;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +35,21 @@ public class GlobalExceptionAdvice {
     public ResponseEntity<ApiResponse<Void>> handleBase(BaseException ex) {
         log.warn("{}: {}", ex.getErrorCode(), ex.getMessage());
         return build(ex.getStatus(), ex.getMessage());
+    }
+
+    // ── Account status exceptions ─────────────────
+    @ExceptionHandler(AccountLockedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountLocked(AccountLockedException ex) {
+        log.warn("Account locked: {}", ex.getMessage());
+        ApiResponse<Void> body = ApiResponse.error(403, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+    }
+
+    @ExceptionHandler(AccountBannedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAccountBanned(AccountBannedException ex) {
+        log.warn("Account banned: {}", ex.getMessage());
+        ApiResponse<Void> body = ApiResponse.error(403, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     // ── Bean-validation failures ─────────────────

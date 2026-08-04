@@ -2,15 +2,10 @@ package com.uit.petrescueapi.application.dto.pet;
 
 import com.uit.petrescueapi.domain.valueobject.Gender;
 import com.uit.petrescueapi.domain.valueobject.HealthStatus;
-import com.uit.petrescueapi.domain.valueobject.PetStatus;
-import io.swagger.v3.oas.models.security.SecurityScheme;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,12 +22,10 @@ public class CreatePetRequestDto {
     @Size(max = 100)
     private String name;
 
-    @NotBlank(message = "Species is required")
-    @Size(max = 50)
-    private String species;
+    @NotNull(message = "Species is required")
+    private UUID speciesId;
 
-    @Size(max = 100)
-    private String breed;
+    private UUID breedId;
 
     @Min(0) @Max(6000)
     private Integer age;
@@ -53,15 +46,6 @@ public class CreatePetRequestDto {
     private boolean neutered;
 
     private HealthStatus healthStatus;
-
-    @PastOrPresent
-    private LocalDate rescueDate;
-
-    @Size(max = 255)
-    private String rescueLocation;
-
-    @Size(max = 10)
-    private List<String> imageUrls;
 
     @Size(max = 10)
     private List<UUID> mediaIds;

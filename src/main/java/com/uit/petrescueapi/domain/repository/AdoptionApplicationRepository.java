@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.domain.repository;
 
 import com.uit.petrescueapi.domain.entity.AdoptionApplication;
+import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -18,5 +19,7 @@ public interface AdoptionApplicationRepository {
 
     Page<AdoptionApplication> findAll(Pageable pageable);
 
-    Page<AdoptionApplication> findByStatus(String status, Pageable pageable);
+    Page<AdoptionApplication> findByStatus(AdoptionApplicationStatus status, Pageable pageable);
+
+    long countByApplicantIdAndStatus(UUID applicantId, AdoptionApplicationStatus status);
 }

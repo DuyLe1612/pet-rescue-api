@@ -70,20 +70,20 @@ public class OrganizationController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update an existing organization")
-    public ResponseEntity<ApiResponse<OrganizationResponseDto>> update(
+    public ResponseEntity<ApiResponse<OrganizationAdminResponseDto>> update(
             @PathVariable UUID id,
             @RequestBody CreateOrganizationRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.update(id, cmd))));
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toAdminDto(commandPort.update(id, cmd))));
     }
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Change organization status (ADMIN only)",
             description = "When changing PENDING → ACTIVE, the requesting user is auto-assigned as OWNER")
-    public ResponseEntity<ApiResponse<OrganizationResponseDto>> changeStatus(
+    public ResponseEntity<ApiResponse<OrganizationAdminResponseDto>> changeStatus(
             @PathVariable UUID id,
             @RequestParam OrganizationStatus status) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.changeStatus(id, status))));
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toAdminDto(commandPort.changeStatus(id, status))));
     }
 
     @DeleteMapping("/{id}")

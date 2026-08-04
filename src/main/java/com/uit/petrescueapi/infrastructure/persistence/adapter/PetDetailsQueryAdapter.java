@@ -75,6 +75,7 @@ public class PetDetailsQueryAdapter implements PetDetailsQueryDataPort {
         return PetMedicalRecordResponseDto.builder()
                 .recordId(e.getRecordId())
                 .petId(e.getPetId())
+                .recordType(e.getRecordType())
                 .description(e.getDescription())
                 .vaccine(e.getVaccine())
                 .diagnosis(e.getDiagnosis())

@@ -39,11 +39,11 @@ public interface PetJpaRepository extends JpaRepository<PetJpaEntity, UUID> {
     Page<PetJpaEntity> findByStatus(@Param("status") PetStatus status, Pageable pageable);
 
     @Query("""
-
+ 
             SELECT
     COALESCE(COUNT(p), 0) as total,
-    COALESCE(SUM(CASE WHEN p.status = 'UNOWNED' THEN 1 ELSE 0 END), 0) as available,
-    COALESCE(SUM(CASE WHEN p.status = 'PENDING' THEN 1 ELSE 0 END), 0) as pending,
+    COALESCE(SUM(CASE WHEN p.status = 'AVAILABLE' THEN 1 ELSE 0 END), 0) as available,
+    COALESCE(SUM(CASE WHEN p.status = 'FOSTERING' THEN 1 ELSE 0 END), 0) as pending,
     COALESCE(SUM(CASE WHEN p.status = 'ADOPTED' THEN 1 ELSE 0 END), 0) as adopted
 FROM PetJpaEntity p
 WHERE p.deleted = false

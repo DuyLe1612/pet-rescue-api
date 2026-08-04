@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class PetRescueApiApplication {
 
     public static void main(String[] args) {
+
         SpringApplication.run(PetRescueApiApplication.class, args);
     }
 

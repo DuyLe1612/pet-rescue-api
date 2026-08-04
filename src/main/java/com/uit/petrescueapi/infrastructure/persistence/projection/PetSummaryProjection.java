@@ -15,7 +15,9 @@ public interface PetSummaryProjection {
     UUID getId();
     String getPetCode();
     String getName();
+    UUID getSpeciesId();
     String getSpecies();
+    UUID getBreedId();
     String getBreed();
     Integer getAge();
     boolean getVaccinated();
@@ -36,6 +38,7 @@ public interface PetSummaryProjection {
     // ── Organization fields (for nested OrganizationMinimalDto) ─
     UUID getOrganizationId();
     String getOrganizationName();
+    String getOrganizationUrl();
 
     // ── Location fields (from organization) ─
     String getProvinceName();

@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.domain.entity.AdoptionApplication;
 import com.uit.petrescueapi.domain.repository.AdoptionApplicationRepository;
+import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.AdoptionApplicationEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.AdoptionApplicationJpaRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,8 +38,13 @@ public class AdoptionApplicationRepositoryAdapter implements AdoptionApplication
     }
 
     @Override
-    public Page<AdoptionApplication> findByStatus(String status, Pageable pageable) {
+    public Page<AdoptionApplication> findByStatus(AdoptionApplicationStatus status, Pageable pageable) {
         // Filter by status in-memory; can be replaced with a dedicated JPA query later
         return jpa.findAll(pageable).map(mapper::toDomain);
+    }
+
+    @Override
+    public long countByApplicantIdAndStatus(UUID applicantId, AdoptionApplicationStatus status) {
+        return jpa.countByApplicantIdAndStatusAndDeletedFalse(applicantId, status);
     }
 }

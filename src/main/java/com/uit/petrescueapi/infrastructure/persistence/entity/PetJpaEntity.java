@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "pets", indexes = {
-        @Index(name = "idx_pet_species", columnList = "species"),
+        @Index(name = "idx_pet_species", columnList = "species_id"),
         @Index(name = "idx_pet_status", columnList = "status"),
         @Index(name = "idx_pet_shelter", columnList = "shelter_id")
 })
@@ -37,11 +37,11 @@ public class PetJpaEntity extends BaseJpaEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "species", nullable = false, length = 50)
-    private String species;
+    @Column(name = "species_id", nullable = false)
+    private UUID speciesId;
 
-    @Column(name = "breed", length = 100)
-    private String breed;
+    @Column(name = "breed_id")
+    private UUID breedId;
 
     @Column(name = "age")
     private Integer age;
@@ -72,12 +72,6 @@ public class PetJpaEntity extends BaseJpaEntity {
 
     @Column(name = "is_neutered", nullable = false)
     private boolean neutered;
-
-    @Column(name = "rescue_date")
-    private LocalDate rescueDate;
-
-    @Column(name = "rescue_location", length = 255)
-    private String rescueLocation;
 
     @Column(name = "shelter_id")
     private UUID shelterId;

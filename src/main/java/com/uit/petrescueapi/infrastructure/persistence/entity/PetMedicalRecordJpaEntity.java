@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.entity;
 
+import com.uit.petrescueapi.domain.valueobject.MedicalRecordType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -28,6 +29,10 @@ public class PetMedicalRecordJpaEntity extends BaseJpaEntity {
 
     @Column(name = "pet_id", nullable = false)
     private UUID petId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "record_type", nullable = false, length = 30)
+    private MedicalRecordType recordType;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;

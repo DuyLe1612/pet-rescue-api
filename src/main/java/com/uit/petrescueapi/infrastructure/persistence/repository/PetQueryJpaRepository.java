@@ -26,8 +26,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.is_vaccinated AS vaccinated,
                p.gender AS gender,
@@ -46,6 +48,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(NULLIF(o.province_code, '') AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -56,9 +59,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
@@ -67,9 +72,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT COUNT(p.pet_id)
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
@@ -88,8 +95,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.is_vaccinated AS vaccinated,
                p.gender AS gender,
@@ -108,6 +117,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(o.province_code AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -118,9 +128,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND p.status IN (:statuses)
@@ -130,9 +142,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT COUNT(p.pet_id)
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND p.status IN (:statuses)
@@ -153,8 +167,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.is_vaccinated AS vaccinated,
                p.gender AS gender,
@@ -173,6 +189,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(o.province_code AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -183,9 +200,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND p.status = :status
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
@@ -193,9 +212,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT COUNT(p.pet_id)
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
           AND p.status = :status
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
@@ -214,8 +235,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.gender AS gender,
                p.color AS color,
@@ -225,8 +248,9 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                p.health_status AS healthStatus,
                p.is_vaccinated AS vaccinated,
                p.is_neutered AS neutered,
-               p.rescue_date AS rescueDate,
-                p.rescue_location AS rescueLocation,
+               CAST(rc.reported_at AS DATE) AS rescueDate,
+                rc.location_text AS rescueLocation,
+                p.rescue_case_id AS rescueCaseId,
                 p.shelter_id AS shelterId,
                  (p.created_at AT TIME ZONE 'UTC') AS createdAt,
                  (p.updated_at AT TIME ZONE 'UTC') AS updatedAt,
@@ -241,6 +265,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(o.province_code AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -251,6 +276,9 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
+        LEFT JOIN rescue_cases rc ON p.rescue_case_id = rc.case_id
         WHERE p.is_deleted = false AND p.pet_id = :id
     """, nativeQuery = true)
     Optional<PetDetailProjection> findDetailById(@Param("id") UUID id);
@@ -261,8 +289,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.is_vaccinated AS vaccinated,
                p.gender AS gender,
@@ -281,6 +311,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(o.province_code AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -291,21 +322,25 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE pco.owner_id = :organizationId
           AND pco.owner_type = 'ORGANIZATION'
           AND p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
     """, countQuery = """
         SELECT COUNT(p.pet_id)
         FROM pets p
         JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE pco.owner_id = :organizationId
           AND pco.owner_type = 'ORGANIZATION'
           AND p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
     """, nativeQuery = true)
     Page<PetSummaryProjection> findSummariesByOrganizationId(
@@ -319,8 +354,10 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         SELECT p.pet_id AS id,
                p.pet_code AS petCode,
                p.name AS name,
-               p.species AS species,
-               p.breed AS breed,
+               p.species_id AS speciesId,
+               ps.name AS species,
+               p.breed_id AS breedId,
+               pb.name AS breed,
                p.age AS age,
                p.is_vaccinated AS vaccinated,
                p.gender AS gender,
@@ -339,6 +376,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                caretaker.phone AS caretakerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
+               o.official_link AS organizationUrl,
                o.province_name AS provinceName,
                CAST(o.province_code AS INTEGER) AS provinceCode,
                o.ward_name AS wardName,
@@ -349,21 +387,25 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
         LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE pco.owner_id = :userId
           AND pco.owner_type = 'USER'
           AND p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
     """, countQuery = """
         SELECT COUNT(p.pet_id)
         FROM pets p
         JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        JOIN pet_species ps ON p.species_id = ps.species_id
+        LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
         WHERE pco.owner_id = :userId
           AND pco.owner_type = 'USER'
           AND p.is_deleted = false
-          AND (:species IS NULL OR p.species = :species)
-          AND (:breed IS NULL OR p.breed = :breed)
+          AND (:species IS NULL OR ps.name = :species OR CAST(p.species_id AS TEXT) = :species)
+          AND (:breed IS NULL OR pb.name = :breed OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
     """, nativeQuery = true)
     Page<PetSummaryProjection> findSummariesByUserId(

@@ -1,6 +1,8 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.organization.OrganizationMinimalDto;
+import com.uit.petrescueapi.application.dto.pet.PetAdminResponseDto;
+import com.uit.petrescueapi.application.dto.pet.PetOwnerSummaryAdminDto;
 import com.uit.petrescueapi.application.dto.pet.PetOwnerSummaryDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto;
@@ -84,7 +86,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 species,
                 breed,
                 gender,
-                PetStatus.UNOWNED.name(),
+                PetStatus.AVAILABLE.name(),
                 ownerOrganizationId,
                 pageable
         ).map(this::toSummaryDto);
@@ -135,7 +137,24 @@ public class PetQueryAdapter implements PetQueryDataPort {
         return toResponseDto(proj, primaryImageUrl, imageUrls);
     }
 
-    // ── Projection → DTO mappers ────────────────
+    @Override
+    public PetAdminResponseDto findByIdForAdmin(UUID id) {
+        PetDetailProjection proj = queryRepo.findDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pet", "id", id));
+
+        String primaryImageUrl = queryRepo.findPrimaryImagePublicIdById(id)
+                .map(cloudStoragePort::buildUrl)
+                .orElse(null);
+
+        List<String> imageUrls = queryRepo.findImagePublicIdsById(id).stream()
+                .filter(publicId -> publicId != null)
+                .map(cloudStoragePort::buildUrl)
+                .toList();
+
+        return toAdminResponseDto(proj, primaryImageUrl, imageUrls);
+    }
+
+    // ── Projection → DTO mappers ───────────────
 
     private PetSummaryResponseDto toSummaryDto(PetSummaryProjection p) {
         String imageUrl = p.getImagePublicId() != null 
@@ -144,9 +163,10 @@ public class PetQueryAdapter implements PetQueryDataPort {
         
         return PetSummaryResponseDto.builder()
                 .petId(p.getId())
-                .petCode(p.getPetCode())
                 .name(p.getName())
+                .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .breedId(p.getBreedId())
                 .breed(p.getBreed())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
@@ -159,30 +179,26 @@ public class PetQueryAdapter implements PetQueryDataPort {
                         p.getOwnerId(),
                         p.getOwnerName(),
                         p.getOwnerAvatarUrl(),
-                        p.getOwnerPhone(),
-                        p.getCaretakerUserId(),
-                        p.getCaretakerName(),
-                        p.getCaretakerAvatarUrl(),
-                        p.getCaretakerPhone()
+                        p.getOwnerPhone()
                 ))
                 .imageUrl(imageUrl)
                 .organization(p.getOrganizationId() != null ? OrganizationMinimalDto.builder()
                         .organizationId(p.getOrganizationId())
                         .name(p.getOrganizationName())
+                        .url(p.getOrganizationUrl())
                         .build() : null)
                 .province(p.getProvinceName())
-                .provinceCode(p.getProvinceCode())
                 .ward(p.getWardName())
-                .wardCode(p.getWardCode())
                 .build();
     }
 
         private PetResponseDto toResponseDto(PetDetailProjection p, String primaryImageUrl, List<String> imageUrls) {
         return PetResponseDto.builder()
                 .petId(p.getId())
-                .petCode(p.getPetCode())
                 .name(p.getName())
+                .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .breedId(p.getBreedId())
                 .breed(p.getBreed())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
@@ -191,6 +207,47 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .status(p.getStatus())
                 .healthStatus(p.getHealthStatus())
                 .owner(toOwnerDto(
+                        p.getOwnerType(),
+                        p.getOwnerId(),
+                        p.getOwnerName(),
+                        p.getOwnerAvatarUrl(),
+                        p.getOwnerPhone()
+                ))
+                .organization(p.getOrganizationId() != null ? OrganizationMinimalDto.builder()
+                        .organizationId(p.getOrganizationId())
+                        .name(p.getOrganizationName())
+                        .url(p.getOrganizationUrl())
+                        .build() : null)
+                .province(p.getProvinceName())
+                .ward(p.getWardName())
+                .color(p.getColor())
+                .weight(p.getWeight())
+                .description(p.getDescription())
+                .neutered(p.getNeutered())
+                .rescueDate(p.getRescueDate())
+                .rescueLocation(p.getRescueLocation())
+                .rescueCaseId(p.getRescueCaseId())
+                .primaryImageUrl(primaryImageUrl)
+                .imageUrls(imageUrls)
+                .build();
+    }
+
+    private PetAdminResponseDto toAdminResponseDto(PetDetailProjection p, String primaryImageUrl, List<String> imageUrls) {
+        return PetAdminResponseDto.builder()
+                .petId(p.getId())
+                .petCode(p.getPetCode())
+                .name(p.getName())
+                .speciesId(p.getSpeciesId())
+                .species(p.getSpecies())
+                .breedId(p.getBreedId())
+                .breed(p.getBreed())
+                .age(p.getAge())
+                .ageDisplay(formatAge(p.getAge()))
+                .vaccinated(p.getVaccinated())
+                .gender(p.getGender())
+                .status(p.getStatus())
+                .healthStatus(p.getHealthStatus())
+                .owner(toOwnerAdminDto(
                         p.getOwnerType(),
                         p.getOwnerId(),
                         p.getOwnerName(),
@@ -204,17 +261,17 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .organization(p.getOrganizationId() != null ? OrganizationMinimalDto.builder()
                         .organizationId(p.getOrganizationId())
                         .name(p.getOrganizationName())
+                        .url(p.getOrganizationUrl())
                         .build() : null)
                 .province(p.getProvinceName())
-                .provinceCode(p.getProvinceCode())
                 .ward(p.getWardName())
-                .wardCode(p.getWardCode())
                 .color(p.getColor())
                 .weight(p.getWeight())
                 .description(p.getDescription())
                 .neutered(p.getNeutered())
                 .rescueDate(p.getRescueDate())
                 .rescueLocation(p.getRescueLocation())
+                .rescueCaseId(p.getRescueCaseId())
                 .primaryImageUrl(primaryImageUrl)
                 .imageUrls(imageUrls)
                 .shelterId(p.getShelterId())
@@ -224,6 +281,26 @@ public class PetQueryAdapter implements PetQueryDataPort {
     }
 
     private PetOwnerSummaryDto toOwnerDto(
+            String ownerType,
+            UUID ownerId,
+            String ownerName,
+            String ownerAvatarUrl,
+            String ownerPhone
+    ) {
+        if (ownerId == null && ownerType == null) {
+            return null;
+        }
+
+        return PetOwnerSummaryDto.builder()
+                .ownerType(ownerType)
+                .ownerId(ownerId)
+                .name(ownerName)
+                .avatarUrl(ownerAvatarUrl)
+                .phone(ownerPhone)
+                .build();
+    }
+
+    private PetOwnerSummaryAdminDto toOwnerAdminDto(
             String ownerType,
             UUID ownerId,
             String ownerName,
@@ -238,7 +315,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
             return null;
         }
 
-        return PetOwnerSummaryDto.builder()
+        return PetOwnerSummaryAdminDto.builder()
                 .ownerType(ownerType)
                 .ownerId(ownerId)
                 .name(ownerName)

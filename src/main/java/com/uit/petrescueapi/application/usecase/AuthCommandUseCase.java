@@ -10,6 +10,8 @@ import com.uit.petrescueapi.domain.entity.EmailVerificationToken;
 import com.uit.petrescueapi.domain.entity.PasswordResetToken;
 import com.uit.petrescueapi.domain.entity.RefreshToken;
 import com.uit.petrescueapi.domain.entity.User;
+import com.uit.petrescueapi.domain.exception.AccountBannedException;
+import com.uit.petrescueapi.domain.exception.AccountLockedException;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.UnauthorizedException;
 import com.uit.petrescueapi.domain.service.AuthDomainService;
@@ -17,6 +19,7 @@ import com.uit.petrescueapi.domain.valueobject.UserStatus;
 import com.uit.petrescueapi.domain.entity.Organization;
 import com.uit.petrescueapi.domain.repository.OrganizationRepository;
 import com.uit.petrescueapi.infrastructure.email.EmailService;
+import com.uit.petrescueapi.infrastructure.redis.LoginAttemptService;
 import com.uit.petrescueapi.infrastructure.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,7 @@ public class AuthCommandUseCase implements AuthCommandPort {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
+    private final LoginAttemptService loginAttemptService;
     private final com.uit.petrescueapi.domain.repository.OrganizationMemberRepository organizationMemberRepository;
     private final OrganizationRepository organizationRepository;
 
@@ -88,23 +92,58 @@ public class AuthCommandUseCase implements AuthCommandPort {
 
     @Override
     public AuthTokenResponseDto login(LoginRequestDto cmd) {
-        User user = authDomainService.findByEmailOrUsername(cmd.getEmailOrUsername());
+        String identifier = cmd.getEmailOrUsername();
 
-        if (!passwordEncoder.matches(cmd.getPassword(), user.getPasswordHash())) {
-            throw new UnauthorizedException("Invalid credentials");
+        // Check if account is rate-limited
+        if (loginAttemptService.isRateLimited(identifier)) {
+            if (loginAttemptService.isLocked(identifier)) {
+                long remainingSeconds = loginAttemptService.getRemainingLockoutSeconds(identifier);
+                log.warn("Login blocked - too many failed attempts for: {}", maskIdentifier(identifier));
+                throw new AccountLockedException(remainingSeconds);
+            }
         }
 
+        // Check if account is locked in Redis
+        if (loginAttemptService.isLocked(identifier)) {
+            long remainingSeconds = loginAttemptService.getRemainingLockoutSeconds(identifier);
+            log.warn("Login blocked - account is locked: {}", maskIdentifier(identifier));
+            throw new AccountLockedException(remainingSeconds);
+        }
+
+        // Find user by email or username
+        User user = authDomainService.findByEmailOrUsername(identifier);
+
+        // Check account status BEFORE password verification for security
         if (user.getStatus() == UserStatus.BANNED) {
-            throw new BusinessException("Your account has been banned");
+            log.warn("Login attempt on banned account: {}", maskIdentifier(identifier));
+            throw new AccountBannedException();
         }
+
         if (user.getStatus() == UserStatus.LOCKED) {
-            throw new BusinessException("Your account has been locked");
+            log.warn("Login attempt on locked account: {}", maskIdentifier(identifier));
+            throw new AccountLockedException("Your account is temporarily locked. Please try again later.");
         }
+
+        // Verify password
+        if (!passwordEncoder.matches(cmd.getPassword(), user.getPasswordHash())) {
+            int attempts = loginAttemptService.recordFailedAttempt(identifier);
+            int remainingAttempts = 5 - attempts;
+            if (remainingAttempts > 0) {
+                log.warn("Invalid password for user: {}. {} attempts remaining", 
+                    maskIdentifier(identifier), remainingAttempts);
+                throw new UnauthorizedException("Invalid email or password. " + remainingAttempts + " attempts remaining.");
+            }
+            throw new UnauthorizedException("Account has been locked due to too many failed attempts. Please try again later.");
+        }
+
+        // Password correct - reset attempts and check email verification
+        loginAttemptService.resetAttempts(identifier);
 
         if (!user.isEmailVerified()) {
             throw new BusinessException("Please verify your email before logging in");
         }
 
+        log.info("User {} logged in successfully", maskIdentifier(identifier));
         return buildTokenResponse(user);
     }
 
@@ -234,7 +273,6 @@ public class AuthCommandUseCase implements AuthCommandPort {
     private UserResponseDto toUserResponse(User user, UUID organizationId, String organizationName, String organizationRole) {
         return UserResponseDto.builder()
                 .userId(user.getId())
-                .userCode(user.getUserCode())
                 .organizationId(organizationId)
                 .organizationName(organizationName)
                 .organizationRole(organizationRole)
@@ -253,5 +291,21 @@ public class AuthCommandUseCase implements AuthCommandPort {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Mask identifier for logging (security: don't log full email/username).
+     */
+    private String maskIdentifier(String identifier) {
+        if (identifier == null || identifier.length() < 3) {
+            return "***";
+        }
+        int atIndex = identifier.indexOf('@');
+        if (atIndex > 1) {
+            // Email: show first char and domain
+            return identifier.charAt(0) + "***@" + identifier.substring(atIndex + 1);
+        }
+        // Username: show first and last char
+        return identifier.charAt(0) + "***" + identifier.charAt(identifier.length() - 1);
     }
 }

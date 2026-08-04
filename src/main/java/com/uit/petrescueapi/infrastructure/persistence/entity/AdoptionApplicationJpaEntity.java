@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.entity;
 
+import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
+import com.uit.petrescueapi.domain.valueobject.HousingCondition;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -39,8 +41,9 @@ public class AdoptionApplicationJpaEntity extends BaseJpaEntity {
     @Column(name = "organization_id")
     private UUID organizationId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)
-    private String status;
+    private AdoptionApplicationStatus status;
 
     @Column(name = "note", columnDefinition = "TEXT")
     private String note;
@@ -48,8 +51,15 @@ public class AdoptionApplicationJpaEntity extends BaseJpaEntity {
     @Column(name = "experience", columnDefinition = "TEXT")
     private String experience;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "housing_condition", length = 50)
+    private HousingCondition housingCondition;
+
     @Column(name = "live_condition", columnDefinition = "TEXT")
     private String liveCondition;
+
+    @Column(name = "e_signature_id")
+    private UUID signatureMediaId;
 
     @Column(name = "decided_at", columnDefinition = "TIMESTAMPTZ")
     private LocalDateTime decidedAt;
