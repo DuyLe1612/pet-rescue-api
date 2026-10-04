@@ -92,6 +92,7 @@ application-local.yml
 
 # Test output
 test-output/
+agent/
 
 # Docker
 docker-compose.override.yml

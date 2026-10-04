@@ -23,7 +23,7 @@ public interface UserGeoLocationJpaRepository extends JpaRepository<UserGeoLocat
 
     @Modifying
     @Query("UPDATE UserGeoLocationJpaEntity g SET g.active = false WHERE g.active = true AND g.lastSeenAt < :threshold")
-    void markInactiveByLastSeenBefore(@Param("threshold") OffsetDateTime threshold);
+    int markInactiveByLastSeenBefore(@Param("threshold") OffsetDateTime threshold);
 
     @Query(value = """
             SELECT g.*

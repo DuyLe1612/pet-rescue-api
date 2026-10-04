@@ -36,7 +36,6 @@ dependencies {
     // Event-Driven Architecture
     implementation("org.springframework.boot:spring-boot-starter-amqp")        // RabbitMQ
     implementation("org.springframework.boot:spring-boot-starter-data-redis")  // Redis
-    implementation("org.springframework.boot:spring-boot-starter-batch")       // Spring Batch
     implementation("org.springframework.boot:spring-boot-starter-websocket")   // WebSocket notifications
 
     // Flyway (managed by Spring dependency-management)

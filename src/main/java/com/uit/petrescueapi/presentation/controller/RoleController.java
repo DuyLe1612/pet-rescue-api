@@ -1,6 +1,8 @@
 package com.uit.petrescueapi.presentation.controller;
 
-import com.uit.petrescueapi.application.dto.role.*;
+import com.uit.petrescueapi.application.dto.role.CreateRoleRequestDto;
+import com.uit.petrescueapi.application.dto.role.RoleResponseDto;
+import com.uit.petrescueapi.application.dto.role.RoleSummaryResponseDto;
 import com.uit.petrescueapi.application.port.command.RoleCommandPort;
 import com.uit.petrescueapi.application.port.query.RoleQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
@@ -15,13 +17,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/roles")
 @RequiredArgsConstructor
 @Slf4j
-@io.swagger.v3.oas.annotations.tags.Tag(name = "Roles", description = "Role and permission management")
+@io.swagger.v3.oas.annotations.tags.Tag(name = "Roles", description = "Role management")
 public class RoleController {
 
     private final RoleCommandPort commandPort;
@@ -34,14 +34,6 @@ public class RoleController {
             @Valid @RequestBody CreateRoleRequestDto cmd) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(mapper.toDto(commandPort.create(cmd))));
-    }
-
-    @PostMapping("/{id}/permissions")
-    @Operation(summary = "Assign permissions to a role")
-    public ResponseEntity<ApiResponse<RoleResponseDto>> assignPermissions(
-            @PathVariable Integer id,
-            @Valid @RequestBody AssignPermissionsRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.assignPermissions(id, cmd))));
     }
 
     @DeleteMapping("/{id}")
@@ -67,11 +59,5 @@ public class RoleController {
     @Operation(summary = "Get role by ID")
     public ResponseEntity<ApiResponse<RoleResponseDto>> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
-    }
-
-    @GetMapping("/{id}/permissions")
-    @Operation(summary = "Get permissions for a role")
-    public ResponseEntity<ApiResponse<List<PermissionResponseDto>>> getPermissions(@PathVariable Integer id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.getPermissions(id)));
     }
 }

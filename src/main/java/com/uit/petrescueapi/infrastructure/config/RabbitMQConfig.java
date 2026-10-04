@@ -58,6 +58,12 @@ public class RabbitMQConfig {
     @Value("${app.rabbitmq.routing-key.comment-unliked}")
     private String commentUnlikedRoutingKey;
 
+    @Value("${app.rabbit.listener.concurrency:1}")
+    private int concurrentConsumers;
+
+    @Value("${app.rabbit.listener.max-concurrency:1}")
+    private int maxConcurrentConsumers;
+
     // ===== Exchange =====
 
     @Bean
@@ -183,8 +189,8 @@ public class RabbitMQConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter());
-        factory.setConcurrentConsumers(3);
-        factory.setMaxConcurrentConsumers(10);
+        factory.setConcurrentConsumers(concurrentConsumers);
+        factory.setMaxConcurrentConsumers(maxConcurrentConsumers);
         return factory;
     }
 }

@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.application.usecase;
 
-import com.uit.petrescueapi.application.dto.role.AssignPermissionsRequestDto;
 import com.uit.petrescueapi.application.dto.role.CreateRoleRequestDto;
 import com.uit.petrescueapi.application.port.command.RoleCommandPort;
 import com.uit.petrescueapi.domain.entity.Role;
@@ -13,6 +12,11 @@ import org.springframework.stereotype.Service;
  * Command (write) use-case for Role operations.
  * Translates request DTOs into domain calls and delegates business rules
  * to {@link RoleDomainService}.
+ *
+ * <p>Role → permission assignment is intentionally not exposed yet — the
+ * underlying role-permission join is not mapped, so the endpoint would
+ * silently no-op. This will be re-introduced in a follow-up task once the
+ * role_permissions join table is mapped onto {@code RoleJpaEntity}.</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -30,13 +34,6 @@ public class RoleCommandUseCase implements RoleCommandPort {
                 .description(cmd.getDescription())
                 .build();
         return domainService.create(role);
-    }
-
-    @Override
-    public Role assignPermissions(Integer roleId, AssignPermissionsRequestDto cmd) {
-        log.debug("Command: assign permissions to role {}", roleId);
-        // TODO: implement permission assignment in domain service
-        return domainService.findById(roleId);
     }
 
     @Override

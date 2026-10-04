@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
-import com.uit.petrescueapi.application.dto.role.PermissionResponseDto;
 import com.uit.petrescueapi.application.dto.role.RoleResponseDto;
 import com.uit.petrescueapi.application.dto.role.RoleSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.RoleQueryDataPort;
@@ -13,9 +12,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Query-side adapter (CQRS read path) for Role.
@@ -44,15 +40,6 @@ public class RoleQueryAdapter implements RoleQueryDataPort {
         RoleDetailProjection proj = queryRepo.findDetailById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role", "roleId", roleId));
         return toResponseDto(proj);
-    }
-
-    // ── Permissions query ───────────────────────
-
-    @Override
-    public List<PermissionResponseDto> getPermissions(Integer roleId) {
-        // TODO: Add query when role_permissions join table is properly mapped
-        // RoleJpaEntity does not currently have a permissions collection.
-        return Collections.emptyList();
     }
 
     // ── Projection → DTO mappers ────────────────
