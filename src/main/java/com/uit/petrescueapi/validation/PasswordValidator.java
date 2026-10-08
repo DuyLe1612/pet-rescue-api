@@ -20,37 +20,38 @@ public class PasswordValidator implements ConstraintValidator<Password, String> 
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        if (value == null || value.isBlank()) {
-            return true; // Leave @NotBlank for required check
-        }
-        
-        if (value.length() < MIN_LENGTH) {
-            return false;
-        }
-        
-        if (!hasUppercase(value)) {
-            return false;
-        }
-        
-        if (!hasLowercase(value)) {
-            return false;
-        }
-        
-        if (!hasDigit(value)) {
-            return false;
-        }
-        
+
+//        if (value == null || value.isBlank()) {
+//            return true; // Leave @NotBlank for required check
+//        }
+//
+//        if (value.length() < MIN_LENGTH) {
+//            return false;
+//        }
+//
+//        if (!hasUppercase(value)) {
+//            return false;
+//        }
+//
+//        if (!hasLowercase(value)) {
+//            return false;
+//        }
+//
+//        if (!hasDigit(value)) {
+//            return false;
+//        }
+
         return true;
     }
-    
+
     private boolean hasUppercase(String value) {
         return value.chars().anyMatch(Character::isUpperCase);
     }
-    
+
     private boolean hasLowercase(String value) {
         return value.chars().anyMatch(Character::isLowerCase);
     }
-    
+
     private boolean hasDigit(String value) {
         return value.chars().anyMatch(Character::isDigit);
     }
