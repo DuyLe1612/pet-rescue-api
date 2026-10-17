@@ -66,8 +66,8 @@ public class MongoSchemaInitializer implements ApplicationRunner {
                 new IndexOptions().unique(true).sparse(true));
         index(INBOXES, "inbox_list", Indexes.compoundIndex(
                 Indexes.ascending("userId", "hidden"), Indexes.descending("sortAt", "conversationId")));
-        index(INBOXES, "inbox_peer", Indexes.ascending("peer.id"));
-        index(MESSAGE_BUCKETS, "bucket_message_id", Indexes.ascending("messages.id"));
+        index(INBOXES, "inbox_peer", Indexes.ascending("peer.userId"));
+        index(MESSAGE_BUCKETS, "bucket_message_id", Indexes.ascending("messages.messageId"));
 
         // posts
         index(POSTS, "post_feed", Indexes.compoundIndex(

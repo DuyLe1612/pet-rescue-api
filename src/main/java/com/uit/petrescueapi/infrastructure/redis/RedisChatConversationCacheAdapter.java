@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.redis;
 
+import com.uit.petrescueapi.infrastructure.config.ChatOnPostgres;
 import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatConversationCachePort;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@ChatOnPostgres
 public class RedisChatConversationCacheAdapter implements ChatConversationCachePort {
 
     private final RedisTemplate<String, Object> redis;

@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.ChatOnPostgres;
 import com.uit.petrescueapi.domain.entity.Conversation;
 import com.uit.petrescueapi.domain.repository.ConversationRepository;
 import com.uit.petrescueapi.domain.valueobject.ConversationType;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@ChatOnPostgres
 public class ConversationRepositoryAdapter implements ConversationRepository {
 
     private final ConversationJpaRepository jpaRepository;

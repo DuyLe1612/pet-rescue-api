@@ -38,6 +38,12 @@ public class MongoConfig {
         return new MongoTransactionManager(databaseFactory);
     }
 
+    /** {@code chatTransactionManager} / {@code postTransactionManager} → JPA or MongoDB per {@code app.storage.*}. */
+    @Bean
+    public static StorageTransactionAliases storageTransactionAliases() {
+        return new StorageTransactionAliases();
+    }
+
     /** Only touches MongoDB when at least one feature is stored there. */
     @Bean
     @ConditionalOnExpression("'${app.storage.chat:postgres}' == 'mongo' or '${app.storage.post:postgres}' == 'mongo'")

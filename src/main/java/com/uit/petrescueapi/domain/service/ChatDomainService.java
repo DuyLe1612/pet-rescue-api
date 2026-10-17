@@ -22,7 +22,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+// "chatTransactionManager" resolves to JPA or MongoDB per app.storage.chat (StorageTransactionAliases)
+@Transactional(transactionManager = "chatTransactionManager")
 public class ChatDomainService {
 
     private final ConversationRepository conversationRepository;
@@ -40,10 +41,13 @@ public class ChatDomainService {
             throw new BusinessException("Cannot create conversation with yourself", "CHAT_SELF");
         }
 
-        userRepository.findById(requesterId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", "id", requesterId));
-        userRepository.findById(participantId)
-            .orElseThrow(() -> new ResourceNotFoundException("User", "id", participantId));
+        // existsById, not findById: no lazy roles to load (there is no JPA session under a MongoDB transaction)
+        if (!userRepository.existsById(requesterId)) {
+            throw new ResourceNotFoundException("User", "id", requesterId);
+        }
+        if (!userRepository.existsById(participantId)) {
+            throw new ResourceNotFoundException("User", "id", participantId);
+        }
 
         Conversation existingConversation = conversationRepository
                 .findDirectConversationId(requesterId, participantId, type, relatedEntityId)
