@@ -17,6 +17,4 @@ import java.util.UUID;
 public interface TagJpaRepository extends JpaRepository<TagJpaEntity, UUID> {
 
     Optional<TagJpaEntity> findByCodeAndDeletedFalse(String code);
-
-    Optional<TagJpaEntity> findByTagIdAndDeletedFalse(UUID tagId);
 }

@@ -29,6 +29,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
     @Query("""
         SELECT a.applicationId   AS applicationId,
                a.adoptionCode    AS adoptionCode,
+               a.petId           AS petId,
                p.name            AS petName,
                (SELECT MIN(mf.publicId)
                 FROM PetMediaJpaEntity pm
@@ -59,6 +60,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
     @Query("""
         SELECT a.applicationId   AS applicationId,
                a.adoptionCode    AS adoptionCode,
+               a.petId           AS petId,
                p.name            AS petName,
                (SELECT MIN(mf.publicId)
                 FROM PetMediaJpaEntity pm
@@ -69,7 +71,6 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
                a.createdAt       AS createdAt,
-               a.petId           AS petId,
                a.applicantId     AS applicantId,
                a.organizationId  AS organizationId,
                o.name            AS organizationName,
@@ -91,6 +92,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
     @Query("""
         SELECT a.applicationId   AS applicationId,
                a.adoptionCode    AS adoptionCode,
+               a.petId           AS petId,
                p.name            AS petName,
                (SELECT MIN(mf.publicId)
                 FROM PetMediaJpaEntity pm
@@ -122,6 +124,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
     @Query("""
         SELECT a.applicationId   AS applicationId,
                a.adoptionCode    AS adoptionCode,
+               a.petId           AS petId,
                p.name            AS petName,
                (SELECT MIN(mf.publicId)
                 FROM PetMediaJpaEntity pm

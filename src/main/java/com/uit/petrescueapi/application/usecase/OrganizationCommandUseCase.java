@@ -29,13 +29,6 @@ public class OrganizationCommandUseCase implements OrganizationCommandPort {
     private final OrganizationDomainService domainService;
 
     @Override
-    public Organization create(CreateOrganizationRequestDto cmd) {
-        log.debug("Command: create organization '{}'", cmd.getName());
-        Organization org = buildOrganization(cmd);
-        return domainService.create(org);
-    }
-
-    @Override
     public Organization createByUser(CreateOrganizationRequestDto cmd, UUID requestedByUserId) {
         log.debug("Command: create organization '{}' by user {}", cmd.getName(), requestedByUserId);
         Organization org = buildOrganization(cmd);

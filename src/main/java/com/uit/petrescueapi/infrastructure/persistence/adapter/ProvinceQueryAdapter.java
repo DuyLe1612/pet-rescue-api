@@ -2,9 +2,9 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.uit.petrescueapi.application.dto.geo.ProvinceDetailDto;
-import com.uit.petrescueapi.application.dto.geo.ProvinceSummaryDto;
-import com.uit.petrescueapi.application.dto.geo.WardDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceDetailDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceSummaryDto;
+import com.uit.petrescueapi.application.dto.location.WardDto;
 import com.uit.petrescueapi.application.port.out.ProvinceQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;

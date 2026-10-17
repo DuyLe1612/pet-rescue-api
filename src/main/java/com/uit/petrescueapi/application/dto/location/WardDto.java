@@ -1,4 +1,4 @@
-package com.uit.petrescueapi.application.dto.geo;
+package com.uit.petrescueapi.application.dto.location;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,10 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class ProvinceSummaryDto {
+public class WardDto {
     private Integer code;
     private String name;
     private String codename;
     private String divisionType;
-    private Integer phoneCode;
+    private Integer provinceCode;
 }

@@ -28,8 +28,4 @@ public interface PetRepository {
     List<Pet> findByStatus(PetStatus status);
 
     Page<Pet> findByStatus(PetStatus status, Pageable pageable);
-
-    void deleteById(UUID id);
-
-    boolean existsById(UUID id);
 }

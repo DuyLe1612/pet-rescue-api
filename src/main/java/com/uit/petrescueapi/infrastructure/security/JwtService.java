@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -59,15 +58,6 @@ public class JwtService {
 
     public String extractUserId(String token) {
         return extractClaim(token, Claims::getSubject);
-    }
-
-    public String extractEmail(String token) {
-        return extractClaim(token, claims -> claims.get("email", String.class));
-    }
-
-    public UUID extractOrganizationId(String token) {
-        String orgId = extractClaim(token, claims -> claims.get("organizationId", String.class));
-        return orgId != null ? UUID.fromString(orgId) : null;
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

@@ -61,9 +61,4 @@ public class BannerRepositoryAdapter implements BannerRepository {
     public List<Banner> findActiveByTargetPage(String targetPage) {
         return mapper.toDomainList(jpa.findActiveByTargetPage(targetPage, LocalDateTime.now()));
     }
-
-    @Override
-    public void delete(UUID bannerId) {
-        jpa.deleteById(bannerId);
-    }
 }

@@ -26,8 +26,10 @@ public class PetResponseDto {
     private String name;
     private UUID speciesId;
     private String species;
+    private String speciesVi;
     private UUID breedId;
     private String breed;
+    private String breedVi;
     private Integer age;
     private String ageDisplay;
     private boolean vaccinated;

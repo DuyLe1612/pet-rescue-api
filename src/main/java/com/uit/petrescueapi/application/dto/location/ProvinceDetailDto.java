@@ -1,18 +1,21 @@
-package com.uit.petrescueapi.application.dto.geo;
+package com.uit.petrescueapi.application.dto.location;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class WardDto {
+public class ProvinceDetailDto {
     private Integer code;
     private String name;
     private String codename;
     private String divisionType;
-    private Integer provinceCode;
+    private Integer phoneCode;
+    private List<WardDto> wards;
 }

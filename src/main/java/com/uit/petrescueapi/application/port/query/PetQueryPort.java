@@ -16,8 +16,6 @@ public interface PetQueryPort {
 
     PetResponseDto findById(UUID id);
 
-    Page<PetSummaryResponseDto> findAll(Pageable pageable);
-
     Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,
@@ -29,29 +27,11 @@ public interface PetQueryPort {
             Pageable pageable
     );
 
-    Page<PetSummaryResponseDto> findAvailable(Pageable pageable);
-
     Page<PetSummaryResponseDto> findAvailableWithFilters(
             String species,
             String breed,
             String gender,
             UUID ownerOrganizationId,
-            Pageable pageable
-    );
-
-    Page<PetSummaryResponseDto> findByOrganizationId(
-            UUID organizationId,
-            String species,
-            String breed,
-            String gender,
-            Pageable pageable
-    );
-
-    Page<PetSummaryResponseDto> findByUserId(
-            UUID userId,
-            String species,
-            String breed,
-            String gender,
             Pageable pageable
     );
 }

@@ -7,8 +7,6 @@ import com.uit.petrescueapi.infrastructure.persistence.repository.RescueMediaJpa
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -27,21 +25,5 @@ public class RescueCaseMediaRepositoryAdapter
                         mapper.toEntity(rescueMedia)
                 )
         );
-    }
-
-    @Override
-    public List<RescueMedia> findByCaseId(
-            UUID caseId) {
-
-        return mapper.toDomainList(
-                jpa.findByCaseId(caseId)
-        );
-    }
-
-    @Override
-    public void deleteByCaseId(
-            UUID caseId) {
-
-        jpa.deleteByCaseId(caseId);
     }
 }

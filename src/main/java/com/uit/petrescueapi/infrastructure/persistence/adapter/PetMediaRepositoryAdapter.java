@@ -29,11 +29,6 @@ public class PetMediaRepositoryAdapter implements PetMediaRepository {
     }
 
     @Override
-    public Optional<PetMedia> findPrimaryByPetId(UUID petId) {
-        return jpa.findPrimaryByPetId(petId).map(mapper::toDomain);
-    }
-
-    @Override
     public Optional<PetMedia> findByPetIdAndMediaFileId(UUID petId, UUID mediaFileId) {
         return jpa.findByPetIdAndMediaFileId(petId, mediaFileId).stream().findFirst().map(mapper::toDomain);
     }

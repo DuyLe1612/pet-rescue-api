@@ -3,8 +3,6 @@ package com.uit.petrescueapi.domain.repository;
 import com.uit.petrescueapi.domain.entity.PetOwnership;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -14,10 +12,6 @@ import java.util.UUID;
 public interface PetOwnershipRepository {
 
     PetOwnership save(PetOwnership ownership);
-
-    Optional<PetOwnership> findCurrentOwnership(UUID petId);
-
-    List<PetOwnership> findAllByPetId(UUID petId);
 
     /**
      * End current ownership by setting toTime.

@@ -34,8 +34,14 @@ public class PetAdminResponseDto {
     private String name;
     private UUID speciesId;
     private String species;
+
+    @Schema(description = "Vietnamese species name for display", example = "Chó")
+    private String speciesVi;
     private UUID breedId;
     private String breed;
+
+    @Schema(description = "Vietnamese breed name for display", example = "Chó Golden Retriever")
+    private String breedVi;
     private Integer age;
     private String ageDisplay;
     private boolean vaccinated;

@@ -41,11 +41,6 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
                     @Param("search") String search,
                     Pageable pageable);
 
-    @Query("SELECT fr FROM FriendRequestJpaEntity fr WHERE fr.requesterId = :userId AND fr.status = :status")
-    Page<FriendRequestJpaEntity> findByRequesterAndStatus(@Param("userId") UUID userId,
-                                                          @Param("status") FriendRequestStatus status,
-                                                          Pageable pageable);
-
     @Query(value = """
             SELECT u.user_id AS userId,
                    u.username AS username,

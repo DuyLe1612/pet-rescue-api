@@ -20,8 +20,10 @@ public interface PetDetailProjection {
     String getName();
     UUID getSpeciesId();
     String getSpecies();
+    String getSpeciesVi();
     UUID getBreedId();
     String getBreed();
+    String getBreedVi();
     Integer getAge();
     Gender getGender();
     String getColor();

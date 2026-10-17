@@ -23,6 +23,11 @@ public class PetBreedJpaEntity extends BaseJpaEntity {
     @Column(name = "species_id", nullable = false)
     private UUID speciesId;
 
+    /** English name: canonical value used for filtering. */
     @Column(name = "name", nullable = false, length = 100)
     private String name;
+
+    /** Vietnamese display name. */
+    @Column(name = "name_vi", nullable = false, length = 100)
+    private String nameVi;
 }

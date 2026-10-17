@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -23,16 +21,6 @@ public class PetOwnershipRepositoryAdapter implements PetOwnershipRepository {
     @Override
     public PetOwnership save(PetOwnership ownership) {
         return mapper.toDomain(jpa.save(mapper.toEntity(ownership)));
-    }
-
-    @Override
-    public Optional<PetOwnership> findCurrentOwnership(UUID petId) {
-        return jpa.findByPetIdAndToTimeIsNull(petId).map(mapper::toDomain);
-    }
-
-    @Override
-    public List<PetOwnership> findAllByPetId(UUID petId) {
-        return mapper.toDomainList(jpa.findAllByPetIdOrderByFromTimeDesc(petId));
     }
 
     @Override

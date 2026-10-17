@@ -9,8 +9,6 @@ import com.uit.petrescueapi.infrastructure.persistence.mapper.PostEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaRepository;
 import com.uit.petrescueapi.infrastructure.persistence.repository.MediaFileJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -63,19 +61,5 @@ public class PostRepositoryAdapter implements PostRepository {
         return jpa.findById(postId)
                 .filter(e -> !e.isDeleted())
                 .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<Post> findAll(Pageable pageable) {
-        return jpa.findAll(pageable).map(mapper::toDomain);
-    }
-
-    @Override
-    public void delete(UUID postId) {
-        jpa.findById(postId).ifPresent(entity -> {
-            entity.setDeleted(true);
-            entity.setDeletedAt(LocalDateTime.now());
-            jpa.save(entity);
-        });
     }
 }

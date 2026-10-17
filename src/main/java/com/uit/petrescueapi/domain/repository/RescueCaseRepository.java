@@ -1,7 +1,6 @@
 package com.uit.petrescueapi.domain.repository;
 
 import com.uit.petrescueapi.domain.entity.RescueCase;
-import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -18,6 +17,4 @@ public interface RescueCaseRepository {
     Optional<RescueCase> findById(UUID caseId);
 
     Page<RescueCase> findAll(Pageable pageable);
-
-    Page<RescueCase> findByStatus(RescueCaseStatus status, Pageable pageable);
 }

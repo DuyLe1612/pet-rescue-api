@@ -13,6 +13,7 @@ public interface AdoptionWebMapper {
     @Mapping(target = "liveCondition", source = "liveCondition")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "adoptionCode", source = "adoptionCode")
+    @Mapping(target = "petId", source = "petId")
     @Mapping(target = "petName", ignore = true)
     @Mapping(target = "petPrimaryImageUrl", ignore = true)
     AdoptionResponseDto toDto(AdoptionApplication app);

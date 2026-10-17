@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.application.port.out;
 
-import com.uit.petrescueapi.application.dto.user.UserAdminResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserReputationResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.dto.user.UserPublicSearchDto;
@@ -19,8 +18,6 @@ import java.util.UUID;
 public interface UserQueryDataPort {
 
     UserResponseDto findById(UUID userId);
-
-    UserAdminResponseDto findByIdForAdmin(UUID userId);
 
     Page<UserSummaryResponseDto> findAllSummaries(String searchName, Pageable pageable);
 

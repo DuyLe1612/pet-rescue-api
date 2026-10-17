@@ -24,6 +24,4 @@ public interface BannerRepository {
     Page<Banner> findByTargetPage(String targetPage, Pageable pageable);
 
     List<Banner> findActiveByTargetPage(String targetPage);
-
-    void delete(UUID bannerId);
 }

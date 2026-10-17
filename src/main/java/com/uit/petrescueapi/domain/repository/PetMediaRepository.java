@@ -14,8 +14,6 @@ public interface PetMediaRepository {
 
     List<PetMedia> findByPetId(UUID petId);
 
-    java.util.Optional<PetMedia> findPrimaryByPetId(UUID petId);
-
     java.util.Optional<PetMedia> findByPetIdAndMediaFileId(UUID petId, UUID mediaFileId);
 
     void clearPrimary(UUID petId);

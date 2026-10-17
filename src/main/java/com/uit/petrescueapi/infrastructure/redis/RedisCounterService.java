@@ -43,11 +43,6 @@ public class RedisCounterService {
         return removed != null && removed > 0;
     }
 
-    public long getPostLikeCount(UUID postId) {
-        Long count = redis.opsForZSet().zCard(postLikesKey(postId));
-        return count == null ? 0L : count;
-    }
-
     public boolean checkUserLikedPost(UUID postId, UUID userId) {
         return redis.opsForZSet().score(postLikesKey(postId), userId.toString()) != null;
     }
@@ -64,27 +59,9 @@ public class RedisCounterService {
         return removed != null && removed > 0;
     }
 
-    public long getCommentLikeCount(UUID commentId) {
-        Long count = redis.opsForZSet().zCard(commentLikesKey(commentId));
-        return count == null ? 0L : count;
-    }
-
-    public boolean checkUserLikedComment(UUID commentId, UUID userId) {
-        return redis.opsForZSet().score(commentLikesKey(commentId), userId.toString()) != null;
-    }
-
     public long incrementPostCommentCount(UUID postId) {
         Long value = redis.opsForValue().increment(postCommentCountKey(postId));
         return value == null ? 0L : value;
-    }
-
-    public long decrementPostCommentCount(UUID postId) {
-        Long value = redis.opsForValue().decrement(postCommentCountKey(postId));
-        if (value == null || value < 0) {
-            redis.opsForValue().set(postCommentCountKey(postId), "0");
-            return 0L;
-        }
-        return value;
     }
 
     public long getPostCommentCount(UUID postId) {
@@ -95,20 +72,6 @@ public class RedisCounterService {
     public long incrementCommentReplyCount(UUID parentCommentId) {
         Long value = redis.opsForValue().increment(commentReplyCountKey(parentCommentId));
         return value == null ? 0L : value;
-    }
-
-    public long decrementCommentReplyCount(UUID parentCommentId) {
-        Long value = redis.opsForValue().decrement(commentReplyCountKey(parentCommentId));
-        if (value == null || value < 0) {
-            redis.opsForValue().set(commentReplyCountKey(parentCommentId), "0");
-            return 0L;
-        }
-        return value;
-    }
-
-    public long getCommentReplyCount(UUID parentCommentId) {
-        String value = redis.opsForValue().get(commentReplyCountKey(parentCommentId));
-        return value == null ? 0L : Long.parseLong(value);
     }
 
     private String postLikesKey(UUID postId) {

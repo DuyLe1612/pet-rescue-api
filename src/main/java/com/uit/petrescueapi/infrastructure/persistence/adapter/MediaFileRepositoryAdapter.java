@@ -5,8 +5,6 @@ import com.uit.petrescueapi.domain.repository.MediaFileRepository;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.MediaFileEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.MediaFileJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -35,13 +33,6 @@ public class MediaFileRepositoryAdapter implements MediaFileRepository {
     @Override
     public Optional<MediaFile> findByPublicId(String publicId) {
         return jpa.findByPublicIdAndDeletedFalse(publicId)
-                .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<MediaFile> findByUploaderId(UUID uploaderId, Pageable pageable) {
-        // Can be replaced with a dedicated JPA query later
-        return jpa.findAll(pageable)
                 .map(mapper::toDomain);
     }
 

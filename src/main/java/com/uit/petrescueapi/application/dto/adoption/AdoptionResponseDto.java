@@ -8,7 +8,7 @@ import java.util.UUID;
 
 /**
  * Response DTO for adoption application.
- * Optimized: excludes unused fields (petId, applicantId, applicantUsername, 
+ * Optimized: excludes unused fields (applicantId, applicantUsername, 
  * organizationId, organizationName, note, decidedAt, decidedBy, decidedByUsername, 
  * rejectReason, readyAt).
  */
@@ -24,6 +24,9 @@ public class AdoptionResponseDto {
 
     @Schema(example = "A-0001")
     private String adoptionCode;
+
+    @Schema(example = "7c9e6679-7425-40de-944b-e07fc1f90ae7")
+    private UUID petId;
 
     @Schema(description = "Pet name (denormalized for list views)", example = "Buddy")
     private String petName;

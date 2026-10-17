@@ -5,11 +5,8 @@ import com.uit.petrescueapi.domain.repository.TagRepository;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.TagEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.TagJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,19 +33,5 @@ public class TagRepositoryAdapter implements TagRepository {
     public Optional<Tag> findByCode(String code) {
         return jpa.findByCodeAndDeletedFalse(code)
                 .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<Tag> findAll(Pageable pageable) {
-        return jpa.findAll(pageable).map(mapper::toDomain);
-    }
-
-    @Override
-    public void delete(UUID tagId) {
-        jpa.findById(tagId).ifPresent(entity -> {
-            entity.setDeleted(true);
-            entity.setDeletedAt(LocalDateTime.now());
-            jpa.save(entity);
-        });
     }
 }

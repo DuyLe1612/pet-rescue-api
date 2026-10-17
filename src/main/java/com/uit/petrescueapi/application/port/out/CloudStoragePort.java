@@ -2,7 +2,6 @@ package com.uit.petrescueapi.application.port.out;
 
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Map;
 
 /**
  * Output port for cloud storage operations (Cloudinary).

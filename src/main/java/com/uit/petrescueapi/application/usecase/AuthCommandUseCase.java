@@ -7,7 +7,6 @@ import com.uit.petrescueapi.application.dto.auth.RegisterRequestDto;
 import com.uit.petrescueapi.application.dto.user.UserResponseDto;
 import com.uit.petrescueapi.application.port.command.AuthCommandPort;
 import com.uit.petrescueapi.domain.entity.EmailVerificationToken;
-import com.uit.petrescueapi.domain.entity.PasswordResetToken;
 import com.uit.petrescueapi.domain.entity.RefreshToken;
 import com.uit.petrescueapi.domain.entity.User;
 import com.uit.petrescueapi.domain.exception.AccountBannedException;

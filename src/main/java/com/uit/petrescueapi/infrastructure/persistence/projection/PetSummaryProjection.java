@@ -17,8 +17,10 @@ public interface PetSummaryProjection {
     String getName();
     UUID getSpeciesId();
     String getSpecies();
+    String getSpeciesVi();
     UUID getBreedId();
     String getBreed();
+    String getBreedVi();
     Integer getAge();
     boolean getVaccinated();
     Gender getGender();

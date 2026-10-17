@@ -7,9 +7,10 @@ import com.uit.petrescueapi.application.dto.pet.UpdatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetSpeciesResponseDto;
 import com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto;
+import com.uit.petrescueapi.application.dto.pet.PetTaxonomyResponseDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
 import com.uit.petrescueapi.application.port.query.PetQueryPort;
-import com.uit.petrescueapi.domain.exception.ForbiddenException;
+import com.uit.petrescueapi.application.port.query.PetTaxonomyQueryPort;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
@@ -18,8 +19,6 @@ import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
 import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PetBreedJpaRepository;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PetSpeciesJpaRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -54,8 +53,7 @@ public class PetController {
     private final PetWebMapper mapper;
     private final UserDomainService userDomainService;
     private final OrganizationDomainService organizationDomainService;
-    private final PetSpeciesJpaRepository speciesRepository;
-    private final PetBreedJpaRepository breedRepository;
+    private final PetTaxonomyQueryPort taxonomyQueryPort;
 
     // ── Commands (write) ─────────────────────────
 
@@ -74,25 +72,6 @@ public class PetController {
         log.debug("Creating pet for user {}", userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(mapper.toDto(petCommandPort.createForUser(cmd, userId))));
-    }
-
-    @PostMapping("/shelter")
-    @Deprecated
-    @Operation(summary = "Create a pet as a shelter member (organization-owned)")
-    public ResponseEntity<ApiResponse<PetResponseDto>> createAsShelter(
-            @Valid @RequestBody CreatePetRequestDto cmd,
-            Authentication authentication) {
-        UUID userId = UUID.fromString(authentication.getName());
-
-        // shelterId must be provided in request body
-        UUID shelterId = cmd.getShelterId();
-        if (shelterId == null) {
-            throw new ForbiddenException("shelterId is required for shelter pet creation");
-        }
-
-        log.debug("Creating pet for shelter {} by user {}", shelterId, userId);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(mapper.toDto(petCommandPort.createForShelter(cmd, shelterId, userId))));
     }
 
     @PutMapping("/{id}")
@@ -139,27 +118,28 @@ public class PetController {
         return ResponseEntity.ok(ApiResponse.ok(petQueryPort.findById(id)));
     }
 
+    @GetMapping("/taxonomy")
+    @Operation(summary = "List all species with their breeds",
+            description = "Single call for FE pickers. `name` is the English canonical value (send it back in filters), " +
+                    "`nameVi` is the Vietnamese label to display.")
+    public ResponseEntity<ApiResponse<List<PetTaxonomyResponseDto>>> getTaxonomy() {
+        return ResponseEntity.ok(ApiResponse.ok(taxonomyQueryPort.findTaxonomy()));
+    }
+
     @GetMapping("/species")
-    @Operation(summary = "List pet species")
+    @Operation(summary = "List pet species", description = "`search` matches both English and Vietnamese names.")
     public ResponseEntity<ApiResponse<PageResponse<PetSpeciesResponseDto>>> getSpecies(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String sortOrder) {
-        var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder);
-        var species = (search == null || search.isBlank()
-                ? speciesRepository.findByDeletedFalse(pageable)
-                : speciesRepository.findByNameContainingIgnoreCaseAndDeletedFalse(search, pageable))
-                .map(item -> PetSpeciesResponseDto.builder()
-                        .speciesId(item.getSpeciesId())
-                        .name(item.getName())
-                        .build());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(species)));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                taxonomyQueryPort.findSpecies(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/species/{speciesId}/breeds")
-    @Operation(summary = "List pet breeds by species")
+    @Operation(summary = "List pet breeds by species", description = "`search` matches both English and Vietnamese names.")
     public ResponseEntity<ApiResponse<PageResponse<PetBreedResponseDto>>> getBreedsBySpecies(
             @PathVariable UUID speciesId,
             @RequestParam(required = false) String search,
@@ -167,16 +147,8 @@ public class PetController {
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "name") String sortBy,
             @RequestParam(defaultValue = "asc") String sortOrder) {
-        var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder);
-        var breeds = (search == null || search.isBlank()
-                ? breedRepository.findBySpeciesIdAndDeletedFalse(speciesId, pageable)
-                : breedRepository.findBySpeciesIdAndNameContainingIgnoreCaseAndDeletedFalse(speciesId, search, pageable))
-                .map(item -> PetBreedResponseDto.builder()
-                        .breedId(item.getBreedId())
-                        .speciesId(item.getSpeciesId())
-                        .name(item.getName())
-                        .build());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(breeds)));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                taxonomyQueryPort.findBreeds(speciesId, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping
@@ -238,63 +210,6 @@ public class PetController {
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
                         species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
-                ))));
-    }
-
-    @GetMapping("/available")
-    @Deprecated
-    @Operation(summary = "List available pets (paginated, with optional filters)",
-            description = "Deprecated: Use GET /api/v1/pets with status=AVAILABLE query parameter instead")
-    public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getAvailable(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
-            @RequestParam(required = false) String species,
-            @RequestParam(required = false) String breed,
-            @RequestParam(required = false) String gender,
-            @RequestParam(required = false) UUID organizationId) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(petQueryPort.findAvailableWithFilters(
-                        species, breed, gender, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
-                ))));
-    }
-
-    @GetMapping("/by-organization/{organizationId}")
-    @Deprecated
-    @Operation(summary = "List pets owned by an organization (paginated)",
-            description = "Deprecated: Use GET /api/v1/pets with organizationId={id} query parameter instead")
-    public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getByOrganization(
-            @PathVariable UUID organizationId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
-            @RequestParam(required = false) String species,
-            @RequestParam(required = false) String breed,
-            @RequestParam(required = false) String gender) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(petQueryPort.findByOrganizationId(
-                        organizationId, species, breed, gender, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
-                ))));
-    }
-
-    @GetMapping("/by-user/{userId}")
-    @Deprecated
-    @Operation(summary = "List pets owned by a user (paginated, with optional filters)",
-            description = "Deprecated: Use GET /api/v1/pets with userId={id} query parameter instead")
-    public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getByUser(
-            @PathVariable UUID userId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder,
-            @RequestParam(required = false) String species,
-            @RequestParam(required = false) String breed,
-            @RequestParam(required = false) String gender) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(petQueryPort.findByUserId(
-                        userId, species, breed, gender, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

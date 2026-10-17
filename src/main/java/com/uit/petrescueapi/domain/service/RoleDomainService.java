@@ -53,16 +53,6 @@ public class RoleDomainService {
     }
 
     /**
-     * Partial update of an existing role.
-     */
-    public Role update(Integer id, Role patch) {
-        log.debug("Updating role {}", id);
-        Role existing = findById(id);
-        applyUpdates(existing, patch);
-        return roleRepository.save(existing);
-    }
-
-    /**
      * Soft delete a role.
      */
     public void delete(Integer id) {
@@ -71,9 +61,4 @@ public class RoleDomainService {
     }
 
     // ── Private helpers ─────────────────────────────
-
-    private void applyUpdates(Role target, Role source) {
-        if (source.getName() != null)        target.setName(source.getName());
-        if (source.getDescription() != null) target.setDescription(source.getDescription());
-    }
 }

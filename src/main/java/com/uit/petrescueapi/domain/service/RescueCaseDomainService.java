@@ -8,8 +8,6 @@ import com.uit.petrescueapi.domain.repository.*;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,16 +57,6 @@ public class RescueCaseDomainService {
     @Transactional(readOnly = true)
     public Optional<RescueCaseCompletion> findCompletionById(UUID completionId) {
         return rescueCaseCompletionRepository.findById(completionId);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<RescueCase> findAll(Pageable pageable) {
-        return rescueCaseRepository.findAll(pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<RescueCaseCompletion> findAllCompletions(Pageable pageable) {
-        return rescueCaseCompletionRepository.findAll(pageable);
     }
     // ── Commands ────────────────────────────────────
 

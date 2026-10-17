@@ -15,12 +15,6 @@ import java.util.UUID;
 public interface OrganizationCommandPort {
 
     /**
-     * @deprecated Use {@link #createByUser} or {@link #createByAdmin} instead
-     */
-    @Deprecated
-    Organization create(CreateOrganizationRequestDto cmd);
-
-    /**
      * Create organization requested by a regular user.
      * Status is set to PENDING; user becomes OWNER when approved.
      */

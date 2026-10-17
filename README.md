@@ -150,7 +150,7 @@ src/main/java/com/uit/petrescueapi/
 │   │   │   ├── AuthCommandPort.java        #   register, login, refresh, verifyEmail, logout
 │   │   │   └── ... (9 more for future features)
 │   │   ├── query/                          #   Read port interfaces (10 total, return DTOs)
-│   │   │   ├── PetQueryPort.java           #   findById → PetResponseDto, findAll/Available → Page<Summary>
+│   │   │   ├── PetQueryPort.java           #   findById → PetResponseDto, findAllWithFilters/findAvailableWithFilters → Page<Summary>
 │   │   │   └── ... (9 more for future features)
 │   │   └── out/
 │   │       └── PetQueryDataPort.java       #   ⭐ Output port for CQRS query adapter 
@@ -340,13 +340,14 @@ GET    /actuator/health
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/` | Create a new pet |
-| `GET` | `/?page=0&size=20` | List all pets (paginated, with org data) |
+| `GET` | `/?page=0&pageSize=20` | List pets (filters: `species`, `breed`, `gender`, `status`, `organizationId`, `userId`, `availableOnly`) |
 | `GET` | `/{id}` | Get pet detail (with org data + images) |
-| `GET` | `/available?page=0&size=20` | List available pets only |
+| `GET` | `/taxonomy` | All species with their breeds (English `name` + Vietnamese `nameVi`) |
+| `GET` | `/species` | List species (paginated, search EN/VI) |
+| `GET` | `/species/{speciesId}/breeds` | List breeds of a species (paginated, search EN/VI) |
 | `PUT` | `/{id}` | Update a pet |
 | `PATCH` | `/{id}/status?status=PENDING` | Change pet status (validated transitions) |
 | `DELETE` | `/{id}` | Soft-delete a pet |
-| `GET` | `/by-organization/{orgId}?page=0&size=20` | List pets owned by an organization (via `pet_ownerships`) |
 
 ### Mock Endpoints (9 controllers)
 
@@ -562,6 +563,8 @@ public class AdminController {
 ## Guide: How to Add a New CQRS Query Endpoint (Step by Step)
 
 This section walks through **exactly what was done** to implement `GET /api/v1/pets/by-organization/{organizationId}` — fetching paged pets by organization ID using the `pet_ownerships` join table. Use this as a recipe for adding any new query endpoint.
+
+> **Note:** this dedicated endpoint has since been removed in favour of `GET /api/v1/pets?organizationId={id}`; the steps below remain a valid recipe.
 
 ### Context
 

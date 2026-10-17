@@ -14,11 +14,7 @@ public interface BannerQueryPort {
 
     BannerResponseDto findById(UUID bannerId);
 
-    Page<BannerResponseDto> findAll(Pageable pageable);
-
     Page<BannerResponseDto> findAllFiltered(String targetPage, Boolean active, String search, Pageable pageable);
-
-    Page<BannerResponseDto> findByTargetPage(String targetPage, Pageable pageable);
 
     /**
      * Find active banners for a specific page (within date range, sorted by display order).

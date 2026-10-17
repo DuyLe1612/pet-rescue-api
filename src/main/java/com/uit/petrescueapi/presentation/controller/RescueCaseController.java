@@ -105,39 +105,6 @@ public class RescueCaseController {
             PageResponse.from(queryPort.findAll(search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
-    @GetMapping("/nearby")
-    @Deprecated
-    @Operation(summary = "Find rescue cases near a location",
-            description = "Deprecated: Use GET /api/v1/rescue-cases with lat=X&lng=Y&distance=Z query parameters instead")
-    public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getNearby(
-            @RequestParam double lat,
-            @RequestParam double lng,
-            @RequestParam(defaultValue = "5000") double distance,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "reportedAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
-        return ResponseEntity.ok(ApiResponse.ok(
-            PageResponse.from(queryPort.findNearby(lat, lng, distance, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
-    }
-
-    @GetMapping("/map/bounding-box")
-    @Deprecated
-    @Operation(summary = "Find rescue cases within bounding box",
-            description = "Deprecated: Use GET /api/v1/rescue-cases with minLat=X&minLng=Y&maxLat=Z&maxLng=W query parameters instead")
-    public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getInBoundingBox(
-            @RequestParam double minLat,
-            @RequestParam double minLng,
-            @RequestParam double maxLat,
-            @RequestParam double maxLng,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "reportedAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
-        return ResponseEntity.ok(ApiResponse.ok(
-            PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
-    }
-
     // ══════════════════════════════════════════════════════════════════════════
     // MAP MARKER ENDPOINTS - Ultra-fast for real-time map rendering
     // Returns lightweight markers (no pagination - limited to 500 per request)

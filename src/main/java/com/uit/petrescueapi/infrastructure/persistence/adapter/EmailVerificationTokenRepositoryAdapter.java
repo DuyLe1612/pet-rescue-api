@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
-import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -25,10 +24,5 @@ public class EmailVerificationTokenRepositoryAdapter implements EmailVerificatio
     @Override
     public Optional<EmailVerificationToken> findByToken(String token) {
         return jpa.findByToken(token).map(mapper::toDomain);
-    }
-
-    @Override
-    public Optional<EmailVerificationToken> findLatestByUserId(UUID userId) {
-        return jpa.findLatestByUserId(userId).map(mapper::toDomain);
     }
 }

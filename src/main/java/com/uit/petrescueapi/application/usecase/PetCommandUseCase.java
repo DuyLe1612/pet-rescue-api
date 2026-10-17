@@ -6,7 +6,6 @@ import com.uit.petrescueapi.application.dto.pet.UpdatePetRequestDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
 import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
-import com.uit.petrescueapi.domain.entity.MediaFile;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
 import com.uit.petrescueapi.domain.entity.PetMedia;
@@ -22,13 +21,11 @@ import com.uit.petrescueapi.infrastructure.persistence.repository.PetBreedJpaRep
 import com.uit.petrescueapi.infrastructure.persistence.repository.PetSpeciesJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.crossstore.ChangeSetPersister;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-import java.util.ArrayList;
 import java.util.List;
 
 /**

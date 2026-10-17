@@ -46,11 +46,6 @@ public interface PetMediaJpaRepository extends JpaRepository<PetMediaJpaEntity, 
             nativeQuery = true)
     Page<PetMediaProjection> findMediaWithFilesByPetId(@Param("petId") UUID petId, Pageable pageable);
 
-    @Modifying
-    @Query("DELETE FROM PetMediaJpaEntity pm WHERE pm.petId = :petId")
-    @Transactional
-    void deleteAllByPetId(@Param("petId") UUID petId);
-
     List<PetMediaJpaEntity> findByPetIdAndMediaFileId(UUID petId, UUID mediaFileId);
 
     @Modifying
@@ -67,7 +62,4 @@ public interface PetMediaJpaRepository extends JpaRepository<PetMediaJpaEntity, 
     @Query(value = "DELETE FROM pet_media WHERE pet_id = :petId AND media_id = :mediaId", nativeQuery = true)
     @Transactional
     void deleteByPetIdAndMediaId(@Param("petId") UUID petId, @Param("mediaId") UUID mediaId);
-
-    @Query(value = "SELECT * FROM pet_media WHERE pet_id = :petId AND is_primary = TRUE LIMIT 1", nativeQuery = true)
-    java.util.Optional<PetMediaJpaEntity> findPrimaryByPetId(@Param("petId") UUID petId);
 }

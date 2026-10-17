@@ -14,6 +14,7 @@ public interface AdoptionDetailProjection {
     // ── Summary fields ───────────────────────────
     UUID getApplicationId();
     String getAdoptionCode();
+    UUID getPetId();
     String getPetName();
     String getPetPrimaryImageUrl();
     String getApplicantUsername();
@@ -23,7 +24,6 @@ public interface AdoptionDetailProjection {
     LocalDateTime getCreatedAt();
 
     // ── Detail fields ────────────────────────────
-    UUID getPetId();
     UUID getApplicantId();
     UUID getOrganizationId();
     String getOrganizationName();

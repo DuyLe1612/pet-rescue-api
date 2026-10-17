@@ -31,9 +31,15 @@ public class PetSummaryResponseDto {
     private UUID speciesId;
     private String species;
 
+    @Schema(description = "Vietnamese species name for display", example = "Chó")
+    private String speciesVi;
+
     @Schema(example = "Golden Retriever")
     private UUID breedId;
     private String breed;
+
+    @Schema(description = "Vietnamese breed name for display", example = "Chó Golden Retriever")
+    private String breedVi;
 
     @Schema(example = "24", description = "Age in months")
     private Integer age;

@@ -1,7 +1,7 @@
 package com.uit.petrescueapi.presentation.controller;
 
-import com.uit.petrescueapi.application.dto.geo.ProvinceDetailDto;
-import com.uit.petrescueapi.application.dto.geo.ProvinceSummaryDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceDetailDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceSummaryDto;
 import com.uit.petrescueapi.application.port.query.ProvinceQueryPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;

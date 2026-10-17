@@ -31,8 +31,4 @@ public class ChatWebSocketSessionRegistry {
     public Set<WebSocketSession> getSessions(UUID userId) {
         return sessionsByUser.getOrDefault(userId, Set.of());
     }
-
-    public Set<UUID> getAllUserIds() {
-        return sessionsByUser.keySet();
-    }
 }

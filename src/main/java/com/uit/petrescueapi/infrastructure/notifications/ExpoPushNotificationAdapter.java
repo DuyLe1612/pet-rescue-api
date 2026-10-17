@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.infrastructure.notifications;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uit.petrescueapi.application.port.out.PushNotificationPort;
 import lombok.RequiredArgsConstructor;

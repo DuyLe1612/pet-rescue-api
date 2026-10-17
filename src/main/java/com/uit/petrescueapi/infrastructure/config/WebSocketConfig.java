@@ -13,7 +13,6 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * - /topic/post/{postId}/likes       - New like on a post
  * - /topic/post/{postId}/comments    - New comment on a post
  * - /topic/comment/{commentId}/likes - New like on a comment
- * - /user/queue/geo/updates          - Nearby geo updates for current user
  * 
  * Example client connection:
  * const socket = new SockJS('http://localhost:8080/ws');

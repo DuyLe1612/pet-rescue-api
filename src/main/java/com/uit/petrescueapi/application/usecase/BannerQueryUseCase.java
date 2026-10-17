@@ -35,21 +35,9 @@ public class BannerQueryUseCase implements BannerQueryPort {
     }
 
     @Override
-    public Page<BannerResponseDto> findAll(Pageable pageable) {
-        log.debug("Query: find all banners");
-        return domainService.findAll(pageable).map(this::toDto);
-    }
-
-    @Override
     public Page<BannerResponseDto> findAllFiltered(String targetPage, Boolean active, String search, Pageable pageable) {
         log.debug("Query: find banners with filters targetPage={}, active={}, search={}", targetPage, active, search);
         return domainService.findAllFiltered(targetPage, active, search, pageable).map(this::toDto);
-    }
-
-    @Override
-    public Page<BannerResponseDto> findByTargetPage(String targetPage, Pageable pageable) {
-        log.debug("Query: find banners by target page {}", targetPage);
-        return domainService.findByTargetPage(targetPage, pageable).map(this::toDto);
     }
 
     @Override

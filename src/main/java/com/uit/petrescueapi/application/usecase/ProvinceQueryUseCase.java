@@ -1,7 +1,7 @@
 package com.uit.petrescueapi.application.usecase;
 
-import com.uit.petrescueapi.application.dto.geo.ProvinceDetailDto;
-import com.uit.petrescueapi.application.dto.geo.ProvinceSummaryDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceDetailDto;
+import com.uit.petrescueapi.application.dto.location.ProvinceSummaryDto;
 import com.uit.petrescueapi.application.port.out.ProvinceQueryDataPort;
 import com.uit.petrescueapi.application.port.query.ProvinceQueryPort;
 import lombok.RequiredArgsConstructor;

@@ -6,8 +6,6 @@ import com.uit.petrescueapi.domain.valueobject.FriendRequestStatus;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.ChatEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.FriendRequestJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -39,15 +37,5 @@ public class FriendRequestRepositoryAdapter implements FriendRequestRepository {
     public Optional<FriendRequest> findPendingBetween(UUID requesterId, UUID addresseeId) {
         return jpaRepository.findByRequesterIdAndAddresseeIdAndStatus(requesterId, addresseeId, FriendRequestStatus.PENDING)
                 .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<FriendRequest> findByAddresseeAndStatus(UUID addresseeId, FriendRequestStatus status, Pageable pageable) {
-        return jpaRepository.findByAddresseeAndStatus(addresseeId, status, pageable).map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<FriendRequest> findByRequesterAndStatus(UUID requesterId, FriendRequestStatus status, Pageable pageable) {
-        return jpaRepository.findByRequesterAndStatus(requesterId, status, pageable).map(mapper::toDomain);
     }
 }

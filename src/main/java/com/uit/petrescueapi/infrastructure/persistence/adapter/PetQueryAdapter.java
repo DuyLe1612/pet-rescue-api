@@ -38,11 +38,6 @@ public class PetQueryAdapter implements PetQueryDataPort {
     // ── List (summary) queries with filters ──────────────────
 
     @Override
-    public Page<PetSummaryResponseDto> findAllSummaries(Pageable pageable) {
-                return findAllWithFilters(null, null, null, null, null, null, null, pageable);
-    }
-
-    @Override
     public Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,
@@ -70,11 +65,6 @@ public class PetQueryAdapter implements PetQueryDataPort {
     }
 
     @Override
-    public Page<PetSummaryResponseDto> findAvailableSummaries(Pageable pageable) {
-        return findAvailableWithFilters(null, null, null, null, pageable);
-    }
-
-    @Override
     public Page<PetSummaryResponseDto> findAvailableWithFilters(
             String species,
             String breed,
@@ -89,32 +79,6 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 PetStatus.AVAILABLE.name(),
                 ownerOrganizationId,
                 pageable
-        ).map(this::toSummaryDto);
-    }
-
-    @Override
-    public Page<PetSummaryResponseDto> findSummariesByOrganizationId(
-            UUID organizationId,
-            String species,
-            String breed,
-            String gender,
-            Pageable pageable
-    ) {
-        return queryRepo.findSummariesByOrganizationId(
-                organizationId, species, breed, gender, pageable
-        ).map(this::toSummaryDto);
-    }
-
-    @Override
-    public Page<PetSummaryResponseDto> findSummariesByUserId(
-            UUID userId,
-            String species,
-            String breed,
-            String gender,
-            Pageable pageable
-    ) {
-        return queryRepo.findSummariesByUserId(
-                userId, species, breed, gender, pageable
         ).map(this::toSummaryDto);
     }
 
@@ -166,8 +130,10 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .name(p.getName())
                 .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .speciesVi(p.getSpeciesVi())
                 .breedId(p.getBreedId())
                 .breed(p.getBreed())
+                .breedVi(p.getBreedVi())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
                 .vaccinated(p.getVaccinated())
@@ -198,8 +164,10 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .name(p.getName())
                 .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .speciesVi(p.getSpeciesVi())
                 .breedId(p.getBreedId())
                 .breed(p.getBreed())
+                .breedVi(p.getBreedVi())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
                 .vaccinated(p.getVaccinated())
@@ -239,8 +207,10 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 .name(p.getName())
                 .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())
+                .speciesVi(p.getSpeciesVi())
                 .breedId(p.getBreedId())
                 .breed(p.getBreed())
+                .breedVi(p.getBreedVi())
                 .age(p.getAge())
                 .ageDisplay(formatAge(p.getAge()))
                 .vaccinated(p.getVaccinated())

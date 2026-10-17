@@ -8,7 +8,6 @@ import com.uit.petrescueapi.infrastructure.persistence.repository.RoleJpaReposit
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -32,11 +31,6 @@ public class RoleRepositoryAdapter implements RoleRepository {
     @Override
     public Optional<Role> findByCode(String code) {
         return jpa.findByCode(code).map(mapper::toDomain);
-    }
-
-    @Override
-    public List<Role> findAll() {
-        return jpa.findAll().stream().map(mapper::toDomain).toList();
     }
 
     @Override

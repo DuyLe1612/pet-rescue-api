@@ -6,8 +6,6 @@ import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.AdoptionApplicationEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.AdoptionApplicationJpaRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -30,17 +28,6 @@ public class AdoptionApplicationRepositoryAdapter implements AdoptionApplication
         return jpa.findById(applicationId)
                 .filter(e -> !e.isDeleted())
                 .map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<AdoptionApplication> findAll(Pageable pageable) {
-        return jpa.findAll(pageable).map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<AdoptionApplication> findByStatus(AdoptionApplicationStatus status, Pageable pageable) {
-        // Filter by status in-memory; can be replaced with a dedicated JPA query later
-        return jpa.findAll(pageable).map(mapper::toDomain);
     }
 
     @Override

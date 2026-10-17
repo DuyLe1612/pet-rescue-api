@@ -23,6 +23,9 @@ public class AdoptionSummaryResponseDto {
     @Schema(example = "A-0001")
     private String adoptionCode;
 
+    @Schema(example = "7c9e6679-7425-40de-944b-e07fc1f90ae7")
+    private UUID petId;
+
     @Schema(example = "Buddy")
     private String petName;
 

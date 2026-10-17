@@ -58,14 +58,4 @@ public class PetRepositoryAdapter implements PetRepository {
     public Page<Pet> findByStatus(PetStatus status, Pageable pageable) {
         return jpa.findByStatus(status, pageable).map(mapper::toDomain);
     }
-
-    @Override
-    public void deleteById(UUID id) {
-        jpa.deleteById(id);
-    }
-
-    @Override
-    public boolean existsById(UUID id) {
-        return jpa.existsById(id);
-    }
 }

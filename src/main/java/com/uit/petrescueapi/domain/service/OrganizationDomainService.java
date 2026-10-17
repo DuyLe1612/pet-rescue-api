@@ -41,18 +41,6 @@ public class OrganizationDomainService {
     // ── Commands ────────────────────────────────────
 
     /**
-     * @deprecated Use {@link #createByUser} or {@link #createByAdmin} instead
-     */
-    @Deprecated
-    public Organization create(Organization org) {
-        log.info("Creating organization: {}", org.getName());
-        org.setOrganizationId(UUID.randomUUID());
-        org.setOrganizationCode(visualCodeRepository.nextOrganizationCode());
-        org.setStatus(OrganizationStatus.PENDING);
-        return orgRepository.save(org);
-    }
-
-    /**
      * Create organization requested by a regular user.
      * Status is set to PENDING; user becomes OWNER when approved.
      */
@@ -158,11 +146,6 @@ public class OrganizationDomainService {
     public void removeMember(UUID orgId, UUID userId) {
         log.debug("Removing member {} from organization {}", userId, orgId);
         memberRepository.delete(orgId, userId);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isMember(UUID orgId, UUID userId) {
-        return memberRepository.exists(orgId, userId);
     }
 
     @Transactional(readOnly = true)

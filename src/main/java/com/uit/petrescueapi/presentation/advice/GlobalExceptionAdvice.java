@@ -4,7 +4,6 @@ import com.uit.petrescueapi.domain.exception.AccountBannedException;
 import com.uit.petrescueapi.domain.exception.AccountLockedException;
 import com.uit.petrescueapi.domain.exception.BaseException;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

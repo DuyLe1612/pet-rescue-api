@@ -2,7 +2,6 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.repository.RescueCaseRepository;
-import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.entity.MediaFile;
 import com.uit.petrescueapi.domain.repository.MediaFileRepository;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
@@ -77,12 +76,5 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
     @Override
     public Page<RescueCase> findAll(Pageable pageable) {
         return jpa.findAll(pageable).map(mapper::toDomain);
-    }
-
-    @Override
-    public Page<RescueCase> findByStatus(RescueCaseStatus status, Pageable pageable) {
-        // Filter by status in-memory; can be replaced with a dedicated JPA query later
-        return jpa.findAll(pageable)
-                .map(mapper::toDomain);
     }
 }

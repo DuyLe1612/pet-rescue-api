@@ -14,11 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -60,26 +57,6 @@ public class PetDomainService {
     public Pet findById(UUID id) {
         return petRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pet", "id", id));
-    }
-
-    @Transactional(readOnly = true)
-    public List<Pet> findAll() {
-        return petRepository.findAll();
-    }
-
-    @Transactional(readOnly = true)
-    public Page<Pet> findAll(Pageable pageable) {
-        return petRepository.findAll(pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Pet> findAvailable() {
-        return petRepository.findByStatus(PetStatus.AVAILABLE);
-    }
-
-    @Transactional(readOnly = true)
-    public Page<Pet> findAvailable(Pageable pageable) {
-        return petRepository.findByStatus(PetStatus.AVAILABLE, pageable);
     }
 
     // ── Commands ────────────────────────────────────

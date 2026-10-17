@@ -36,12 +36,6 @@ public class UserDomainService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
     }
 
-    @Transactional(readOnly = true)
-    public User findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-    }
-
     /**
      * Create a user with specified role (for admin/dev operations).
      * Password must be pre-hashed by the caller.

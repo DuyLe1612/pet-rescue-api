@@ -5,7 +5,6 @@ import com.uit.petrescueapi.application.port.out.DashboardDataPort;
 import com.uit.petrescueapi.application.port.query.AdminDashboardQueryPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -49,25 +48,5 @@ public class AdminDashboardUsecase implements AdminDashboardQueryPort {
     public PendingTasksDto getPendingTasks(int month, int year) {
         log.info("getPendingTasks for {}/{}", month, year);
         return dashboardDataPort.getPendingTasks(month, year);
-    }
-
-    @CacheEvict(value = {"admin:dashboard", "admin:rescue-stats", "admin:pending-tasks"}, allEntries = true)
-    public void evictAllCaches() {
-        log.info("Evicting all admin dashboard caches");
-    }
-
-    @CacheEvict(value = "admin:dashboard", allEntries = true)
-    public void evictDashboardCache() {
-        log.info("Evicting admin:dashboard cache");
-    }
-
-    @CacheEvict(value = "admin:rescue-stats", allEntries = true)
-    public void evictRescueStatsCache() {
-        log.info("Evicting admin:rescue-stats cache");
-    }
-
-    @CacheEvict(value = "admin:pending-tasks", allEntries = true)
-    public void evictPendingTasksCache() {
-        log.info("Evicting admin:pending-tasks cache");
     }
 }

@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -18,8 +17,6 @@ import java.util.UUID;
  */
 @Repository
 public interface PostJpaRepository extends JpaRepository<PostJpaEntity, UUID> {
-
-    Optional<PostJpaEntity> findByPostIdAndDeletedFalse(UUID postId);
 
     @Modifying
     @Query("UPDATE PostJpaEntity p SET p.likeCount = p.likeCount + 1 WHERE p.postId = :postId AND p.deleted = false")
@@ -32,8 +29,4 @@ public interface PostJpaRepository extends JpaRepository<PostJpaEntity, UUID> {
     @Modifying
     @Query("UPDATE PostJpaEntity p SET p.commentCount = p.commentCount + 1 WHERE p.postId = :postId AND p.deleted = false")
     void incrementCommentCount(@Param("postId") UUID postId);
-
-    @Modifying
-    @Query("UPDATE PostJpaEntity p SET p.commentCount = CASE WHEN p.commentCount > 0 THEN p.commentCount - 1 ELSE 0 END WHERE p.postId = :postId AND p.deleted = false")
-    void decrementCommentCount(@Param("postId") UUID postId);
 }
