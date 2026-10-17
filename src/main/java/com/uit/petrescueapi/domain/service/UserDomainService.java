@@ -29,6 +29,7 @@ public class UserDomainService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final VisualCodeRepository visualCodeRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Transactional(readOnly = true)
     public User findById(UUID id) {
@@ -146,7 +147,12 @@ public class UserDomainService {
         if (provinceCode != null) user.setProvinceCode(provinceCode);
         if (provinceName != null) user.setProvinceName(provinceName);
         user.setUpdatedAt(LocalDateTime.now());
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        if (username != null || fullName != null || avatarUrl != null) {
+            // MongoDB posts/comments/inboxes keep a copy of these fields
+            events.publishEvent(new com.uit.petrescueapi.domain.event.UserProfileChangedEvent(id));
+        }
+        return saved;
     }
 
     public User lockAccount(UUID id) {

@@ -37,6 +37,7 @@ public class RescueCaseDomainService {
     private final RescueCaseCompletionRepository rescueCaseCompletionRepository;
     private final VisualCodeRepository visualCodeRepository;
     private final UserRepository userRepository;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     // ── Status-transition matrix ───────────────────
     private static final Map<RescueCaseStatus, Set<RescueCaseStatus>> ALLOWED_TRANSITIONS = Map.of(
@@ -123,7 +124,9 @@ public class RescueCaseDomainService {
             rescueCase.setResolvedAt(LocalDateTime.now());
         }
 
-        return rescueCaseRepository.save(rescueCase);
+        RescueCase saved = rescueCaseRepository.save(rescueCase);
+        events.publishEvent(new com.uit.petrescueapi.domain.event.RescueCaseStatusChangedEvent(caseId, newStatus.name()));
+        return saved;
     }
     public RescueCaseCompletion approveCompletion(UUID completionId, UUID userId) {
         log.debug("Approving rescue case completion {} by user {}", completionId,userId);
@@ -151,6 +154,8 @@ public class RescueCaseDomainService {
             completion.get().setVerifiedBy(userId);
         }
         rescueCaseRepository.save(rescueCase);
+        events.publishEvent(new com.uit.petrescueapi.domain.event.RescueCaseStatusChangedEvent(
+                rescueCase.getCaseId(), rescueCase.getStatus().name()));
         return  rescueCaseCompletionRepository.save(completion.get());
     }
 
