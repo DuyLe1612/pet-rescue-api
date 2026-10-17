@@ -39,6 +39,12 @@ services:
       RABBITMQ_VHOST: ${RABBITMQ_VHOST}
       RABBITMQ_SSL_ENABLED: ${RABBITMQ_SSL_ENABLED:-true}
 
+      # MongoDB (e.g. Atlas — replica set by default)
+      MONGO_URI: ${MONGO_URI}
+      MONGO_HEALTH_ENABLED: ${MONGO_HEALTH_ENABLED:-false}
+      APP_STORAGE_CHAT: ${APP_STORAGE_CHAT:-postgres}
+      APP_STORAGE_POST: ${APP_STORAGE_POST:-postgres}
+
       # Email
       EMAIL_FROM: ${EMAIL_FROM}
       EMAIL_VERIFICATION_URL: ${EMAIL_VERIFICATION_URL}
