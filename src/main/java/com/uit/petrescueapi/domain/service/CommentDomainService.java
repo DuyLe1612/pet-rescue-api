@@ -18,12 +18,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+@Transactional(transactionManager = "postTransactionManager")
 public class CommentDomainService {
 
     private final CommentRepository commentRepository;
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "postTransactionManager", readOnly = true)
     public Comment findById(UUID commentId) {
         return commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment", "commentId", commentId));

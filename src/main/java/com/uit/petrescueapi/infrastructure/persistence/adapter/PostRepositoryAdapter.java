@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.PostOnPostgres;
 import com.uit.petrescueapi.domain.entity.Post;
 import com.uit.petrescueapi.domain.repository.PostRepository;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@PostOnPostgres
 public class PostRepositoryAdapter implements PostRepository {
 
     private final PostJpaRepository jpa;

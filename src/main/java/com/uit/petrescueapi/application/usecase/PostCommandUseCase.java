@@ -31,6 +31,7 @@ public class PostCommandUseCase implements PostCommandPort {
                 .content(cmd.getContent())
                 .rescueCaseId(cmd.getRescueCaseId())
                 .mediaIds(cmd.getMediaIds())
+                .tagCodes(cmd.getTagCodes())
                 .build();
         return domainService.create(post);
     }
@@ -41,6 +42,8 @@ public class PostCommandUseCase implements PostCommandPort {
         Post patch = Post.builder()
                 .content(cmd.getContent())
                 .mediaIds(cmd.getMediaIds())
+                .tagIds(null)
+                .tagCodes(cmd.getTagCodes())
                 .build();
         return domainService.update(postId, patch);
     }

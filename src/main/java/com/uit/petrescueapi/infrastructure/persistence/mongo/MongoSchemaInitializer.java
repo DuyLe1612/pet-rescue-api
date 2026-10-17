@@ -77,15 +77,15 @@ public class MongoSchemaInitializer implements ApplicationRunner {
                         Indexes.descending("createdAt", "_id")),
                 new IndexOptions().partialFilterExpression(new Document("deleted", false)));
         index(POSTS, "post_tags", Indexes.compoundIndex(Indexes.ascending("tags"), Indexes.descending("createdAt")));
-        index(POSTS, "post_author", Indexes.compoundIndex(Indexes.ascending("author.id"), Indexes.descending("createdAt")));
+        index(POSTS, "post_author", Indexes.compoundIndex(Indexes.ascending("author.userId"), Indexes.descending("createdAt")));
         index(POSTS, "post_analysis_status", Indexes.ascending("analysis.status", "createdAt"));
-        index(POSTS, "post_rescue_case", Indexes.ascending("rescueCase.id"), new IndexOptions().sparse(true));
+        index(POSTS, "post_rescue_case", Indexes.ascending("rescueCase.caseId"), new IndexOptions().sparse(true));
         index(POSTS, "post_text", Indexes.text("content"), new IndexOptions().defaultLanguage("none"));
 
         // comments + likes
         index(COMMENTS, "comment_thread", Indexes.compoundIndex(
                 Indexes.ascending("postId", "parentId"), Indexes.descending("createdAt", "_id")));
-        index(COMMENTS, "comment_author", Indexes.ascending("author.id"));
+        index(COMMENTS, "comment_author", Indexes.ascending("author.userId"));
         index(POST_LIKES, "post_like_user", Indexes.ascending("_id.userId"));
         index(COMMENT_LIKES, "comment_like_user", Indexes.ascending("_id.userId"));
 

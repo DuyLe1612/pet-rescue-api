@@ -31,7 +31,8 @@ public class MongoTransientRetryAspect {
 
     @Around("execution(public * com.uit.petrescueapi.domain.service.ChatDomainService.*(..))"
             + " || execution(public * com.uit.petrescueapi.domain.service.PostDomainService.*(..))"
-            + " || execution(public * com.uit.petrescueapi.domain.service.CommentDomainService.*(..))")
+            + " || execution(public * com.uit.petrescueapi.domain.service.CommentDomainService.*(..))"
+            + " || execution(public * com.uit.petrescueapi.domain.service.LikeDomainService.*(..))")
     public Object retryTransient(ProceedingJoinPoint pjp) throws Throwable {
         for (int attempt = 1; ; attempt++) {
             try {

@@ -1,7 +1,9 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.PostOnPostgres;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
+import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
@@ -36,6 +38,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@PostOnPostgres
 public class PostQueryAdapter implements PostQueryDataPort {
 
     private final PostQueryJpaRepository queryRepo;
@@ -50,10 +53,13 @@ public class PostQueryAdapter implements PostQueryDataPort {
     }
 
     @Override
-    public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId) {
+    public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter) {
+        // filters need the DA2 facets, which only exist in the MongoDB post documents
         Page<PostSummaryResponseDto> page = (cursor == null)
-                ? queryRepo.findFirstFeedPage( PageRequest.of(0, size)).map(this::toSummaryDto)
-                : queryRepo.findFeedByCursor(cursor, viewerId, PageRequest.of(0, size)).map(this::toSummaryDto);
+                ? queryRepo.findFirstFeedPage(PageRequest.of(0, size)).map(this::toSummaryDto)
+                : (cursorId != null
+                        ? queryRepo.findFeedByCursor(cursor, cursorId, PageRequest.of(0, size))
+                        : queryRepo.findFeedBefore(cursor, PageRequest.of(0, size))).map(this::toSummaryDto);
 
         List<PostSummaryResponseDto> items = page.getContent();
 
@@ -80,6 +86,7 @@ public class PostQueryAdapter implements PostQueryDataPort {
         return PostCursorResponseDto.builder()
                 .items(items)
                 .nextCursor(nextCursor)
+                .nextCursorId(items.isEmpty() ? null : items.get(items.size() - 1).getPostId())
                 .hasMore(hasMore)
                 .build();
     }

@@ -3,8 +3,7 @@ package com.uit.petrescueapi.infrastructure.messaging;
 import com.uit.petrescueapi.domain.event.CommentCreatedEvent;
 import com.uit.petrescueapi.domain.event.CommentLikedEvent;
 import com.uit.petrescueapi.domain.event.CommentUnlikedEvent;
-import com.uit.petrescueapi.infrastructure.persistence.repository.CommentJpaRepository;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaRepository;
+import com.uit.petrescueapi.application.port.out.SocialCounterPort;
 import com.uit.petrescueapi.infrastructure.redis.RedisCounterService;
 import org.junit.jupiter.api.Test;
 
@@ -18,9 +17,8 @@ class CommentEventListenerTest {
     @Test
     void handleCommentCreatedIncrementsPostAndParentCounters() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        CommentJpaRepository commentRepo = mock(CommentJpaRepository.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        CommentEventListener listener = new CommentEventListener(redis, commentRepo, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        CommentEventListener listener = new CommentEventListener(redis, counters);
 
         UUID postId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
@@ -34,17 +32,16 @@ class CommentEventListenerTest {
                 .build());
 
         verify(redis).incrementPostCommentCount(postId);
-        verify(postRepo).incrementCommentCount(postId);
+        verify(counters).addPostComments(postId, 1);
         verify(redis).incrementCommentReplyCount(parentId);
-        verify(commentRepo).incrementReplyCount(parentId);
+        verify(counters).addCommentReplies(parentId, 1);
     }
 
     @Test
     void handleCommentLikedUpdatesDbWhenRedisAdded() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        CommentJpaRepository commentRepo = mock(CommentJpaRepository.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        CommentEventListener listener = new CommentEventListener(redis, commentRepo, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        CommentEventListener listener = new CommentEventListener(redis, counters);
 
         UUID commentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -56,15 +53,14 @@ class CommentEventListenerTest {
                 .timestamp(LocalDateTime.now())
                 .build());
 
-        verify(commentRepo).incrementLikeCount(commentId);
+        verify(counters).addCommentLikes(commentId, 1);
     }
 
     @Test
     void handleCommentUnlikedUpdatesDbWhenRedisRemoved() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        CommentJpaRepository commentRepo = mock(CommentJpaRepository.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        CommentEventListener listener = new CommentEventListener(redis, commentRepo, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        CommentEventListener listener = new CommentEventListener(redis, counters);
 
         UUID commentId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -76,6 +72,6 @@ class CommentEventListenerTest {
                 .timestamp(LocalDateTime.now())
                 .build());
 
-        verify(commentRepo).decrementLikeCount(commentId);
+        verify(counters).addCommentLikes(commentId, -1);
     }
 }

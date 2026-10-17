@@ -18,7 +18,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+@Transactional(transactionManager = "postTransactionManager")
 public class LikeDomainService {
 
     private final PostLikeRepository postLikeRepository;

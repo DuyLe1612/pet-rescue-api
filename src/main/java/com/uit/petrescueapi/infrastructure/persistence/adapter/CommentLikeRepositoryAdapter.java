@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.PostOnPostgres;
 import com.uit.petrescueapi.domain.entity.CommentLike;
 import com.uit.petrescueapi.domain.repository.CommentLikeRepository;
 import com.uit.petrescueapi.infrastructure.persistence.mapper.CommentLikeEntityMapper;
@@ -11,6 +12,7 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@PostOnPostgres
 public class CommentLikeRepositoryAdapter implements CommentLikeRepository {
 
     private final CommentLikeJpaRepository jpa;

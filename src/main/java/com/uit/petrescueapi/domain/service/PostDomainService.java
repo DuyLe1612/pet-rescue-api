@@ -23,14 +23,15 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+// "postTransactionManager" resolves to JPA or MongoDB per app.storage.post (StorageTransactionAliases)
+@Transactional(transactionManager = "postTransactionManager")
 public class PostDomainService {
 
     private final PostRepository postRepository;
 
     // ── Queries ─────────────────────────────────────
 
-    @Transactional(readOnly = true)
+    @Transactional(transactionManager = "postTransactionManager", readOnly = true)
     public Post findById(UUID postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "postId", postId));
@@ -77,6 +78,7 @@ public class PostDomainService {
         if (source.getContent() != null)      target.setContent(source.getContent());
         if (source.getMediaIds() != null)     target.setMediaIds(source.getMediaIds());
         if (source.getTagIds() != null)       target.setTagIds(source.getTagIds());
+        if (source.getTagCodes() != null)     target.setTagCodes(source.getTagCodes());
         if (source.getRescueCaseId() != null) target.setRescueCaseId(source.getRescueCaseId());
     }
 }

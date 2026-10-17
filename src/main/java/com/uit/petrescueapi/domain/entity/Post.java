@@ -28,4 +28,7 @@ public class Post extends BaseEntity {
 
     @Builder.Default
     private List<UUID> tagIds = new ArrayList<>();
+
+    /** Tag codes as sent by the client; {@code null} on a patch means "unchanged". */
+    private List<String> tagCodes;
 }
