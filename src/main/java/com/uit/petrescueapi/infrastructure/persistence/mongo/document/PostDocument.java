@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo.document;
 
+import com.uit.petrescueapi.application.dto.analysis.PostAnalysisSuggestion;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.MongoCollections;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -41,6 +42,10 @@ public class PostDocument {
     private RescueCaseRefDocument rescueCase;
     /** User-confirmed structured data (DA2 Goal 1); the only fields the feed filters on. */
     private FacetsDocument facets;
+    /** AI analysis state + suggestion (never used for filtering until confirmed into {@link #facets}). */
+    private AnalysisDocument analysis;
+    /** NONE | SUGGESTED | ACCEPTED | DISMISSED */
+    private String rescueSuggestion;
     private LocalDateTime createdAt;
     private UUID createdBy;
     private LocalDateTime updatedAt;
@@ -85,6 +90,33 @@ public class PostDocument {
         private UUID caseId;
         private String status;
     }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnalysisDocument {
+        /** {@link com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus} name. */
+        private String status;
+        /** Version of the structured-output contract the suggestion follows. */
+        private int schemaVersion;
+        private String model;
+        private LocalDateTime analyzedAt;
+        private UUID lastRunId;
+        private int attempts;
+        private String lastError;
+        private PostAnalysisSuggestion suggested;
+        private UUID confirmedBy;
+        private LocalDateTime confirmedAt;
+        private UUID rejectedBy;
+        private LocalDateTime updatedAt;
+
+        public static AnalysisDocument pending(LocalDateTime now) {
+            return AnalysisDocument.builder().status("PENDING").schemaVersion(SCHEMA_VERSION).updatedAt(now).build();
+        }
+    }
+
+    public static final int SCHEMA_VERSION = 1;
 
     @Data
     @Builder

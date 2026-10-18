@@ -70,6 +70,9 @@ dependencies {
     // Database — MongoDB (chat + social posts, see migrate.md)
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 
+    // Claude API — DA2 Intelligent Post Processing (PostAnalysisPort)
+    implementation("com.anthropic:anthropic-java:2.34.0")
+
     // Lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")

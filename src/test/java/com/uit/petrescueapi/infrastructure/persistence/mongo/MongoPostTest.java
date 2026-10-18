@@ -197,6 +197,36 @@ class MongoPostTest extends MongoIntegrationTest {
         assertThat(postQuery.findFeedByCursor(null, null, 10, null, PostFeedFilter.none()).getItems()).isEmpty();
     }
 
+    // ── DA2: analysis queue ──────────────────────────────────
+
+    private Document analysis(UUID postId) {
+        return raw(postId).get("analysis", Document.class);
+    }
+
+    @Test
+    void newPostIsQueuedForAnalysis() {
+        Post p = newPost(ALICE, "Mn ơi ở Q7 có bé cún bị thương");
+        assertThat(analysis(p.getPostId())).containsEntry("status", "PENDING");
+        assertThat(raw(p.getPostId()).getString("rescueSuggestion")).isEqualTo("NONE");
+    }
+
+    @Test
+    void editingContentRequeuesUnconfirmedAnalysisButNotConfirmedOne() {
+        Post p = newPost(ALICE, "v1");
+        mongo.getCollection(MongoCollections.POSTS).updateOne(new Document("_id", p.getPostId()),
+                new Document("$set", new Document("analysis.status", "ANALYZED").append("analysis.attempts", 2)));
+        posts.update(p.getPostId(), Post.builder().content("v2").build());
+        assertThat(analysis(p.getPostId())).containsEntry("status", "PENDING").containsEntry("attempts", 0);
+
+        mongo.getCollection(MongoCollections.POSTS).updateOne(new Document("_id", p.getPostId()),
+                new Document("$set", new Document("analysis.status", "CONFIRMED")));
+        posts.update(p.getPostId(), Post.builder().content("v3").build());
+        assertThat(analysis(p.getPostId())).containsEntry("status", "CONFIRMED");
+
+        posts.update(p.getPostId(), Post.builder().mediaIds(List.of(MEDIA_1)).build()); // no content change
+        assertThat(analysis(p.getPostId())).containsEntry("status", "CONFIRMED");
+    }
+
     // ── feed ─────────────────────────────────────────────────
 
     private void insertPost(UUID id, LocalDateTime createdAt, List<String> tags, String category) {

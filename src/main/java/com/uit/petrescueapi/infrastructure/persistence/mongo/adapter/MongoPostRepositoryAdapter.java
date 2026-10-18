@@ -5,9 +5,11 @@ import com.uit.petrescueapi.application.port.out.UserSnapshotPort;
 import com.uit.petrescueapi.domain.entity.Post;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.repository.PostRepository;
+import com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus;
 import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
+import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument.AnalysisDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument.MediaDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument.RescueCaseRefDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument.StatsDocument;
@@ -16,10 +18,12 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -67,7 +71,16 @@ public class MongoPostRepositoryAdapter implements PostRepository {
                     .setOnInsert("stats", new StatsDocument())
                     .setOnInsert("previewComments", new ArrayList<>())
                     .setOnInsert("createdAt", post.getCreatedAt())
-                    .setOnInsert("createdBy", post.getCreatedBy());
+                    .setOnInsert("createdBy", post.getCreatedBy())
+                    // DA2: every new post is queued for AI analysis
+                    .setOnInsert("analysis", AnalysisDocument.pending(LocalDateTime.now()))
+                    .setOnInsert("rescueSuggestion", "NONE");
+        } else if (!Objects.equals(existing.getContent(), post.getContent()) && !isFinal(existing.getAnalysis())) {
+            // the suggestion described the old text; a human decision is never discarded
+            update.set("analysis.status", PostAnalysisStatus.PENDING.name())
+                    .set("analysis.attempts", 0)
+                    .set("analysis.lastError", null)
+                    .set("analysis.updatedAt", LocalDateTime.now());
         }
         mongo.upsert(query(where("_id").is(post.getPostId())), update, PostDocument.class);
 
@@ -78,6 +91,11 @@ public class MongoPostRepositoryAdapter implements PostRepository {
     @Override
     public Optional<Post> findById(UUID postId) {
         return Optional.ofNullable(mongo.findById(postId, PostDocument.class)).map(MongoPostRepositoryAdapter::toDomain);
+    }
+
+    private static boolean isFinal(AnalysisDocument analysis) {
+        return analysis != null && analysis.getStatus() != null
+                && PostAnalysisStatus.valueOf(analysis.getStatus()).isFinal();
     }
 
     private List<MediaDocument> resolveMedia(List<UUID> mediaIds) {
