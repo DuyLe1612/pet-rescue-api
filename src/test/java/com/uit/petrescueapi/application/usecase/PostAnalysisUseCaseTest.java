@@ -43,15 +43,25 @@ class PostAnalysisUseCaseTest {
         final Map<UUID, List<String>> runErrors = new HashMap<>();
         String failure;
         List<String> confirmedTags;
+        boolean reserved;
+        int claims;
 
         @Override public Optional<AnalysisTarget> findTarget(UUID postId) { return Optional.ofNullable(posts.get(postId)); }
+        @Override public Optional<Claim> claim(UUID postId, int maxLifetimeAttempts, LocalDateTime staleBefore) {
+            AnalysisTarget t = posts.get(postId);
+            if (t == null || t.status().isFinal() || claims >= maxLifetimeAttempts) return Optional.empty();
+            claims++;
+            return Optional.of(new Claim(t, UUID.randomUUID()));
+        }
+        @Override public boolean reserveRescueCase(UUID postId) { if (reserved) return false; reserved = true; return true; }
+        @Override public void releaseRescueCase(UUID postId) { reserved = false; }
         @Override public UUID saveRun(UUID postId, PostAnalysisPort.Result result, List<String> errors) {
             UUID id = UUID.randomUUID(); runs.add(id); runErrors.put(id, errors); return id;
         }
-        @Override public void markAnalyzed(UUID postId, UUID runId, String model, PostAnalysisSuggestion s) {
+        @Override public void markAnalyzed(UUID postId, UUID token, UUID runId, String model, PostAnalysisSuggestion s) {
             posts.computeIfPresent(postId, (k, t) -> with(t, PostAnalysisStatus.ANALYZED, s, t.facets(), t.rescueCaseId()));
         }
-        @Override public void markFailed(UUID postId, UUID runId, String reason) {
+        @Override public void markFailed(UUID postId, UUID token, UUID runId, String reason) {
             failure = reason;
             posts.computeIfPresent(postId, (k, t) -> with(t, PostAnalysisStatus.FAILED, null, t.facets(), t.rescueCaseId()));
         }
@@ -68,7 +78,7 @@ class PostAnalysisUseCaseTest {
         @Override public void linkRescueCase(UUID postId, UUID caseId, String status) {
             posts.computeIfPresent(postId, (k, t) -> with(t, t.status(), t.suggestion(), t.facets(), caseId));
         }
-        @Override public List<UUID> findRetryable(int maxAttempts, LocalDateTime before, int limit) { return List.of(); }
+        @Override public List<UUID> findRetryable(int maxAttempts, int maxLifetimeAttempts, LocalDateTime before, LocalDateTime staleBefore, int limit) { return List.of(); }
         @Override public List<PostAnalysisMetricsDto> metrics() { return List.of(); }
 
         static AnalysisTarget with(AnalysisTarget t, PostAnalysisStatus status, PostAnalysisSuggestion s, PostFacets f, UUID caseId) {
@@ -149,6 +159,23 @@ class PostAnalysisUseCaseTest {
     }
 
     @Test
+    void lifetimeCapStopsPaidCalls() {
+        aiReturns(null, "overloaded");
+        for (int i = 0; i < PostAnalysisUseCase.MAX_LIFETIME_ATTEMPTS + 2; i++) {
+            useCase.analyze(postId);
+            store.resetToPending(postId);
+        }
+        verify(ai, times(PostAnalysisUseCase.MAX_LIFETIME_ATTEMPTS)).analyze(any(), any());
+    }
+
+    @Test
+    void retryIsOnlyForPendingOrFailedAnalyses() {
+        aiReturns(good, null);
+        useCase.analyze(postId);                                        // ANALYZED
+        assertThatThrownBy(() -> useCase.retry(postId, AUTHOR)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void withoutModelAnalyzeIsANoOp() {
         var noAi = new PostAnalysisUseCase(store, Optional.empty(), mock(AnalysisCatalogPort.class), new PostAnalysisValidator(), rescueCases);
         noAi.analyze(postId);
@@ -209,6 +236,30 @@ class PostAnalysisUseCaseTest {
 
         assertThatThrownBy(() -> useCase.createRescueCase(postId, new CreateRescueCaseFromPostRequestDto(null, null, null), AUTHOR))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void doubleSubmitCreatesOnlyOneRescueCase() {
+        aiReturns(good, null);
+        useCase.analyze(postId);
+        useCase.confirm(postId, confirmation("Dog", List.of(), true), AUTHOR);
+        store.reserveRescueCase(postId);                                // the other request holds the reservation
+
+        assertThatThrownBy(() -> useCase.createRescueCase(postId, new CreateRescueCaseFromPostRequestDto(null, null, null), AUTHOR))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(rescueCases);
+    }
+
+    @Test
+    void failedRescueCaseCreationReleasesTheReservation() {
+        aiReturns(good, null);
+        useCase.analyze(postId);
+        useCase.confirm(postId, confirmation("Dog", List.of(), true), AUTHOR);
+        when(rescueCases.report(any(), eq(AUTHOR))).thenThrow(new BusinessException("db down"));
+
+        assertThatThrownBy(() -> useCase.createRescueCase(postId, new CreateRescueCaseFromPostRequestDto(null, null, null), AUTHOR))
+                .isInstanceOf(BusinessException.class);
+        assertThat(store.reserved).isFalse();
     }
 
     @Test

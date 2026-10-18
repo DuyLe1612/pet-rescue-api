@@ -30,7 +30,8 @@ class MongoSchemaInitializerTest extends MongoIntegrationTest {
 
     @Test
     void createsReadPathIndexes() {
-        assertThat(indexNames(MongoCollections.INBOXES)).contains("inbox_list");
+        assertThat(indexNames(MongoCollections.INBOXES)).contains("inbox_list", "inbox_conversation"); // every send updates by conversationId
+        assertThat(indexNames(MongoCollections.COMMENTS)).contains("comment_replies");                 // replies are queried by parentId alone
         assertThat(indexNames(MongoCollections.CONVERSATIONS)).contains("conversation_direct_key");
         assertThat(indexNames(MongoCollections.MESSAGE_BUCKETS)).contains("bucket_message_id");
         assertThat(indexNames(MongoCollections.POSTS)).contains("post_feed", "post_facets", "post_tags",

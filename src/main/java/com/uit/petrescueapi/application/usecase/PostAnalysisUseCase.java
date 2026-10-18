@@ -43,6 +43,11 @@ import java.util.stream.Stream;
 @Slf4j
 public class PostAnalysisUseCase implements PostAnalysisCommandPort {
 
+    /** Paid model calls per post over its whole life, whatever retries or edits happen. */
+    public static final int MAX_LIFETIME_ATTEMPTS = 6;
+    /** A claim older than this belongs to a worker that died mid-call. */
+    static final java.time.Duration CLAIM_TIMEOUT = java.time.Duration.ofMinutes(5);
+
     private final PostAnalysisStorePort store;
     private final Optional<PostAnalysisPort> ai;
     private final AnalysisCatalogPort catalog;
@@ -64,16 +69,18 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
             log.debug("AI post analysis disabled; post {} stays PENDING", postId);
             return;
         }
-        AnalysisTarget target = store.findTarget(postId).orElse(null);
-        if (target == null || target.status().isFinal()) {
-            return;
+        PostAnalysisStorePort.Claim claim = store.claim(postId, MAX_LIFETIME_ATTEMPTS,
+                java.time.LocalDateTime.now().minus(CLAIM_TIMEOUT)).orElse(null);
+        if (claim == null) {
+            return; // decided by a human, analysed by another worker right now, or out of budget
         }
+        UUID token = claim.token();
         Catalog values = catalog();
-        PostAnalysisPort.Result result = ai.get().analyze(target.content(), values);
+        PostAnalysisPort.Result result = ai.get().analyze(claim.target().content(), values);
 
         if (!result.succeeded()) {
             UUID runId = store.saveRun(postId, result, List.of());
-            store.markFailed(postId, runId, result.failure());
+            store.markFailed(postId, token, runId, result.failure());
             return;
         }
         PostAnalysisValidator.Outcome outcome = validator.validate(result.suggestion(), values);
@@ -81,9 +88,9 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
                 outcome.suggestion(), null, result.latencyMs(), result.inputTokens(), result.outputTokens());
         UUID runId = store.saveRun(postId, checked, outcome.errors());
         if (outcome.fatal()) {
-            store.markFailed(postId, runId, "invalid model output: " + String.join("; ", outcome.errors()));
+            store.markFailed(postId, token, runId, "invalid model output: " + String.join("; ", outcome.errors()));
         } else {
-            store.markAnalyzed(postId, runId, result.model(), outcome.suggestion());
+            store.markAnalyzed(postId, token, runId, result.model(), outcome.suggestion());
         }
     }
 
@@ -125,8 +132,9 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
     @Override
     public PostAnalysisResponseDto retry(UUID postId, UUID userId) {
         AnalysisTarget target = loadOwned(postId, userId);
-        if (target.status().isFinal()) {
-            throw new BusinessException("Analysis was already " + target.status(), "POST_ANALYSIS_FINAL");
+        if (target.status() != PostAnalysisStatus.PENDING && target.status() != PostAnalysisStatus.FAILED) {
+            throw new BusinessException("Only a pending or failed analysis can be retried (is " + target.status() + ")",
+                    "POST_ANALYSIS_NOT_RETRYABLE");
         }
         store.resetToPending(postId);
         return toDto(load(postId));
@@ -155,7 +163,17 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
                 .longitude(request == null ? null : request.longitude())
                 .contactPhone(request == null ? null : request.contactPhone())
                 .build();
-        RescueCase created = rescueCases.report(command, userId);
+        // reserve first: a double tap must not create two public rescue cases
+        if (!store.reserveRescueCase(postId)) {
+            throw new BusinessException("A rescue case is already being created for this post", "POST_RESCUE_CASE_EXISTS");
+        }
+        RescueCase created;
+        try {
+            created = rescueCases.report(command, userId);
+        } catch (RuntimeException e) {
+            store.releaseRescueCase(postId);
+            throw e;
+        }
         store.linkRescueCase(postId, created.getCaseId(), created.getStatus() == null ? null : created.getStatus().name());
         return created;
     }

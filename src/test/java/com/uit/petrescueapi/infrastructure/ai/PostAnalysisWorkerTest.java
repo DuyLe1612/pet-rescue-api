@@ -37,7 +37,7 @@ class PostAnalysisWorkerTest {
     void retryPassAnalysesEveryQueuedPostEvenIfOneFails() {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
-        when(store.findRetryable(eq(PostAnalysisWorker.MAX_ATTEMPTS), any(), anyInt())).thenReturn(List.of(a, b));
+        when(store.findRetryable(eq(PostAnalysisWorker.MAX_ATTEMPTS), anyInt(), any(), any(), anyInt())).thenReturn(List.of(a, b));
         doThrow(new RuntimeException("boom")).when(analysis).analyze(a);
 
         worker.retryQueuedPosts();

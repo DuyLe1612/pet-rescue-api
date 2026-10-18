@@ -6,6 +6,8 @@ package com.uit.petrescueapi.domain.valueobject;
  */
 public enum PostAnalysisStatus {
     PENDING,
+    /** A worker holds the post for one model call (claim token on the document). */
+    ANALYZING,
     ANALYZED,
     CONFIRMED,
     REJECTED,

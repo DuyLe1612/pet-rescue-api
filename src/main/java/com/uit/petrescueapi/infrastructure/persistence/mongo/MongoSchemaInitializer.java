@@ -67,6 +67,7 @@ public class MongoSchemaInitializer implements ApplicationRunner {
         index(INBOXES, "inbox_list", Indexes.compoundIndex(
                 Indexes.ascending("userId", "hidden"), Indexes.descending("sortAt", "conversationId")));
         index(INBOXES, "inbox_peer", Indexes.ascending("peer.userId"));
+        index(INBOXES, "inbox_conversation", Indexes.ascending("conversationId"));
         index(MESSAGE_BUCKETS, "bucket_message_id", Indexes.ascending("messages.messageId"));
 
         // posts
@@ -85,6 +86,8 @@ public class MongoSchemaInitializer implements ApplicationRunner {
         // comments + likes
         index(COMMENTS, "comment_thread", Indexes.compoundIndex(
                 Indexes.ascending("postId", "parentId"), Indexes.descending("createdAt", "_id")));
+        index(COMMENTS, "comment_replies", Indexes.compoundIndex(
+                Indexes.ascending("parentId"), Indexes.ascending("createdAt", "_id")));
         index(COMMENTS, "comment_author", Indexes.ascending("author.userId"));
         index(POST_LIKES, "post_like_user", Indexes.ascending("_id.userId"));
         index(COMMENT_LIKES, "comment_like_user", Indexes.ascending("_id.userId"));

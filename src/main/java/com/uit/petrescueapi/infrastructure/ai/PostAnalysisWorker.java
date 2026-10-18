@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.ai;
 
 import com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort;
+import com.uit.petrescueapi.application.usecase.PostAnalysisUseCase;
 import com.uit.petrescueapi.domain.event.PostContentSubmittedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +42,8 @@ public class PostAnalysisWorker {
             initialDelayString = "${app.ai.post-analysis.retry-delay-ms:60000}")
     public void retryQueuedPosts() {
         // skip posts touched in the last minute: their event-driven attempt may still be running
-        for (UUID postId : store.findRetryable(MAX_ATTEMPTS, LocalDateTime.now().minusMinutes(1), BATCH)) {
+        for (UUID postId : store.findRetryable(MAX_ATTEMPTS, PostAnalysisUseCase.MAX_LIFETIME_ATTEMPTS, LocalDateTime.now().minusMinutes(1),
+                LocalDateTime.now().minusMinutes(5), BATCH)) {
             analyseSafely(postId);
         }
     }

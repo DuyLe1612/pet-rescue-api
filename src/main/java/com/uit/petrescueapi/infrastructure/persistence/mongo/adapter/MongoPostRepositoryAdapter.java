@@ -79,6 +79,7 @@ public class MongoPostRepositoryAdapter implements PostRepository {
             // the suggestion described the old text; a human decision is never discarded
             update.set("analysis.status", PostAnalysisStatus.PENDING.name())
                     .set("analysis.attempts", 0)
+                    .set("analysis.claimToken", null)
                     .set("analysis.lastError", null)
                     .set("analysis.updatedAt", LocalDateTime.now());
         }

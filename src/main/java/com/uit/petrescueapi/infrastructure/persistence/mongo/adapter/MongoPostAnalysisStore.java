@@ -17,6 +17,7 @@ import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocume
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -48,13 +49,36 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
 
     @Override
     public Optional<AnalysisTarget> findTarget(UUID postId) {
-        PostDocument d = mongo.findOne(query(where("_id").is(postId).and("deleted").is(false)), PostDocument.class);
-        if (d == null) {
-            return Optional.empty();
-        }
+        return Optional.ofNullable(mongo.findOne(query(where("_id").is(postId).and("deleted").is(false)), PostDocument.class))
+                .map(MongoPostAnalysisStore::toTarget);
+    }
+
+    @Override
+    public Optional<Claim> claim(UUID postId, int maxLifetimeAttempts, LocalDateTime staleBefore) {
+        Criteria claimable = new Criteria().orOperator(
+                where("analysis.status").in(PostAnalysisStatus.PENDING.name(), PostAnalysisStatus.FAILED.name()),
+                where("analysis.status").exists(false),
+                where("analysis.status").is(PostAnalysisStatus.ANALYZING.name()).and("analysis.updatedAt").lt(staleBefore));
+        Criteria budget = new Criteria().orOperator(
+                where("analysis.totalAttempts").lt(maxLifetimeAttempts), where("analysis.totalAttempts").exists(false));
+        UUID token = UUID.randomUUID();
+        PostDocument claimed = mongo.findAndModify(
+                query(new Criteria().andOperator(where("_id").is(postId), where("deleted").is(false), claimable, budget)),
+                new Update()
+                        .set("analysis.status", PostAnalysisStatus.ANALYZING.name())
+                        .set("analysis.claimToken", token)
+                        .set("analysis.updatedAt", LocalDateTime.now())
+                        .inc("analysis.attempts", 1)
+                        .inc("analysis.totalAttempts", 1),
+                FindAndModifyOptions.options().returnNew(true),
+                PostDocument.class);
+        return Optional.ofNullable(claimed).map(d -> new Claim(toTarget(d), token));
+    }
+
+    private static AnalysisTarget toTarget(PostDocument d) {
         AnalysisDocument a = d.getAnalysis();
         FacetsDocument f = d.getFacets();
-        return Optional.of(new AnalysisTarget(
+        return new AnalysisTarget(
                 d.getId(),
                 d.getAuthor() == null ? null : d.getAuthor().getUserId(),
                 d.getContent(),
@@ -65,7 +89,7 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                 d.getRescueCase() == null ? null : d.getRescueCase().getCaseId(),
                 a == null ? null : a.getModel(),
                 a == null ? null : a.getAnalyzedAt(),
-                d.getRescueSuggestion() == null ? "NONE" : d.getRescueSuggestion()));
+                d.getRescueSuggestion() == null ? "NONE" : d.getRescueSuggestion());
     }
 
     @Override
@@ -90,15 +114,16 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
     }
 
     @Override
-    public void markAnalyzed(UUID postId, UUID runId, String model, PostAnalysisSuggestion suggestion) {
+    public void markAnalyzed(UUID postId, UUID token, UUID runId, String model, PostAnalysisSuggestion suggestion) {
         LocalDateTime now = LocalDateTime.now();
-        mongo.updateFirst(notFinal(postId), new Update()
+        mongo.updateFirst(claimedBy(postId, token), new Update()
                         .set("analysis.status", PostAnalysisStatus.ANALYZED.name())
                         .set("analysis.schemaVersion", PostDocument.SCHEMA_VERSION)
                         .set("analysis.model", model)
                         .set("analysis.analyzedAt", now)
                         .set("analysis.lastRunId", runId)
                         .set("analysis.lastError", null)
+                        .set("analysis.claimToken", null)
                         .set("analysis.suggested", suggestion)
                         .set("analysis.updatedAt", now)
                         .set("rescueSuggestion", suggestion.needsRescue() ? "SUGGESTED" : "NONE"),
@@ -106,13 +131,14 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
     }
 
     @Override
-    public void markFailed(UUID postId, UUID runId, String reason) {
-        mongo.updateFirst(notFinal(postId), new Update()
+    public void markFailed(UUID postId, UUID token, UUID runId, String reason) {
+        // the attempt was already counted by claim()
+        mongo.updateFirst(claimedBy(postId, token), new Update()
                         .set("analysis.status", PostAnalysisStatus.FAILED.name())
                         .set("analysis.lastRunId", runId)
                         .set("analysis.lastError", reason)
-                        .set("analysis.updatedAt", LocalDateTime.now())
-                        .inc("analysis.attempts", 1),
+                        .set("analysis.claimToken", null)
+                        .set("analysis.updatedAt", LocalDateTime.now()),
                 PostDocument.class);
     }
 
@@ -136,7 +162,10 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                         .set("rescueSuggestion", rescueSuggestionAfterConfirm(before, facets)),
                 PostDocument.class);
 
-        UUID runId = before == null || before.getAnalysis() == null ? null : before.getAnalysis().getLastRunId();
+        // only an ANALYZED suggestion describes the text being confirmed (after an edit it is stale)
+        AnalysisDocument analysisBefore = before == null ? null : before.getAnalysis();
+        UUID runId = analysisBefore != null && PostAnalysisStatus.ANALYZED.name().equals(analysisBefore.getStatus())
+                ? analysisBefore.getLastRunId() : null;
         if (runId != null) {
             mongo.updateFirst(query(where("_id").is(runId)), new Update().set("humanLabel", HumanLabelDocument.builder()
                             .category(facets.category().name())
@@ -172,9 +201,24 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
         mongo.updateFirst(notFinal(postId), new Update()
                         .set("analysis.status", PostAnalysisStatus.PENDING.name())
                         .set("analysis.attempts", 0)
+                        .set("analysis.claimToken", null)
                         .set("analysis.lastError", null)
                         .set("analysis.updatedAt", LocalDateTime.now()),
                 PostDocument.class);
+    }
+
+    /** {@code rescueCase: null} also matches a missing field, so this is a single atomic check-and-set. */
+    @Override
+    public boolean reserveRescueCase(UUID postId) {
+        return mongo.updateFirst(query(where("_id").is(postId).and("rescueCase").is(null)),
+                new Update().set("rescueCase", new PostDocument.RescueCaseRefDocument(null, "CREATING")),
+                PostDocument.class).getModifiedCount() == 1;
+    }
+
+    @Override
+    public void releaseRescueCase(UUID postId) {
+        mongo.updateFirst(query(where("_id").is(postId).and("rescueCase.caseId").is(null)),
+                new Update().unset("rescueCase"), PostDocument.class);
     }
 
     @Override
@@ -186,13 +230,17 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
     }
 
     @Override
-    public List<UUID> findRetryable(int maxAttempts, LocalDateTime before, int limit) {
+    public List<UUID> findRetryable(int maxAttempts, int maxLifetimeAttempts, LocalDateTime before, LocalDateTime staleBefore, int limit) {
         Criteria queued = new Criteria().andOperator(
                 where("analysis.status").in(PostAnalysisStatus.PENDING.name(), PostAnalysisStatus.FAILED.name()),
                 new Criteria().orOperator(where("analysis.attempts").lt(maxAttempts), where("analysis.attempts").exists(false)),
                 new Criteria().orOperator(where("analysis.updatedAt").lt(before), where("analysis.updatedAt").exists(false)));
+        Criteria stale = where("analysis.status").is(PostAnalysisStatus.ANALYZING.name()).and("analysis.updatedAt").lt(staleBefore);
         Criteria legacy = where("analysis").exists(false); // posts created before the analysis feature
-        Query q = query(new Criteria().andOperator(where("deleted").is(false), new Criteria().orOperator(queued, legacy)))
+        Criteria budget = new Criteria().orOperator(
+                where("analysis.totalAttempts").lt(maxLifetimeAttempts), where("analysis.totalAttempts").exists(false));
+        Query q = query(new Criteria().andOperator(where("deleted").is(false), budget,
+                        new Criteria().orOperator(queued, stale, legacy)))
                 .with(Sort.by(Sort.Order.asc("createdAt")))
                 .limit(limit);
         q.fields().include("_id");
@@ -230,6 +278,12 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                     ratio(number(d, "rescueOk"), n)));
         }
         return result;
+    }
+
+    private Query claimedBy(UUID postId, UUID token) {
+        return query(where("_id").is(postId)
+                .and("analysis.status").is(PostAnalysisStatus.ANALYZING.name())
+                .and("analysis.claimToken").is(token));
     }
 
     private Query notFinal(UUID postId) {

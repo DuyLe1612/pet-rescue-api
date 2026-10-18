@@ -103,7 +103,12 @@ public class PostDocument {
         private String model;
         private LocalDateTime analyzedAt;
         private UUID lastRunId;
+        /** Attempts for the current text; reset by an edit or a retry. */
         private int attempts;
+        /** Paid model calls ever made for this post; never reset (cost cap). */
+        private int totalAttempts;
+        /** Holder of the current ANALYZING claim; results from other tokens are dropped. */
+        private UUID claimToken;
         private String lastError;
         private PostAnalysisSuggestion suggested;
         private UUID confirmedBy;
