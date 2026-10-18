@@ -49,7 +49,8 @@ class PostStorageWiringTest {
             .withBean(CloudStoragePort.class, () -> mock(CloudStoragePort.class))
             .withBean(MongoTemplate.class, () -> mock(MongoTemplate.class))
             .withBean(UserSnapshotPort.class, () -> mock(UserSnapshotPort.class))
-            .withBean(PostReferencePort.class, () -> mock(PostReferencePort.class));
+            .withBean(PostReferencePort.class, () -> mock(PostReferencePort.class))
+            .withBean(com.uit.petrescueapi.application.port.out.PostMediaPort.class, () -> mock(com.uit.petrescueapi.application.port.out.PostMediaPort.class));
 
     @Test
     void postgresIsTheDefault() {

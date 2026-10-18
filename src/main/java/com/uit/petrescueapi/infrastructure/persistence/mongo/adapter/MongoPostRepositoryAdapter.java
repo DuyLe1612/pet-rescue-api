@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
+import com.uit.petrescueapi.application.port.out.PostMediaPort;
 import com.uit.petrescueapi.application.port.out.PostReferencePort;
 import com.uit.petrescueapi.application.port.out.UserSnapshotPort;
 import com.uit.petrescueapi.domain.entity.Post;
@@ -43,13 +44,14 @@ public class MongoPostRepositoryAdapter implements PostRepository {
 
     private final MongoTemplate mongo;
     private final PostReferencePort references;
+    private final PostMediaPort postMedia;
     private final UserSnapshotPort userSnapshots;
 
     @Override
     public Post save(Post post) {
         PostDocument existing = mongo.findById(post.getPostId(), PostDocument.class);
 
-        List<MediaDocument> media = resolveMedia(post.getMediaIds());
+        List<MediaDocument> media = resolveMedia(post.getPostId(), post.getMediaIds());
         List<String> tags = resolveTags(post.getTagCodes() != null ? post.getTagCodes()
                 : existing != null ? existing.getTags() : List.of());
         RescueCaseRefDocument rescueCase = resolveRescueCase(post.getRescueCaseId(), existing);
@@ -99,17 +101,14 @@ public class MongoPostRepositoryAdapter implements PostRepository {
                 && PostAnalysisStatus.valueOf(analysis.getStatus()).isFinal();
     }
 
-    private List<MediaDocument> resolveMedia(List<UUID> mediaIds) {
+    /** Promotes TEMP uploads (as the PostgreSQL path does) so the snapshotted public id stays valid. */
+    private List<MediaDocument> resolveMedia(UUID postId, List<UUID> mediaIds) {
         if (mediaIds == null || mediaIds.isEmpty()) {
             return List.of();
         }
-        List<UUID> distinct = List.copyOf(new LinkedHashSet<>(mediaIds));
-        Map<UUID, String> publicIds = references.findMediaPublicIds(distinct);
-        List<UUID> missing = distinct.stream().filter(id -> !publicIds.containsKey(id)).toList();
-        if (!missing.isEmpty()) {
-            throw new BusinessException("Unknown media: " + missing, "POST_MEDIA_NOT_FOUND");
-        }
-        return distinct.stream().map(id -> new MediaDocument(id, publicIds.get(id))).toList();
+        return postMedia.attach(postId, List.copyOf(new LinkedHashSet<>(mediaIds))).stream()
+                .map(m -> new MediaDocument(m.mediaId(), m.publicId()))
+                .toList();
     }
 
     private List<String> resolveTags(List<String> codes) {

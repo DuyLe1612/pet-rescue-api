@@ -7,6 +7,7 @@ import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.CommentQueryDataPort;
+import com.uit.petrescueapi.application.port.out.PostMediaPort;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
 import com.uit.petrescueapi.application.port.out.PostReferencePort;
 import com.uit.petrescueapi.application.port.out.SocialCounterPort;
@@ -60,6 +61,7 @@ class MongoPostTest extends MongoIntegrationTest {
     static final UUID BOB = UUID.fromString("00000000-0000-0000-0000-00000000000b");
     static final UUID MEDIA_1 = UUID.fromString("00000000-0000-0000-0000-0000000000e1");
     static final UUID MEDIA_2 = UUID.fromString("00000000-0000-0000-0000-0000000000e2");
+    static final UUID MEDIA_TEMP = UUID.fromString("00000000-0000-0000-0000-0000000000e3");
     static final UUID RESCUE = UUID.fromString("00000000-0000-0000-0000-0000000000c1");
 
     @TestConfiguration
@@ -93,12 +95,6 @@ class MongoPostTest extends MongoIntegrationTest {
         PostReferencePort postReferencePort() {
             return new PostReferencePort() {
                 @Override
-                public Map<UUID, String> findMediaPublicIds(Collection<UUID> mediaIds) {
-                    Map<UUID, String> known = Map.of(MEDIA_1, "posts/one", MEDIA_2, "posts/two");
-                    return mediaIds.stream().filter(known::containsKey).collect(Collectors.toMap(Function.identity(), known::get));
-                }
-
-                @Override
                 public Set<String> findExistingTagCodes(Collection<String> codes) {
                     return codes.stream().filter(Set.of("rescue", "dog", "cat")::contains).collect(Collectors.toSet());
                 }
@@ -108,6 +104,17 @@ class MongoPostTest extends MongoIntegrationTest {
                     return RESCUE.equals(caseId) ? Optional.of("OPEN") : Optional.empty();
                 }
             };
+        }
+
+        /** MEDIA_1/MEDIA_2 are already permanent; MEDIA_TEMP gets promoted into the post folder. */
+        @Bean
+        PostMediaPort postMediaPort() {
+            return (postId, mediaIds) -> mediaIds.stream().map(id -> {
+                if (id.equals(MEDIA_1)) return new PostMediaPort.AttachedMedia(id, "posts/one");
+                if (id.equals(MEDIA_2)) return new PostMediaPort.AttachedMedia(id, "posts/two");
+                if (id.equals(MEDIA_TEMP)) return new PostMediaPort.AttachedMedia(id, "posts/" + postId + "/temp");
+                throw new BusinessException("Unknown media: " + id, "POST_MEDIA_NOT_FOUND");
+            }).toList();
         }
 
         @Bean
@@ -160,6 +167,14 @@ class MongoPostTest extends MongoIntegrationTest {
         Document doc = raw(p.getPostId());
         assertThat(doc.get("rescueCase", Document.class).getString("status")).isEqualTo("OPEN");
         assertThat(doc.get("stats", Document.class)).containsEntry("likes", 0).containsEntry("comments", 0);
+    }
+
+    @Test
+    void tempMediaIsStoredWithItsPromotedPermanentPublicId() {
+        Post p = posts.create(Post.builder().authorId(ALICE).content("x").mediaIds(List.of(MEDIA_TEMP)).build());
+
+        assertThat(postQuery.findById(p.getPostId()).getImageUrls())
+                .containsExactly("https://cdn/posts/" + p.getPostId() + "/temp");
     }
 
     @Test
