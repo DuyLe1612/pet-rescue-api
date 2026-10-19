@@ -2,7 +2,7 @@ package com.uit.petrescueapi.infrastructure.messaging;
 
 import com.uit.petrescueapi.domain.event.PostLikedEvent;
 import com.uit.petrescueapi.domain.event.PostUnlikedEvent;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaRepository;
+import com.uit.petrescueapi.application.port.out.SocialCounterPort;
 import com.uit.petrescueapi.infrastructure.redis.RedisCounterService;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +16,8 @@ class PostLikeEventListenerTest {
     @Test
     void handlePostLikedUpdatesDbWhenRedisAdded() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        PostLikeEventListener listener = new PostLikeEventListener(redis, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        PostLikeEventListener listener = new PostLikeEventListener(redis, counters);
 
         UUID postId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -29,14 +29,14 @@ class PostLikeEventListenerTest {
                 .timestamp(LocalDateTime.now())
                 .build());
 
-        verify(postRepo).incrementLikeCount(postId);
+        verify(counters).addPostLikes(postId, 1);
     }
 
     @Test
     void handlePostLikedSkipsDbWhenRedisDuplicate() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        PostLikeEventListener listener = new PostLikeEventListener(redis, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        PostLikeEventListener listener = new PostLikeEventListener(redis, counters);
 
         UUID postId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -48,14 +48,14 @@ class PostLikeEventListenerTest {
                 .timestamp(LocalDateTime.now())
                 .build());
 
-        verify(postRepo, never()).incrementLikeCount(postId);
+        verify(counters, never()).addPostLikes(any(), anyInt());
     }
 
     @Test
     void handlePostUnlikedUpdatesDbWhenRedisRemoved() {
         RedisCounterService redis = mock(RedisCounterService.class);
-        PostJpaRepository postRepo = mock(PostJpaRepository.class);
-        PostLikeEventListener listener = new PostLikeEventListener(redis, postRepo);
+        SocialCounterPort counters = mock(SocialCounterPort.class);
+        PostLikeEventListener listener = new PostLikeEventListener(redis, counters);
 
         UUID postId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -67,6 +67,6 @@ class PostLikeEventListenerTest {
                 .timestamp(LocalDateTime.now())
                 .build());
 
-        verify(postRepo).decrementLikeCount(postId);
+        verify(counters).addPostLikes(postId, -1);
     }
 }

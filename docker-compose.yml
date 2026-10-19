@@ -70,6 +70,25 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── MongoDB ───────────────────────────────────────────
+  # Chat + social posts (migrate.md). Single-node replica set → transactions work.
+  # The healthcheck initiates the replica set on first boot.
+  mongo:
+    image: mongo:7
+    container_name: petrescue-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   # ── Spring Boot App ───────────────────────────────────
   # Only started with:  docker-compose --profile docker up -d --build
   # Use bootRun for day-to-day development instead.
@@ -83,6 +102,8 @@ services:
       redis:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -99,9 +120,16 @@ services:
       RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: petrescue
       RABBITMQ_PASSWORD: petrescue
+      # directConnection: the replica set advertises localhost:27017, which is only valid inside the mongo container
+      MONGO_URI: mongodb://mongo:27017/petrescue?replicaSet=rs0&directConnection=true
+      APP_STORAGE_CHAT: ${APP_STORAGE_CHAT:-postgres}
+      APP_STORAGE_POST: ${APP_STORAGE_POST:-postgres}
+      AI_POST_ANALYSIS_ENABLED: ${AI_POST_ANALYSIS_ENABLED:-false}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     restart: on-failure
 
 volumes:
   pgdata:
   redis-data:
   rabbitmq-data:
+  mongo-data:

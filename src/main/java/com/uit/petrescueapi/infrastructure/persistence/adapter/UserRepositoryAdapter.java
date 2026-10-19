@@ -30,6 +30,11 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public boolean existsById(UUID id) {
+        return jpa.existsById(id);
+    }
+
+    @Override
     public Optional<User> findByEmail(String email) {
         return jpa.findByEmail(email).map(mapper::toDomain);
     }

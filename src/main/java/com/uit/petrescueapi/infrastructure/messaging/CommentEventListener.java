@@ -1,16 +1,14 @@
 package com.uit.petrescueapi.infrastructure.messaging;
 
+import com.uit.petrescueapi.application.port.out.SocialCounterPort;
 import com.uit.petrescueapi.domain.event.CommentCreatedEvent;
 import com.uit.petrescueapi.domain.event.CommentLikedEvent;
 import com.uit.petrescueapi.domain.event.CommentUnlikedEvent;
-import com.uit.petrescueapi.infrastructure.persistence.repository.CommentJpaRepository;
-import com.uit.petrescueapi.infrastructure.persistence.repository.PostJpaRepository;
 import com.uit.petrescueapi.infrastructure.redis.RedisCounterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -18,18 +16,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class CommentEventListener {
 
     private final RedisCounterService redisCounterService;
-    private final CommentJpaRepository commentJpaRepository;
-    private final PostJpaRepository postJpaRepository;
+    private final SocialCounterPort counters;
 
     @RabbitListener(queues = "${app.rabbitmq.queue.comment-created}")
-    @Transactional
     public void handleCommentCreated(CommentCreatedEvent event) {
         redisCounterService.incrementPostCommentCount(event.getPostId());
-        postJpaRepository.incrementCommentCount(event.getPostId());
+        counters.addPostComments(event.getPostId(), 1);
 
         if (event.getParentCommentId() != null) {
             redisCounterService.incrementCommentReplyCount(event.getParentCommentId());
-            commentJpaRepository.incrementReplyCount(event.getParentCommentId());
+            counters.addCommentReplies(event.getParentCommentId(), 1);
         }
 
         log.debug("Handled CommentCreatedEvent: commentId={}, postId={}, parentCommentId={}",
@@ -37,11 +33,10 @@ public class CommentEventListener {
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queue.comment-liked}")
-    @Transactional
     public void handleCommentLiked(CommentLikedEvent event) {
         boolean added = redisCounterService.incrementCommentLikes(event.getCommentId(), event.getUserId());
         if (added) {
-            commentJpaRepository.incrementLikeCount(event.getCommentId());
+            counters.addCommentLikes(event.getCommentId(), 1);
         }
 
         log.debug("Handled CommentLikedEvent: commentId={}, userId={}, redisAdded={}",
@@ -49,11 +44,10 @@ public class CommentEventListener {
     }
 
     @RabbitListener(queues = "${app.rabbitmq.queue.comment-unliked}")
-    @Transactional
     public void handleCommentUnliked(CommentUnlikedEvent event) {
         boolean removed = redisCounterService.decrementCommentLikes(event.getCommentId(), event.getUserId());
         if (removed) {
-            commentJpaRepository.decrementLikeCount(event.getCommentId());
+            counters.addCommentLikes(event.getCommentId(), -1);
         }
 
         log.debug("Handled CommentUnlikedEvent: commentId={}, userId={}, redisRemoved={}",

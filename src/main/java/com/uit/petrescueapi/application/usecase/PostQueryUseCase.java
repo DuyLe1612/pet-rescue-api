@@ -2,6 +2,7 @@ package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
+import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
 import com.uit.petrescueapi.application.port.query.PostQueryPort;
@@ -41,8 +42,8 @@ public class PostQueryUseCase implements PostQueryPort {
     }
 
     @Override
-    public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId) {
+    public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter) {
         log.debug("Query: find post feed by cursor {}, size {}", cursor, size);
-        return queryDataPort.findFeedByCursor(cursor, size, viewerId);
+        return queryDataPort.findFeedByCursor(cursor, cursorId, size, viewerId, filter == null ? PostFeedFilter.none() : filter);
     }
 }

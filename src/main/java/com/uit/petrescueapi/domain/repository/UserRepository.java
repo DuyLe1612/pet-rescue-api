@@ -14,6 +14,9 @@ public interface UserRepository {
 
     Optional<User> findById(UUID id);
 
+    /** Existence check without loading the aggregate (no lazy roles). */
+    boolean existsById(UUID id);
+
     Optional<User> findByEmail(String email);
 
     Optional<User> findByUsername(String username);

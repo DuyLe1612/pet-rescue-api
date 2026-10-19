@@ -84,6 +84,22 @@ public interface PostQueryJpaRepository extends JpaRepository<PostJpaEntity, UUI
             Pageable pageable
     );
 
+    @Query("""
+    SELECT p.postId       AS postId,
+           p.authorId     AS authorId,
+           u.username     AS authorUsername,
+           p.content      AS content,
+           p.likeCount    AS likeCount,
+           p.commentCount AS commentCount,
+           p.createdAt    AS createdAt
+    FROM PostJpaEntity p
+    LEFT JOIN UserJpaEntity u ON p.authorId = u.userId
+    WHERE p.deleted = false
+      AND p.createdAt < :cursorCreatedAt
+    ORDER BY p.createdAt DESC, p.postId DESC
+""")
+    Page<PostSummaryProjection> findFeedBefore(@Param("cursorCreatedAt") LocalDateTime cursorCreatedAt, Pageable pageable);
+
     // ── Detail (single post) ────────────────────
 
     @Query("""

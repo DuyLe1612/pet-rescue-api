@@ -25,6 +25,8 @@ public class PostSummaryResponseDto {
     @Schema(example = "johndoe")
     private String authorUsername;
 
+    private String authorAvatarUrl;
+
     @Schema(example = "Found this little guy near the park, he needs help!")
     private String content;
 
@@ -34,4 +36,7 @@ public class PostSummaryResponseDto {
 
     private LocalDateTime createdAt;
     private List<String> imageUrls;
+
+    @Schema(description = "Newest root comments (max 2), only when posts are stored in MongoDB")
+    private List<CommentPreviewDto> previewComments;
 }

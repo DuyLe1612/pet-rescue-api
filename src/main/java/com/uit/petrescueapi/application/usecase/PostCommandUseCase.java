@@ -22,6 +22,7 @@ import java.util.UUID;
 public class PostCommandUseCase implements PostCommandPort {
 
     private final PostDomainService domainService;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
     @Override
     public Post create(CreatePostRequestDto cmd, UUID authorId) {
@@ -31,8 +32,12 @@ public class PostCommandUseCase implements PostCommandPort {
                 .content(cmd.getContent())
                 .rescueCaseId(cmd.getRescueCaseId())
                 .mediaIds(cmd.getMediaIds())
+                .tagCodes(cmd.getTagCodes())
                 .build();
-        return domainService.create(post);
+        Post created = domainService.create(post);
+        // DA2: queue the new post for AI analysis (handled after commit, off the request thread)
+        events.publishEvent(new com.uit.petrescueapi.domain.event.PostContentSubmittedEvent(created.getPostId()));
+        return created;
     }
 
     @Override
@@ -41,8 +46,14 @@ public class PostCommandUseCase implements PostCommandPort {
         Post patch = Post.builder()
                 .content(cmd.getContent())
                 .mediaIds(cmd.getMediaIds())
+                .tagIds(null)
+                .tagCodes(cmd.getTagCodes())
                 .build();
-        return domainService.update(postId, patch);
+        Post updated = domainService.update(postId, patch);
+        if (cmd.getContent() != null) {
+            events.publishEvent(new com.uit.petrescueapi.domain.event.PostContentSubmittedEvent(postId));
+        }
+        return updated;
     }
 
     @Override

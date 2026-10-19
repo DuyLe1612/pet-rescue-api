@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.PostOnPostgres;
 import com.uit.petrescueapi.application.dto.comment.CommentResponseDto;
 import com.uit.petrescueapi.application.dto.comment.CommentSummaryDto;
 import com.uit.petrescueapi.application.port.out.CommentQueryDataPort;
@@ -19,6 +20,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@PostOnPostgres
 public class CommentQueryAdapter implements CommentQueryDataPort {
 
     private final CommentQueryJpaRepository queryRepo;

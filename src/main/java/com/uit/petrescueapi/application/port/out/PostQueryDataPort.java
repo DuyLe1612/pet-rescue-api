@@ -2,6 +2,7 @@ package com.uit.petrescueapi.application.port.out;
 
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
+import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,5 +22,9 @@ public interface PostQueryDataPort {
 
     Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 
-    PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, int size, UUID viewerId);
+    /**
+     * Feed page ordered by {@code (createdAt, postId)} descending. Pass the previous page's
+     * {@code nextCursor} + {@code nextCursorId}; {@code cursorId} may be null for old clients.
+     */
+    PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter);
 }

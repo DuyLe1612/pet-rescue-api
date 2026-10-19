@@ -91,13 +91,20 @@ public class PostController {
     @GetMapping("/feed")
     @Operation(
             summary = "Post feed by cursor",
-            description = "Returns post feed using cursor pagination by timestamp."
+            description = "Returns post feed using cursor pagination by (createdAt, postId): pass nextCursor as cursor and "
+                    + "nextCursorId as cursorId. Optional filters on confirmed post facets (category, species, district) and tag code."
     )
     public ResponseEntity<ApiResponse<PostCursorResponseDto>> getFeed(
             @RequestParam(required = false) LocalDateTime cursor,
-                        @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) UUID cursorId,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String tag,
             Authentication authentication) {
         UUID viewerId = authentication != null ? UUID.fromString(authentication.getName()) : null;
-                return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, pageSize, viewerId)));
+        PostFeedFilter filter = new PostFeedFilter(category, species, district, tag);
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, cursorId, pageSize, viewerId, filter)));
     }
 }

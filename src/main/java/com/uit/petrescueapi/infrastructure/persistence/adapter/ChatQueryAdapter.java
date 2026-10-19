@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.infrastructure.config.ChatOnPostgres;
 import com.uit.petrescueapi.application.dto.chat.ChatMessageDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
@@ -22,6 +23,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@ChatOnPostgres
 public class ChatQueryAdapter implements ChatQueryDataPort {
 
     private final ConversationJpaRepository conversationRepository;
