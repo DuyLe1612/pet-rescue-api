@@ -97,3 +97,6 @@ agent/
 # Docker
 docker-compose.override.yml
 .env.production
+
+# Cursor
+.cursor/
