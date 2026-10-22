@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Same TEMP → PERMANENT promotion as {@link PostRepositoryAdapter} (PostgreSQL posts), for posts
- * stored in MongoDB. {@code media_files} stays in PostgreSQL, so this runs in its own JPA transaction.
+ * Promotes TEMP uploads to PERMANENT when they are attached to a (MongoDB) post.
+ * {@code media_files} stays in PostgreSQL, so this runs in its own JPA transaction.
  */
 @Component
 @RequiredArgsConstructor

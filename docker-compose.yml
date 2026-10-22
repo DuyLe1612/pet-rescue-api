@@ -122,8 +122,6 @@ services:
       RABBITMQ_PASSWORD: petrescue
       # directConnection: the replica set advertises localhost:27017, which is only valid inside the mongo container
       MONGO_URI: mongodb://mongo:27017/petrescue?replicaSet=rs0&directConnection=true
-      APP_STORAGE_CHAT: ${APP_STORAGE_CHAT:-postgres}
-      APP_STORAGE_POST: ${APP_STORAGE_POST:-postgres}
       AI_POST_ANALYSIS_ENABLED: ${AI_POST_ANALYSIS_ENABLED:-false}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     restart: on-failure

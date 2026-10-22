@@ -23,15 +23,15 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-// "postTransactionManager" resolves to JPA or MongoDB per app.storage.post (StorageTransactionAliases)
-@Transactional(transactionManager = "postTransactionManager")
+// chat/post data lives in MongoDB; a plain @Transactional would open a JPA transaction (MongoConfig)
+@Transactional(transactionManager = "mongoTransactionManager")
 public class PostDomainService {
 
     private final PostRepository postRepository;
 
     // ── Queries ─────────────────────────────────────
 
-    @Transactional(transactionManager = "postTransactionManager", readOnly = true)
+    @Transactional(transactionManager = "mongoTransactionManager", readOnly = true)
     public Post findById(UUID postId) {
         return postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post", "postId", postId));

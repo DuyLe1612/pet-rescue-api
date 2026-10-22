@@ -3,7 +3,6 @@ package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 import com.uit.petrescueapi.domain.entity.Conversation;
 import com.uit.petrescueapi.domain.repository.ConversationRepository;
 import com.uit.petrescueapi.domain.valueobject.ConversationType;
-import com.uit.petrescueapi.infrastructure.config.ChatOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.ConversationDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.InboxDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.LastMessageDocument;
@@ -25,7 +24,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * last-message summary of every inbox that points at it, so the conversation list needs no join.
  */
 @Component
-@ChatOnMongo
 @RequiredArgsConstructor
 public class MongoConversationRepositoryAdapter implements ConversationRepository {
 

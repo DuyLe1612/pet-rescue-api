@@ -41,9 +41,7 @@ services:
 
       # MongoDB (e.g. Atlas — replica set by default)
       MONGO_URI: ${MONGO_URI}
-      MONGO_HEALTH_ENABLED: ${MONGO_HEALTH_ENABLED:-false}
-      APP_STORAGE_CHAT: ${APP_STORAGE_CHAT:-postgres}
-      APP_STORAGE_POST: ${APP_STORAGE_POST:-postgres}
+      MONGO_HEALTH_ENABLED: ${MONGO_HEALTH_ENABLED:-true}
       AI_POST_ANALYSIS_ENABLED: ${AI_POST_ANALYSIS_ENABLED:-false}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
 

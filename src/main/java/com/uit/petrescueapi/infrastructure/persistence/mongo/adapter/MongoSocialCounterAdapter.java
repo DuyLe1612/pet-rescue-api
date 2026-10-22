@@ -1,7 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
 import com.uit.petrescueapi.application.port.out.SocialCounterPort;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.CommentDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * enough, so counters never go negative. No triggers exist on this side, so nothing double counts.
  */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoSocialCounterAdapter implements SocialCounterPort {
 

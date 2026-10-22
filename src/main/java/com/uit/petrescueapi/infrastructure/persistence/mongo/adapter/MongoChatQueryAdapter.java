@@ -5,7 +5,6 @@ import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
-import com.uit.petrescueapi.infrastructure.config.ChatOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.ConversationDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.InboxDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.MessageBucketDocument.MessageDocument;
@@ -31,7 +30,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * {@code inboxes}; message history reads 1–2 buckets per page. No joins, no cache.
  */
 @Component
-@ChatOnMongo
 @RequiredArgsConstructor
 public class MongoChatQueryAdapter implements ChatQueryDataPort {
 

@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  * {@link RescueCaseCommandPort} (PostgreSQL).
  *
  * <p>No {@code @Transactional}: every store call is a single-document MongoDB write. Registered by
- * {@code PostAnalysisConfig} only when posts are stored in MongoDB.</p>
+ * {@code PostAnalysisConfig}.</p>
  */
 @Slf4j
 public class PostAnalysisUseCase implements PostAnalysisCommandPort {

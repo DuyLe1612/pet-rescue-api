@@ -2,7 +2,6 @@ package com.uit.petrescueapi.infrastructure.config;
 
 import com.uit.petrescueapi.infrastructure.persistence.mongo.MongoSchemaInitializer;
 import jakarta.persistence.EntityManagerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -16,8 +15,8 @@ import org.springframework.transaction.PlatformTransactionManager;
  * Two transaction managers live side by side (see migrate.md §7.1):
  * <ul>
  *   <li>{@code transactionManager} — JPA/PostgreSQL, {@code @Primary}, used by plain {@code @Transactional}.</li>
- *   <li>{@code mongoTransactionManager} — MongoDB, used by chat/post/comment domain services via
- *       {@code @Transactional(MongoConfig.MONGO_TX)}.</li>
+ *   <li>{@code mongoTransactionManager} — MongoDB (chat, posts, comments, likes), used by their
+ *       domain services via {@code @Transactional(transactionManager = "mongoTransactionManager")}.</li>
  * </ul>
  * The JPA manager is declared explicitly because Spring Boot's JPA auto-configuration backs off
  * as soon as <i>any</i> {@code TransactionManager} bean exists.
@@ -38,15 +37,7 @@ public class MongoConfig {
         return new MongoTransactionManager(databaseFactory);
     }
 
-    /** {@code chatTransactionManager} / {@code postTransactionManager} → JPA or MongoDB per {@code app.storage.*}. */
     @Bean
-    public static StorageTransactionAliases storageTransactionAliases() {
-        return new StorageTransactionAliases();
-    }
-
-    /** Only touches MongoDB when at least one feature is stored there. */
-    @Bean
-    @ConditionalOnExpression("'${app.storage.chat:postgres}' == 'mongo' or '${app.storage.post:postgres}' == 'mongo'")
     public MongoSchemaInitializer mongoSchemaInitializer(MongoTemplate mongoTemplate) {
         return new MongoSchemaInitializer(mongoTemplate);
     }

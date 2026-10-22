@@ -26,18 +26,8 @@ class PostAnalysisWiringTest {
             .withBean(RescueCaseWebMapper.class, () -> mock(RescueCaseWebMapper.class));
 
     @Test
-    void absentOnPostgres() {
-        runner.run(ctx -> {
-            assertThat(ctx).hasNotFailed();
-            assertThat(ctx).doesNotHaveBean(PostAnalysisCommandPort.class);
-            assertThat(ctx).doesNotHaveBean(PostAnalysisController.class);
-            assertThat(ctx).doesNotHaveBean(PostAnalysisWorker.class);
-        });
-    }
-
-    @Test
     void endpointsWithoutWorkerWhenAiIsDisabled() {
-        runner.withPropertyValues("app.storage.post=mongo").run(ctx -> {
+        runner.run(ctx -> {
             assertThat(ctx).hasNotFailed();
             assertThat(ctx).hasSingleBean(PostAnalysisCommandPort.class);
             assertThat(ctx).hasSingleBean(PostAnalysisController.class);
@@ -47,7 +37,7 @@ class PostAnalysisWiringTest {
 
     @Test
     void workerRunsWhenAiIsEnabled() {
-        runner.withPropertyValues("app.storage.post=mongo", "app.ai.post-analysis.enabled=true")
+        runner.withPropertyValues("app.ai.post-analysis.enabled=true")
                 .withBean(PostAnalysisPort.class, () -> mock(PostAnalysisPort.class))
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
