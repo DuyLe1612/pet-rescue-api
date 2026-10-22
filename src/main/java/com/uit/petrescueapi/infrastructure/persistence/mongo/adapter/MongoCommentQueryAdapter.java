@@ -4,7 +4,6 @@ import com.uit.petrescueapi.application.dto.comment.CommentResponseDto;
 import com.uit.petrescueapi.application.dto.comment.CommentSummaryDto;
 import com.uit.petrescueapi.application.port.out.CommentQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.CommentDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -25,7 +24,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 
 /** Comment threads from MongoDB — author is embedded, so no user join. */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoCommentQueryAdapter implements CommentQueryDataPort {
 

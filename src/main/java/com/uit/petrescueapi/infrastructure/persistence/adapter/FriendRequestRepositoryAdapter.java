@@ -3,7 +3,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 import com.uit.petrescueapi.domain.entity.FriendRequest;
 import com.uit.petrescueapi.domain.repository.FriendRequestRepository;
 import com.uit.petrescueapi.domain.valueobject.FriendRequestStatus;
-import com.uit.petrescueapi.infrastructure.persistence.mapper.ChatEntityMapper;
+import com.uit.petrescueapi.infrastructure.persistence.mapper.FriendRequestEntityMapper;
 import com.uit.petrescueapi.infrastructure.persistence.repository.FriendRequestJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import java.util.UUID;
 public class FriendRequestRepositoryAdapter implements FriendRequestRepository {
 
     private final FriendRequestJpaRepository jpaRepository;
-    private final ChatEntityMapper mapper;
+    private final FriendRequestEntityMapper mapper;
 
     @Override
     public FriendRequest save(FriendRequest request) {

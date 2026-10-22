@@ -37,6 +37,6 @@ public class PostSummaryResponseDto {
     private LocalDateTime createdAt;
     private List<String> imageUrls;
 
-    @Schema(description = "Newest root comments (max 2), only when posts are stored in MongoDB")
+    @Schema(description = "Newest root comments (max 2)")
     private List<CommentPreviewDto> previewComments;
 }

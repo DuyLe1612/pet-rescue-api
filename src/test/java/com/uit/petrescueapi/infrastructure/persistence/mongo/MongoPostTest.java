@@ -20,7 +20,6 @@ import com.uit.petrescueapi.domain.service.CommentDomainService;
 import com.uit.petrescueapi.domain.service.LikeDomainService;
 import com.uit.petrescueapi.domain.service.PostDomainService;
 import com.uit.petrescueapi.infrastructure.config.MongoConfig;
-import com.uit.petrescueapi.infrastructure.config.StorageTransactionAliases;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.adapter.*;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
@@ -38,7 +37,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.time.LocalDateTime;
@@ -54,7 +52,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @Import(MongoPostTest.Config.class)
-@TestPropertySource(properties = "app.storage.post=mongo")
 class MongoPostTest extends MongoIntegrationTest {
 
     static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -75,11 +72,6 @@ class MongoPostTest extends MongoIntegrationTest {
         @Bean(MongoConfig.MONGO_TX)
         MongoTransactionManager mongoTransactionManager(MongoDatabaseFactory f) {
             return new MongoTransactionManager(f);
-        }
-
-        @Bean
-        static StorageTransactionAliases storageTransactionAliases() {
-            return new StorageTransactionAliases();
         }
 
         @Bean

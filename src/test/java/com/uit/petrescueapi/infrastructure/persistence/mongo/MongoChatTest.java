@@ -12,7 +12,6 @@ import com.uit.petrescueapi.domain.repository.UserRepository;
 import com.uit.petrescueapi.domain.service.ChatDomainService;
 import com.uit.petrescueapi.domain.valueobject.ConversationType;
 import com.uit.petrescueapi.infrastructure.config.MongoConfig;
-import com.uit.petrescueapi.infrastructure.config.StorageTransactionAliases;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.adapter.MessageBucketReader;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.adapter.MongoChatMessageRepositoryAdapter;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.adapter.MongoChatQueryAdapter;
@@ -30,7 +29,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.test.context.TestPropertySource;
 
 import java.util.Collection;
 import java.util.List;
@@ -46,7 +44,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @Import(MongoChatTest.Config.class)
-@TestPropertySource(properties = "app.storage.chat=mongo")
 class MongoChatTest extends MongoIntegrationTest {
 
     static final UUID ALICE = UUID.fromString("00000000-0000-0000-0000-00000000000a");
@@ -63,11 +60,6 @@ class MongoChatTest extends MongoIntegrationTest {
         @Bean(MongoConfig.MONGO_TX)
         MongoTransactionManager mongoTransactionManager(MongoDatabaseFactory f) {
             return new MongoTransactionManager(f);
-        }
-
-        @Bean
-        static StorageTransactionAliases storageTransactionAliases() {
-            return new StorageTransactionAliases();
         }
 
         @Bean

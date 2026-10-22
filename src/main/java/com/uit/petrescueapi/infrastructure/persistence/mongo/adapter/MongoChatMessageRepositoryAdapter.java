@@ -3,7 +3,6 @@ package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 import com.uit.petrescueapi.domain.entity.ChatMessage;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.ChatMessageRepository;
-import com.uit.petrescueapi.infrastructure.config.ChatOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.ConversationDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.MessageBucketDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.MessageBucketDocument.MessageDocument;
@@ -31,7 +30,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * next bucket every {@value MessageBucketDocument#SIZE} messages).
  */
 @Component
-@ChatOnMongo
 @RequiredArgsConstructor
 public class MongoChatMessageRepositoryAdapter implements ChatMessageRepository {
 

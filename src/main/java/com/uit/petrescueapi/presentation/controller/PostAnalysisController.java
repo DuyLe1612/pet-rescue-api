@@ -6,7 +6,6 @@ import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +27,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
-@PostOnMongo
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Post Analysis", description = "AI post processing (suggest → confirm → rescue case)")
 public class PostAnalysisController {
 

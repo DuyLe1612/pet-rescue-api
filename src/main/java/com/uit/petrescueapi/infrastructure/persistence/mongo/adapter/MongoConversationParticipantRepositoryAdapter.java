@@ -5,7 +5,6 @@ import com.uit.petrescueapi.application.port.out.UserSnapshotPort.UserSnapshot;
 import com.uit.petrescueapi.domain.entity.ConversationParticipant;
 import com.uit.petrescueapi.domain.repository.ConversationParticipantRepository;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
-import com.uit.petrescueapi.infrastructure.config.ChatOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.ConversationDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.InboxDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.InboxDocument.PeerDocument;
@@ -32,7 +31,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * for the list screen, and the seq watermark on the conversation to derive {@code seen}.
  */
 @Component
-@ChatOnMongo
 @RequiredArgsConstructor
 public class MongoConversationParticipantRepositoryAdapter implements ConversationParticipantRepository {
 

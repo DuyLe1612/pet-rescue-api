@@ -2,7 +2,6 @@ package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
 import com.uit.petrescueapi.domain.entity.PostLike;
 import com.uit.petrescueapi.domain.repository.PostLikeRepository;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.LikeDocuments.PostLikeDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.LikeDocuments.PostLikeKey;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +15,6 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoPostLikeRepositoryAdapter implements PostLikeRepository {
 

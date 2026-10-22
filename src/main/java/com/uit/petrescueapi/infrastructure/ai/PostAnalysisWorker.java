@@ -6,7 +6,7 @@ import com.uit.petrescueapi.application.usecase.PostAnalysisUseCase;
 import com.uit.petrescueapi.domain.event.PostContentSubmittedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,7 +23,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnExpression("'${app.storage.post:postgres}' == 'mongo' and '${app.ai.post-analysis.enabled:false}' == 'true'")
+@ConditionalOnProperty(name = "app.ai.post-analysis.enabled", havingValue = "true")
 public class PostAnalysisWorker {
 
     static final int MAX_ATTEMPTS = 3;

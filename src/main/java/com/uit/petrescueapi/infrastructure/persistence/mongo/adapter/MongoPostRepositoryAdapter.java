@@ -7,7 +7,6 @@ import com.uit.petrescueapi.domain.entity.Post;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.repository.PostRepository;
 import com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument.AnalysisDocument;
@@ -38,7 +37,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * renders (media public ids, tag codes, rescue case status, author) is snapshotted into the post.
  */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoPostRepositoryAdapter implements PostRepository {
 
@@ -101,7 +99,7 @@ public class MongoPostRepositoryAdapter implements PostRepository {
                 && PostAnalysisStatus.valueOf(analysis.getStatus()).isFinal();
     }
 
-    /** Promotes TEMP uploads (as the PostgreSQL path does) so the snapshotted public id stays valid. */
+    /** Promotes TEMP uploads so the snapshotted public id stays valid. */
     private List<MediaDocument> resolveMedia(UUID postId, List<UUID> mediaIds) {
         if (mediaIds == null || mediaIds.isEmpty()) {
             return List.of();

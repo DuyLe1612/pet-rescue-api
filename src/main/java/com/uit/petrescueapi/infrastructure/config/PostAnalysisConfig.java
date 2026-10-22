@@ -13,12 +13,10 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Optional;
 
 /**
- * DA2 Intelligent Post Processing needs the MongoDB post documents (analysis, facets, runs), so
- * the use case only exists with {@code app.storage.post=mongo}. The model adapter is optional:
- * without {@code app.ai.post-analysis.enabled=true} posts simply stay PENDING.
+ * DA2 Intelligent Post Processing on the MongoDB post documents (analysis, facets, runs).
+ * The model adapter is optional: without {@code app.ai.post-analysis.enabled=true} posts simply stay PENDING.
  */
 @Configuration
-@PostOnMongo
 public class PostAnalysisConfig {
 
     @Bean

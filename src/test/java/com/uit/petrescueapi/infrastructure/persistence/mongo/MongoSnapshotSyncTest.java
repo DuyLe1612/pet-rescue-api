@@ -10,7 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.mock.env.MockEnvironment;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,8 +37,7 @@ class MongoSnapshotSyncTest extends MongoIntegrationTest {
             ids.forEach(id -> { if (users.containsKey(id)) r.put(id, users.get(id)); });
             return r;
         };
-        MockEnvironment env = new MockEnvironment().withProperty("app.storage.chat", "mongo").withProperty("app.storage.post", "mongo");
-        listener = new MongoSnapshotSyncListener(mongo, port, env);
+        listener = new MongoSnapshotSyncListener(mongo, port);
 
         Document alice = author(ALICE, "alice");
         mongo.getCollection(MongoCollections.POSTS).insertMany(List.of(

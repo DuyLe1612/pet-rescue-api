@@ -7,7 +7,6 @@ import com.uit.petrescueapi.application.port.out.PostAnalysisPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort;
 import com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus;
 import com.uit.petrescueapi.domain.valueobject.PostCategory;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.MongoCollections;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostAnalysisRunDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostAnalysisRunDocument.HumanLabelDocument;
@@ -39,7 +38,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * are guarded so they never overwrite a human decision (CONFIRMED / REJECTED).
  */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoPostAnalysisStore implements PostAnalysisStorePort {
 

@@ -8,7 +8,6 @@ import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
 import lombok.RequiredArgsConstructor;
@@ -36,7 +35,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * author, image public ids, tags, counters and preview comments (no N+1 media load, no joins).
  */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoPostQueryAdapter implements PostQueryDataPort {
 

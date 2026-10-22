@@ -2,7 +2,6 @@ package com.uit.petrescueapi.infrastructure.persistence.mongo;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -21,7 +20,6 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@ConditionalOnExpression("'${app.storage.chat:postgres}' == 'mongo' or '${app.storage.post:postgres}' == 'mongo'")
 public class MongoSnapshotReconciler {
 
     private final NamedParameterJdbcTemplate jdbc;

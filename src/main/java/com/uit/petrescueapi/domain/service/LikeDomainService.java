@@ -18,7 +18,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(transactionManager = "postTransactionManager")
+@Transactional(transactionManager = "mongoTransactionManager")
 public class LikeDomainService {
 
     private final PostLikeRepository postLikeRepository;

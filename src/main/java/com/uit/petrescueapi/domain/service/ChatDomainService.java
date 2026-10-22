@@ -22,8 +22,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-// "chatTransactionManager" resolves to JPA or MongoDB per app.storage.chat (StorageTransactionAliases)
-@Transactional(transactionManager = "chatTransactionManager")
+// chat/post data lives in MongoDB; a plain @Transactional would open a JPA transaction (MongoConfig)
+@Transactional(transactionManager = "mongoTransactionManager")
 public class ChatDomainService {
 
     private final ConversationRepository conversationRepository;

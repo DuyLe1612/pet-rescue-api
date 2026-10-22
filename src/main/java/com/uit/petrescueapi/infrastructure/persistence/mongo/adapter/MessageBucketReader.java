@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
-import com.uit.petrescueapi.infrastructure.config.ChatOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.MessageBucketDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.MessageBucketDocument.MessageDocument;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * deleted messages are skipped and further buckets are read until the page is full.
  */
 @Component
-@ChatOnMongo
 @RequiredArgsConstructor
 public class MessageBucketReader {
 

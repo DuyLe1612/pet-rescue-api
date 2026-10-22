@@ -5,7 +5,6 @@ import com.uit.petrescueapi.application.dto.chat.CreateConversationRequestDto;
 import com.uit.petrescueapi.application.dto.chat.CreateMessageRequestDto;
 import com.uit.petrescueapi.application.dto.chat.MarkReadRequestDto;
 import com.uit.petrescueapi.application.port.command.ChatCommandPort;
-import com.uit.petrescueapi.application.port.out.ChatConversationCachePort;
 import com.uit.petrescueapi.application.port.out.ChatRealtimePort;
 import com.uit.petrescueapi.domain.entity.ChatMessage;
 import com.uit.petrescueapi.domain.entity.Conversation;
@@ -29,7 +28,6 @@ public class ChatCommandUseCase implements ChatCommandPort {
     private final ChatDomainService chatDomainService;
     private final ConversationParticipantRepository participantRepository;
     private final ChatRealtimePort chatRealtimePort;
-    private final ChatConversationCachePort conversationCachePort;
     private final com.uit.petrescueapi.application.port.out.PushNotificationPort pushNotificationPort;
     private final com.uit.petrescueapi.domain.repository.UserRepository userRepository;
 
@@ -55,8 +53,7 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 request.getName(),
                 request.getRelatedInfo()
         );
-        conversationCachePort.evictUser(requesterId);
-        conversationCachePort.evictUser(request.getParticipantId());
+
         return conversation;
     }
 
@@ -93,9 +90,6 @@ public class ChatCommandUseCase implements ChatCommandPort {
         chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
         chatRealtimePort.publishConversationUpdate(java.util.List.of(senderId), conversationId, convoPayload);
 
-        recipients.forEach(conversationCachePort::evictUser);
-        conversationCachePort.evictUser(senderId);
-
         // collect expo push tokens and send push
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
@@ -128,9 +122,6 @@ public class ChatCommandUseCase implements ChatCommandPort {
                 .toList();
 
         chatRealtimePort.publishReadReceipt(recipients, conversationId, userId);
-
-        recipients.forEach(conversationCachePort::evictUser);
-        conversationCachePort.evictUser(userId);
     }
 
     @Override
@@ -148,7 +139,5 @@ public class ChatCommandUseCase implements ChatCommandPort {
         convoPayload.put("lastSenderId", conversation.getLastMessageSenderId());
         convoPayload.put("lastMessageSeq", conversation.getLastMessageSeq());
         chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
-
-        recipients.forEach(conversationCachePort::evictUser);
     }
 }

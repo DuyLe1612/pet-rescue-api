@@ -4,7 +4,6 @@ import com.uit.petrescueapi.application.port.out.UserSnapshotPort;
 import com.uit.petrescueapi.domain.entity.Comment;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.CommentRepository;
-import com.uit.petrescueapi.infrastructure.config.PostOnMongo;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.CommentDocument;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
@@ -28,7 +27,6 @@ import static org.springframework.data.mongodb.core.query.Query.query;
  * the comment / reply counters (creation counters are incremented by the RabbitMQ listener).
  */
 @Component
-@PostOnMongo
 @RequiredArgsConstructor
 public class MongoCommentRepositoryAdapter implements CommentRepository {
 
