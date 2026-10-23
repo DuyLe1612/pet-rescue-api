@@ -1,5 +1,6 @@
 # ── Stage 1: Build ────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine AS builder
+# JDK (not JRE): the Gradle toolchain needs javac 21, otherwise it tries to download one
+FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 
 # Copy wrapper + config files first (separate layer — rarely changes)
