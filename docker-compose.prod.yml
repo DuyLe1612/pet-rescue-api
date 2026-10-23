@@ -59,10 +59,16 @@ services:
 
       JAVA_TOOL_OPTIONS: >-
         -XX:+UseContainerSupport
-        -XX:MaxRAMPercentage=75.0
+        -XX:MaxRAMPercentage=50.0
+        -XX:MaxMetaspaceSize=180m
+        -XX:ReservedCodeCacheSize=48m
+        -XX:TieredStopAtLevel=1
+        -Xss512k
+        -XX:MaxDirectMemorySize=32m
+        -XX:+UseSerialGC
+        -XX:+ExitOnOutOfMemoryError
         -Djava.security.egd=file:/dev/./urandom
         -Dspring.jmx.enabled=false
-        -XX:TieredStopAtLevel=1
 
     restart: unless-stopped
 

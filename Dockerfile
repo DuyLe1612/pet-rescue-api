@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+FROM eclipse-temurin:21-jre-alpine AS builder
 WORKDIR /app
 
 # Copy wrapper + config files first (separate layer — rarely changes)
@@ -41,8 +41,10 @@ EXPOSE 8080
 
 # JAVA_TOOL_OPTIONS is picked up automatically by the JVM — no ENTRYPOINT changes needed.
 # Override this in your compose file or Render/Fly dashboard to tune per-environment.
-# -XX:TieredStopAtLevel=1  → skip JIT tiers 2-4 to shorten cold-start (add for serverless)
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false"
+# Sized for a 512 MB container: non-heap (metaspace ~130 MB, code cache, threads) is ~250 MB,
+# so heap gets 50% and every off-heap region is capped. 75% heap was OOM-killed under load.
+# -XX:TieredStopAtLevel=1  → C1 only: smaller code cache, faster cold-start
+ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=180m -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1 -Xss512k -XX:MaxDirectMemorySize=32m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget -qO- http://localhost:8080/actuator/health || exit 1
