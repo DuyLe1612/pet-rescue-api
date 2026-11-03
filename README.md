@@ -26,10 +26,14 @@ Pet Rescue API is the backend for a pet rescue platform where:
 | **Organization Profiles** | ✅ Domain + Data | Shelters/vet centers linked to pets via JOIN queries |
 | **Pet Query (CQRS)** | ✅ Optimized | Dedicated read path with LEFT JOIN projections — zero N+1 queries |
 | **Pets by Organization** | ✅ Complete | Fetch paged pets via `pet_ownerships` join table (ownership-based, not FK) |
-
-### Planned Features (Mock API Ready)
-
-Swagger UI shows the full planned API surface with mock endpoints for: **Adoptions**, **Posts**, **Rescue Cases**, **Media Upload**, **Tags**, **User Profiles**, and **Role Management**.
+| **Adoptions** | ✅ Complete | Applications, approval rules, reclaim logs |
+| **Rescue Cases + Map** | ✅ Complete | PostGIS radius (`ST_DWithin`) and bounding-box (`ST_Within`) queries |
+| **Social Posts / Comments / Likes** | ✅ Complete | Stored in MongoDB; like/comment counters updated asynchronously via RabbitMQ + Redis |
+| **Realtime Chat** | ✅ Complete | MongoDB (inbox + message-bucket pattern), raw WebSocket at `/chat-ws` |
+| **Media Upload** | ✅ Complete | Cloudinary (upload to `temp/`, move to permanent folder on save) |
+| **Admin Dashboard** | ✅ Complete | Statistics cached in Redis (`@Cacheable`, TTL 2 min – 1 h) |
+| **Login Lockout** | ✅ Complete | Redis counter: 5 failed attempts → 30-minute lock |
+| **AI Post Analysis (DA2)** | ✅ Optional | Claude API structured output; off unless `AI_POST_ANALYSIS_ENABLED=true` |
 
 ---
 
@@ -91,7 +95,17 @@ The **command path** flows through the domain service where business rules (stat
 | **Spring Boot** | 3.5.10 | Application framework |
 | **Java** | 21 (toolchain) | Language |
 | **Spring Data JPA** | — | Repository abstraction + interface projections |
-| **PostgreSQL** | 16 | Database (Docker for local, NeonDB for prod) |
+| **PostgreSQL + PostGIS** | 16 / 3.5 | Core business data + geo queries (Docker for local, NeonDB for prod) |
+| **Hibernate Spatial** | — | Maps PostGIS `geometry(Point, 4326)` columns |
+| **MongoDB** | 7 (replica set) | Chat + social posts/comments/likes + AI analysis runs (see `migrate.md`) |
+| **Redis** | 7 | Login lockout, admin dashboard cache, like de-duplication (ZSET) |
+| **RabbitMQ** | 3.13 | Async social events (topic exchange `social.exchange` + DLQ) |
+| **Spring WebSocket** | — | Realtime chat (`/chat-ws`, JWT checked at handshake) |
+| **Cloudinary** | SDK 1.39.0 | Image/video storage |
+| **Spring Mail** | — | Verification + password-reset emails (`@Async`) |
+| **Anthropic Java SDK** | 2.34.0 | Optional AI post analysis |
+| **Spring AOP** | — | Mongo transient-error retry, optional audit log |
+| **Testcontainers + H2** | — | MongoDB adapter tests on a real replica set; H2 for JPA tests |
 | **Spring Security** | — | JWT stateless authentication + RBAC |
 | **jjwt** | 0.12.6 | HMAC-SHA JWT token generation/validation |
 | **Flyway** | — | Database migrations |
@@ -299,24 +313,24 @@ Register → Email Verification → Login → Access Token (JWT) + Refresh Token
 
 | Token | Storage | Lifetime | Purpose |
 |-------|---------|----------|---------|
-| **Access Token** | Client (header) | 15 min (configurable) | Stateless API authentication |
-| **Refresh Token** | Database | 7 days (configurable) | Obtain new access token without re-login |
+| **Access Token** | Client (header) | 15 min by default (`production` profile: 900000000 ms ≈ 10.4 days) | Stateless API authentication |
+| **Refresh Token** | Database | 7 days by default (`production` profile: 30 days) | Obtain new access token without re-login |
 
 - **Rotation**: Each refresh generates a new refresh token and invalidates the old one
 - **Revocation**: Logout revokes all refresh tokens for the user
-- **Claims**: `sub` = userId (UUID), `email`, `roles` (list of role codes)
+- **Claims**: `sub` = userId (UUID), `email`, `roles` (list of role codes), `organizationId` (when the user belongs to an organization)
+- **Brute-force protection**: failed logins are counted in Redis (`login:attempts:{id}`); 5 failures set `login:lock:{id}` for 30 minutes
 
 ### Public Endpoints (No Auth Required)
 
 ```
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh
+POST   /api/v1/auth/register | login | refresh | resend-verification | forgot-password | reset-password
 GET    /api/v1/auth/verify-email
-POST   /api/v1/auth/resend-verification
 GET    /api/v1/pets/**
+       /api/v1/rescue-cases/**, /api/v1/organizations/map/**
+       /chat-ws/** (JWT checked by the handshake interceptor), /ws/**
 GET    /swagger-ui.html, /api-docs
-GET    /actuator/health
+GET    /actuator/**
 ```
 
 ---
@@ -333,7 +347,8 @@ GET    /actuator/health
 | `GET` | `/verify-email?token=...` | Verify email address |
 | `POST` | `/resend-verification` | Resend verification email |
 | `POST` | `/logout` | Revoke all refresh tokens |
-| `GET` | `/me` | Get current user profile (requires auth) |
+
+The current user's profile is `GET /api/v1/users/me` (the old `/auth/me` was removed).
 
 ### Pet Management (`/api/v1/pets`)
 
@@ -349,9 +364,9 @@ GET    /actuator/health
 | `PATCH` | `/{id}/status?status=PENDING` | Change pet status (validated transitions) |
 | `DELETE` | `/{id}` | Soft-delete a pet |
 
-### Mock Endpoints (9 controllers)
+### Other Endpoints
 
-Full Swagger documentation for planned features: Adoptions, Organizations, Users, Posts, Rescue Cases, Media, Roles, Tags, Pet Details (medical records, location, diary).
+Adoptions, Organizations, Users, Posts, Comments, Likes, Chat, Friends, Rescue Cases, Media, Banners, Locations, Roles, Tags, Pet Details, Push tokens, Post Analysis and the Admin Dashboard are all implemented; see Swagger UI for the full list.
 
 ---
 
@@ -359,13 +374,13 @@ Full Swagger documentation for planned features: Adoptions, Organizations, Users
 
 ### Prerequisites
 - **JDK 21+** (or use the Gradle wrapper which handles the toolchain)
-- **Docker** (for PostgreSQL)
+- **Docker** (for PostgreSQL, Redis, RabbitMQ and MongoDB)
 
 ### Run Locally
 
 ```bash
-# 1. Start PostgreSQL
-docker-compose up -d postgres
+# 1. Start PostgreSQL, Redis, RabbitMQ and MongoDB (replica set rs0)
+docker-compose up -d
 
 # 2. Start the app
 ./gradlew bootRun          # Linux/Mac
@@ -378,25 +393,26 @@ gradlew.bat bootRun        # Windows
 ### Run with Docker (Full Stack)
 
 ```bash
-docker-compose up -d       # Starts app + PostgreSQL
-docker-compose logs -f app # Follow logs
-docker-compose down -v     # Stop + remove volumes
+docker-compose --profile docker up -d --build   # Starts app + all four datastores
+docker-compose logs -f app                      # Follow logs
+docker-compose down -v                          # Stop + remove volumes
 ```
 
 ### Run Tests
 
 ```bash
-./gradlew test             # Uses H2 in-memory — no Docker needed
+./gradlew test             # JPA tests use H2; MongoDB adapter tests start mongo:7 via Testcontainers (needs Docker)
 ```
 
 ---
 
 ## Environment Profiles
 
-| Profile | Activated by | Database | Use case |
-|---------|-------------|----------|----------|
-| *(default)* | `./gradlew bootRun` | Local PostgreSQL (Docker) | Local dev |
-| `production` | `SPRING_PROFILES_ACTIVE=production` | NeonDB (cloud Postgres) | Deployment |
+| Profile | Activated by | Sizing | Use case |
+|---------|-------------|--------|----------|
+| `free` *(default)* | `spring.profiles.default=free` | 512 MB container: Hikari 5, Tomcat 30 threads, 1 Rabbit consumer per queue | Local dev, free-tier hosting |
+| `scale` | `SPRING_PROFILES_ACTIVE=scale` | 1.5 GB container: Hikari 10, Tomcat 80 threads, up to 2 consumers | Single-VM prod |
+| `production` | `SPRING_PROFILES_ACTIVE=production` | NeonDB + cloud Redis/RabbitMQ (SSL), lazy init, Swagger UI off | Deployment |
 
 ---
 
@@ -405,25 +421,26 @@ docker-compose down -v     # Stop + remove volumes
 ### Local Dev Architecture
 
 ```
-┌─ docker-compose.yml ─────────────────────┐
-│  ┌──────────┐       ┌─────────────────┐  │
-│  │ Postgres │◄──────│ Spring Boot App │  │
-│  │ :5432    │       │ :8080           │  │
-│  └──────────┘       └─────────────────┘  │
-└──────────────────────────────────────────┘
+docker-compose.yml
+  postgres  (postgis/postgis:16-3.5)  :5432
+  redis     (redis:7, AOF on)         :6379
+  rabbitmq  (3.13-management)         :5672, UI :15672
+  mongo     (mongo:7, replica set rs0):27017
+  app       (only with --profile docker; otherwise ./gradlew bootRun) :8080
 ```
 
 ### Production Architecture
 
 ```
 ┌─ docker-compose.prod.yml ────────────────┐
-│  ┌─────────────────┐     ┌────────────┐  │
-│  │ Spring Boot App │────►│ NeonDB     │  │
-│  │ :8080           │     │ (cloud)    │  │
-│  └─────────────────┘     └────────────┘  │
-│                    No Postgres container  │
-└──────────────────────────────────────────┘
+│  Spring Boot App :8080 (512 MB limit)    │
+└───────┬──────────┬──────────┬──────────┬─┘
+        ▼          ▼          ▼          ▼
+     NeonDB    Cloud Redis  CloudAMQP  MongoDB Atlas
+   (Postgres)    (SSL)       (SSL)    (replica set)
 ```
+
+Note: `deploy.yml` currently exports only the database, JWT and mail secrets; the Redis, RabbitMQ and MongoDB variables must already be set on the server.
 
 **Dockerfile**: Multi-stage build — `eclipse-temurin:21-jdk-alpine` (builder) → `eclipse-temurin:21-jre-alpine` (runtime, non-root user, health check).
 
@@ -443,7 +460,7 @@ Two GitHub Actions workflows in `.github/workflows/`:
 ## Conventions
 
 - **URI pattern**: `/api/v1/**` — all responses wrapped in `ApiResponse<T>`
-- **`@Transactional`**: Only on domain services — never on adapters or controllers (see [TRANSACTION_BOUNDARIES.md](TRANSACTION_BOUNDARIES.md) for detailed rules)
+- **`@Transactional`**: Only on domain services (plus read-only query adapters) — never on use cases or controllers. Plain `@Transactional` uses the JPA manager; MongoDB services use `@Transactional(transactionManager = "mongoTransactionManager")` (see `MongoConfig`)
 - **Mapping**: MapStruct for all conversions (domain ↔ JPA entity, domain → DTO)
 - **Soft delete**: `deleted`, `deletedAt`, `deletedBy` in `BaseEntity`
 - **Pagination**: Every GET list endpoint is paginated (`PageResponse<T>` envelope)

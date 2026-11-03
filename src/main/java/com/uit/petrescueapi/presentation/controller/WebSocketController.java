@@ -3,8 +3,8 @@ package com.uit.petrescueapi.presentation.controller;
 import org.springframework.stereotype.Controller;
 
 /**
- * Placeholder WebSocket controller for social notification channel ownership.
- * Broadcasting is handled by infrastructure listeners/services.
+ * Empty placeholder for STOMP {@code @MessageMapping} handlers; none exist yet.
+ * Realtime chat is served by {@code ChatWebSocketHandler} on {@code /chat-ws}.
  */
 @Controller
 public class WebSocketController {
