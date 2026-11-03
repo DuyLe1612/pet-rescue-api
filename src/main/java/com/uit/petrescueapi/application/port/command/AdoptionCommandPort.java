@@ -12,7 +12,7 @@ public interface AdoptionCommandPort {
     AdoptionApplication submit(CreateAdoptionRequestDto cmd, UUID applicantId);
     AdoptionApplication approve(UUID applicationId, DecisionRequestDto decision, UUID decidedBy);
     AdoptionApplication reject(UUID applicationId, DecisionRequestDto decision, UUID decidedBy);
-    AdoptionApplication cancel(UUID applicationId);
+    AdoptionApplication cancel(UUID applicationId, UUID requesterId);
     
     /**
      * Complete an approved adoption.

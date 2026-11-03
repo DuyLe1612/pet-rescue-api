@@ -124,10 +124,11 @@ public class MediaController {
                description = "Moves a temp upload to permanent storage. Called after entity is successfully created.")
     public ResponseEntity<ApiResponse<MediaUploadResponseDto>> confirmUpload(
             @PathVariable UUID id,
-            @RequestParam(value = "folder", required = false) String targetFolder) {
+            @RequestParam(value = "folder", required = false) String targetFolder,
+            Authentication authentication) {
         
         log.info("Confirming upload for media {}", id);
-        MediaFile mediaFile = commandPort.confirmUpload(id, targetFolder);
+        MediaFile mediaFile = commandPort.confirmUpload(id, targetFolder, UUID.fromString(authentication.getName()));
         
         MediaUploadResponseDto response = MediaUploadResponseDto.builder()
                 .mediaId(mediaFile.getMediaId())
@@ -147,8 +148,8 @@ public class MediaController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete a media file")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        commandPort.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id, Authentication authentication) {
+        commandPort.delete(id, UUID.fromString(authentication.getName()));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

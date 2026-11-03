@@ -71,7 +71,9 @@ public class OrganizationController {
     @Operation(summary = "Update an existing organization")
     public ResponseEntity<ApiResponse<OrganizationAdminResponseDto>> update(
             @PathVariable UUID id,
-            @RequestBody CreateOrganizationRequestDto cmd) {
+            @RequestBody CreateOrganizationRequestDto cmd,
+            Authentication authentication) {
+        requireOrgOwnerOrAdmin(id, authentication);
         return ResponseEntity.ok(ApiResponse.ok(mapper.toAdminDto(commandPort.update(id, cmd))));
     }
 
@@ -87,7 +89,8 @@ public class OrganizationController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Deactivate an organization (soft delete)")
-    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable UUID id, Authentication authentication) {
+        requireOrgOwnerOrAdmin(id, authentication);
         commandPort.deactivate(id);
         return ResponseEntity.ok(ApiResponse.ok(null, "Organization deactivated"));
     }
@@ -154,9 +157,18 @@ public class OrganizationController {
     @Operation(summary = "Remove a member from an organization")
     public ResponseEntity<ApiResponse<Void>> removeMember(
             @PathVariable UUID id,
-            @PathVariable UUID userId) {
+            @PathVariable UUID userId,
+            Authentication authentication) {
+        requireOrgOwnerOrAdmin(id, authentication);
         commandPort.removeMember(id, userId);
         return ResponseEntity.ok(ApiResponse.ok(null, "Member removed"));
+    }
+
+    private void requireOrgOwnerOrAdmin(UUID organizationId, Authentication authentication) {
+        UUID callerId = UUID.fromString(authentication.getName());
+        if (!orgDomainService.isOwner(organizationId, callerId) && !userDomainService.hasRole(callerId, "ADMIN")) {
+            throw new AccessDeniedException("Only the organization OWNER or an admin can perform this action");
+        }
     }
 
     // ── Queries (read) ──────────────────────────

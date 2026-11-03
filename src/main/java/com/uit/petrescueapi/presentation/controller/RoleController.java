@@ -29,6 +29,7 @@ public class RoleController {
     private final RoleWebMapper mapper;
 
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create a new role")
     public ResponseEntity<ApiResponse<RoleResponseDto>> create(
             @Valid @RequestBody CreateRoleRequestDto cmd) {
@@ -37,6 +38,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a role")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Integer id) {
         commandPort.delete(id);

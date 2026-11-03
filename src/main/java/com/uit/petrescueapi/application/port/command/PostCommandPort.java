@@ -8,6 +8,6 @@ import java.util.UUID;
 
 public interface PostCommandPort {
     Post create(CreatePostRequestDto cmd, UUID authorId);
-    Post update(UUID postId, UpdatePostRequestDto cmd);
-    void delete(UUID postId);
+    Post update(UUID postId, UpdatePostRequestDto cmd, UUID requesterId);
+    void delete(UUID postId, UUID requesterId);
 }

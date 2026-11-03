@@ -26,16 +26,19 @@ import java.util.UUID;
 public class PetDetailsQueryUseCase implements PetDetailsQueryPort {
 
     private final PetDetailsQueryDataPort queryDataPort;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
 
     @Override
-    public Page<PetMedicalRecordResponseDto> findMedicalRecords(UUID petId, Pageable pageable) {
+    public Page<PetMedicalRecordResponseDto> findMedicalRecords(UUID petId, Pageable pageable, UUID requesterId) {
         log.debug("Query: find medical records for pet {}", petId);
+        accessControl.requirePetRecordsReader(petId, requesterId);
         return queryDataPort.findMedicalRecords(petId, pageable);
     }
 
     @Override
-    public Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable) {
+    public Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable, UUID requesterId) {
         log.debug("Query: find ownerships for pet {}", petId);
+        accessControl.requirePetRecordsReader(petId, requesterId);
         return queryDataPort.findOwnerships(petId, pageable);
     }
 

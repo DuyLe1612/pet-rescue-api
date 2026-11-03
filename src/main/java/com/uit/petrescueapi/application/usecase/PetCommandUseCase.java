@@ -13,6 +13,7 @@ import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.repository.PetCurrentOwnerRepository;
 import com.uit.petrescueapi.domain.repository.PetMediaRepository;
+import com.uit.petrescueapi.domain.service.AccessControlDomainService;
 import com.uit.petrescueapi.domain.service.PetDomainService;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
@@ -40,6 +41,7 @@ import java.util.List;
 public class PetCommandUseCase implements PetCommandPort {
 
     private final PetDomainService petDomainService;
+    private final AccessControlDomainService accessControl;
     private final OrganizationDomainService organizationDomainService;
     private final UserDomainService userDomainService;
 
@@ -234,9 +236,11 @@ public class PetCommandUseCase implements PetCommandPort {
     }
 
     @Override
-    public Pet update(UUID id, UpdatePetRequestDto cmd) {
+    public Pet update(UUID id, UpdatePetRequestDto cmd, UUID requesterId) {
 
         log.debug("Command: update pet {}", id);
+
+        accessControl.requirePetManager(id, requesterId);
 
         Pet patch = Pet.builder()
                 .id(id)
@@ -265,9 +269,11 @@ public class PetCommandUseCase implements PetCommandPort {
     }
 
     @Override
-    public void delete(UUID id) {
+    public void delete(UUID id, UUID requesterId) {
 
         log.debug("Command: delete pet {}", id);
+
+        accessControl.requirePetManager(id, requesterId);
 
         petDomainService.delete(id);
     }
@@ -275,13 +281,16 @@ public class PetCommandUseCase implements PetCommandPort {
     @Override
     public Pet changeStatus(
             UUID id,
-            PetStatus newStatus) {
+            PetStatus newStatus,
+            UUID requesterId) {
 
         log.debug(
                 "Command: change status of pet {} to {}",
                 id,
                 newStatus
         );
+
+        accessControl.requirePetManager(id, requesterId);
 
         return petDomainService.changeStatus(
                 id,

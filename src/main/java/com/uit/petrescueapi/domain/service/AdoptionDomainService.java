@@ -47,6 +47,7 @@ public class AdoptionDomainService {
     private final PetDomainService petDomainService;
     private final VisualCodeRepository visualCodeRepository;
     private final OrganizationDomainService organizationDomainService;
+    private final AccessControlDomainService accessControl;
     private final PetCurrentOwnerRepository currentOwnerRepository;
     private final UserReputationRepository userReputationRepository;
     private final ReclaimLogRepository reclaimLogRepository;
@@ -84,9 +85,9 @@ public class AdoptionDomainService {
             );
         }
 
-        if (application.getOrganizationId() == null) {
-            application.setOrganizationId(resolvePetOrganizationOwner(application.getPetId()));
-        }
+        // Always derived from the pet: a client-supplied value would let a caller route
+        // the application to their own organization and approve it themselves.
+        application.setOrganizationId(resolvePetOrganizationOwner(application.getPetId()));
 
         application.setApplicationId(UUID.randomUUID());
         application.setAdoptionCode(visualCodeRepository.nextAdoptionCode());
@@ -102,6 +103,7 @@ public class AdoptionDomainService {
     public AdoptionApplication approve(UUID applicationId, UUID decidedBy, LocalDateTime readyAt) {
         log.info("Approving adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
+        accessControl.requireAdoptionDecider(app.getOrganizationId(), decidedBy);
         validateStatus(app, AdoptionApplicationStatus.PENDING, AdoptionApplicationStatus.APPROVED);
 
         if (readyAt == null) {
@@ -123,6 +125,7 @@ public class AdoptionDomainService {
     public AdoptionApplication reject(UUID applicationId, UUID decidedBy, String rejectReason) {
         log.info("Rejecting adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
+        accessControl.requireAdoptionDecider(app.getOrganizationId(), decidedBy);
         validateStatus(app, AdoptionApplicationStatus.PENDING, AdoptionApplicationStatus.REJECTED);
 
         if (rejectReason == null || rejectReason.isBlank()) {
@@ -141,9 +144,10 @@ public class AdoptionDomainService {
      * Cancel an adoption application.
      * Validates the current status is PENDING before transitioning to CANCELED.
      */
-    public AdoptionApplication cancel(UUID applicationId) {
+    public AdoptionApplication cancel(UUID applicationId, UUID requesterId) {
         log.info("Canceling adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
+        accessControl.requireAdoptionCanceler(app.getApplicantId(), app.getOrganizationId(), requesterId);
 
         if (app.getStatus() != AdoptionApplicationStatus.PENDING
                 && app.getStatus() != AdoptionApplicationStatus.APPROVED) {

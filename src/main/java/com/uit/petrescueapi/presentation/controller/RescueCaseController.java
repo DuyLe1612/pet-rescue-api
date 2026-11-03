@@ -47,16 +47,20 @@ public class RescueCaseController {
     @Operation(summary = "Update a rescue case")
     public ResponseEntity<ApiResponse<RescueCaseResponseDto>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody CreateRescueCaseRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.update(id, cmd))));
+            @Valid @RequestBody CreateRescueCaseRequestDto cmd,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.update(id, cmd, requesterId))));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Change rescue case status")
     public ResponseEntity<ApiResponse<RescueCaseResponseDto>> changeStatus(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdateRescueCaseStatusRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.changeStatus(id, cmd))));
+            @Valid @RequestBody UpdateRescueCaseStatusRequestDto cmd,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.changeStatus(id, cmd, requesterId))));
     }
 
     @GetMapping("/{id}")

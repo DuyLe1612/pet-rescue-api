@@ -9,8 +9,11 @@ import java.util.List;
 import java.util.UUID;
 
 public interface AdoptionQueryPort {
-    AdoptionResponseDto findById(UUID applicationId);
-    Page<AdoptionSummaryResponseDto> findAll(List<String> statuses, String search, Pageable pageable);
-    Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, String search, Pageable pageable);
-    Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, List<String> statuses, String search, Pageable pageable);
+    AdoptionResponseDto findById(UUID applicationId, UUID requesterId);
+    Page<AdoptionSummaryResponseDto> findAll(List<String> statuses, String search, Pageable pageable, UUID requesterId);
+    Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, String search, Pageable pageable, UUID requesterId);
+    Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, List<String> statuses, String search, Pageable pageable, UUID requesterId);
+
+    /** Reclaim logs of one organization for its members; across all organizations for admins only. */
+    void requireReclaimLogAccess(UUID organizationId, UUID requesterId);
 }

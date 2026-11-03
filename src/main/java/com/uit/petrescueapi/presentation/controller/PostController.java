@@ -50,8 +50,10 @@ public class PostController {
     )
     public ResponseEntity<ApiResponse<PostResponseDto>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody UpdatePostRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.update(id, cmd))));
+            @Valid @RequestBody UpdatePostRequestDto cmd,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.update(id, cmd, requesterId))));
     }
 
     @DeleteMapping("/{id}")
@@ -59,8 +61,8 @@ public class PostController {
             summary = "Delete a post",
             description = "Soft-deletes a post by id."
     )
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        commandPort.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id, Authentication authentication) {
+        commandPort.delete(id, UUID.fromString(authentication.getName()));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 

@@ -37,11 +37,11 @@ public interface PetCommandPort {
      */
     Pet createForUserInOrganization(CreatePetRequestDto cmd, UUID organizationId, UUID userId);
 
-    Pet update(UUID id, UpdatePetRequestDto cmd);
+    Pet update(UUID id, UpdatePetRequestDto cmd, UUID requesterId);
 
-    void delete(UUID id);
+    void delete(UUID id, UUID requesterId);
 
-    Pet changeStatus(UUID id, PetStatus newStatus);
+    Pet changeStatus(UUID id, PetStatus newStatus, UUID requesterId);
 
     /**
      * Manually transfer pet ownership to a new owner.

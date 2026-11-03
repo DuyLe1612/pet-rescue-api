@@ -71,6 +71,7 @@ public class UserController {
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "List all users")
     public ResponseEntity<ApiResponse<PageResponse<UserSummaryResponseDto>>> getAll(
             @RequestParam(defaultValue = "0") int page,

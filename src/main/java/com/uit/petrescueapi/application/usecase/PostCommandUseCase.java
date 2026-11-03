@@ -22,6 +22,7 @@ import java.util.UUID;
 public class PostCommandUseCase implements PostCommandPort {
 
     private final PostDomainService domainService;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
     private final org.springframework.context.ApplicationEventPublisher events;
 
     @Override
@@ -41,8 +42,9 @@ public class PostCommandUseCase implements PostCommandPort {
     }
 
     @Override
-    public Post update(UUID postId, UpdatePostRequestDto cmd) {
+    public Post update(UUID postId, UpdatePostRequestDto cmd, UUID requesterId) {
         log.debug("Command: update post {}", postId);
+        accessControl.requireSelfOrAdmin(domainService.findById(postId).getAuthorId(), requesterId);
         Post patch = Post.builder()
                 .content(cmd.getContent())
                 .mediaIds(cmd.getMediaIds())
@@ -57,8 +59,9 @@ public class PostCommandUseCase implements PostCommandPort {
     }
 
     @Override
-    public void delete(UUID postId) {
+    public void delete(UUID postId, UUID requesterId) {
         log.debug("Command: delete post {}", postId);
+        accessControl.requireSelfOrAdmin(domainService.findById(postId).getAuthorId(), requesterId);
         domainService.delete(postId);
     }
 }

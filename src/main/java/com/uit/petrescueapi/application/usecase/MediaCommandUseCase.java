@@ -22,6 +22,7 @@ import java.util.UUID;
 public class MediaCommandUseCase implements MediaCommandPort {
 
     private final MediaFileDomainService domainService;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
     private final CloudStoragePort cloudStoragePort;
 
     @Override
@@ -70,6 +71,18 @@ public class MediaCommandUseCase implements MediaCommandPort {
     public MediaFile confirmUpload(UUID mediaId, String targetFolder) {
         log.debug("Command: confirm media upload {}", mediaId);
         return domainService.confirmUpload(mediaId, targetFolder);
+    }
+
+    @Override
+    public MediaFile confirmUpload(UUID mediaId, String targetFolder, UUID requesterId) {
+        accessControl.requireSelfOrAdmin(domainService.findById(mediaId).getUploaderId(), requesterId);
+        return confirmUpload(mediaId, targetFolder);
+    }
+
+    @Override
+    public void delete(UUID mediaId, UUID requesterId) {
+        accessControl.requireSelfOrAdmin(domainService.findById(mediaId).getUploaderId(), requesterId);
+        delete(mediaId);
     }
 
     @Override
