@@ -75,7 +75,9 @@ public class OrganizationDomainService {
         if (patch.getType() != null)          existing.setType(patch.getType());
         if (patch.getStreetAddress() != null) existing.setStreetAddress(patch.getStreetAddress());
         if (patch.getWardCode() != null)      existing.setWardCode(patch.getWardCode());
+        if (patch.getWardName() != null)      existing.setWardName(patch.getWardName());
         if (patch.getProvinceCode() != null)  existing.setProvinceCode(patch.getProvinceCode());
+        if (patch.getProvinceName() != null)  existing.setProvinceName(patch.getProvinceName());
         if (patch.getPhone() != null)         existing.setPhone(patch.getPhone());
         if (patch.getEmail() != null)         existing.setEmail(patch.getEmail());
         if (patch.getImageUrl() != null)      existing.setImageUrl(patch.getImageUrl());
