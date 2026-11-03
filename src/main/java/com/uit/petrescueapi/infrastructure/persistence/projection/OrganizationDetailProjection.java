@@ -14,7 +14,9 @@ public interface OrganizationDetailProjection {
     String getDescription();
     String getType();
     String getStreetAddress();
+    String getWardCode();
     String getWardName();
+    String getProvinceCode();
     String getProvinceName();
     String getPhone();
     String getEmail();
