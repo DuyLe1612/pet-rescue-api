@@ -12,6 +12,7 @@ public final class MongoCollections {
     public static final String COMMENT_LIKES = "comment_likes";
     public static final String POST_ANALYSIS_RUNS = "post_analysis_runs";
     public static final String MIGRATION_STATE = "_migration_state";
+    public static final String APP_SETTINGS = "app_settings";
 
     private MongoCollections() {
     }

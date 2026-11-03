@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.port.command;
 import com.uit.petrescueapi.application.dto.analysis.ConfirmPostAnalysisRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.CreateRescueCaseFromPostRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
+import com.uit.petrescueapi.application.dto.analysis.PostAnalysisModelDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
 import com.uit.petrescueapi.domain.entity.RescueCase;
 
@@ -27,4 +28,12 @@ public interface PostAnalysisCommandPort {
     RescueCase createRescueCase(UUID postId, CreateRescueCaseFromPostRequestDto request, UUID userId);
 
     List<PostAnalysisMetricsDto> metrics();
+
+    PostAnalysisModelDto modelSettings();
+
+    /** Applies from the next model call; {@code model} must be in the allowed list. */
+    PostAnalysisModelDto switchModel(String model, UUID userId);
+
+    /** Back to the configured default ({@code app.ai.post-analysis.model}). */
+    PostAnalysisModelDto resetModel();
 }

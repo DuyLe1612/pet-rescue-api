@@ -11,7 +11,7 @@ import java.util.List;
  */
 public interface PostAnalysisPort {
 
-    Result analyze(String content, Catalog catalog);
+    Result analyze(String content, Catalog catalog, String model);
 
     /** Values the model must choose from. */
     record Catalog(List<String> speciesNames, List<String> tagCodes) {

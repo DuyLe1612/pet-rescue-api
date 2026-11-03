@@ -54,6 +54,13 @@ public interface PostAnalysisStorePort {
 
     List<PostAnalysisMetricsDto> metrics();
 
+    /** Model chosen at runtime by an admin; empty = use the configured default. Survives restarts. */
+    Optional<String> findModelOverride();
+
+    void saveModelOverride(String model, UUID changedBy);
+
+    void clearModelOverride();
+
     /** Snapshot of everything the use case needs to decide about one post. */
     record Claim(AnalysisTarget target, UUID token) {
     }
