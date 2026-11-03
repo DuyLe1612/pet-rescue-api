@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.infrastructure.config;
 
-import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.out.AnalysisCatalogPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort;
@@ -26,10 +25,9 @@ public class PostAnalysisConfig {
                                                    ObjectProvider<PostAnalysisPort> ai,
                                                    AnalysisCatalogPort catalog,
                                                    PostAnalysisValidator validator,
-                                                   RescueCaseCommandPort rescueCases,
                                                    @Value("${app.ai.post-analysis.model:claude-opus-5-5}") String defaultModel,
                                                    @Value("${app.ai.post-analysis.allowed-models:claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,gemini-3.8-flash,gemini-3.5-flash-lite}") String[] allowedModels) {
-        return new PostAnalysisUseCase(store, Optional.ofNullable(ai.getIfAvailable()), catalog, validator, rescueCases,
+        return new PostAnalysisUseCase(store, Optional.ofNullable(ai.getIfAvailable()), catalog, validator,
                 defaultModel, List.of(allowedModels));
     }
 }

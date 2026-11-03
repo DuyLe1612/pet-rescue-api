@@ -23,6 +23,5 @@ public class PostAnalysisResponseDto {
     private PostAnalysisSuggestion suggestion;
     private PostFacets facets;
     @Schema(description = "NONE | SUGGESTED | ACCEPTED")
-    private String rescueSuggestion;
     private UUID rescueCaseId;
 }

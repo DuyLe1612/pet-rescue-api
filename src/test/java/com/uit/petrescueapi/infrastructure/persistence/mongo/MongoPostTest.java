@@ -214,7 +214,6 @@ class MongoPostTest extends MongoIntegrationTest {
     void newPostIsQueuedForAnalysis() {
         Post p = newPost(ALICE, "Mn ơi ở Q7 có bé cún bị thương");
         assertThat(analysis(p.getPostId())).containsEntry("status", "PENDING");
-        assertThat(raw(p.getPostId()).getString("rescueSuggestion")).isEqualTo("NONE");
     }
 
     @Test

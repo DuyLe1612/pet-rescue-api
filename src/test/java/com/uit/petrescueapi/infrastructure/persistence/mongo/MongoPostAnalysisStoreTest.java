@@ -126,7 +126,7 @@ class MongoPostAnalysisStoreTest extends MongoIntegrationTest {
     // ── results / decisions ─────────────────────────────────
 
     @Test
-    void analyzedSuggestionIsStoredAndRescueIsSuggested() {
+    void analyzedSuggestionIsStored() {
         UUID id = pendingPost();
         analyzed(id, List.of());
 
@@ -134,7 +134,6 @@ class MongoPostAnalysisStoreTest extends MongoIntegrationTest {
         assertThat(t.status()).isEqualTo(PostAnalysisStatus.ANALYZED);
         assertThat(t.suggestion()).isEqualTo(rescueDog);
         assertThat(t.authorId()).isEqualTo(AUTHOR);
-        assertThat(t.rescueSuggestion()).isEqualTo("SUGGESTED");
         assertThat(t.facets()).isNull();                                // AI never writes facets
     }
 
@@ -199,32 +198,6 @@ class MongoPostAnalysisStoreTest extends MongoIntegrationTest {
         List<UUID> queue = store.findRetryable(3, LIFETIME, LocalDateTime.now().plusSeconds(1), LocalDateTime.now().minusMinutes(5), 10);
 
         assertThat(queue).containsExactlyInAnyOrder(pending, failedOnce, legacy);
-    }
-
-    // ── rescue case link ────────────────────────────────────
-
-    @Test
-    void rescueCaseReservationIsExclusive() {
-        UUID id = pendingPost();
-
-        assertThat(store.reserveRescueCase(id)).isTrue();
-        assertThat(store.reserveRescueCase(id)).isFalse();             // double tap
-
-        store.releaseRescueCase(id);
-        assertThat(store.reserveRescueCase(id)).isTrue();
-    }
-
-    @Test
-    void rescueCaseLinkMarksSuggestionAccepted() {
-        UUID id = pendingPost();
-        UUID caseId = UUID.randomUUID();
-        store.reserveRescueCase(id);
-        store.linkRescueCase(id, caseId, "REPORTED");
-
-        AnalysisTarget t = store.findTarget(id).orElseThrow();
-        assertThat(t.rescueCaseId()).isEqualTo(caseId);
-        assertThat(t.rescueSuggestion()).isEqualTo("ACCEPTED");
-        assertThat(store.reserveRescueCase(id)).isFalse();
     }
 
     // ── metrics ─────────────────────────────────────────────

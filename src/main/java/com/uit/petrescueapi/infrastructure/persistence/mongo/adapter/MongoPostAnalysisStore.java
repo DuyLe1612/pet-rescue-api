@@ -33,7 +33,7 @@ import static org.springframework.data.mongodb.core.query.Criteria.where;
 import static org.springframework.data.mongodb.core.query.Query.query;
 
 /**
- * Analysis state lives on the post ({@code analysis}, {@code facets}, {@code rescueSuggestion});
+ * Analysis state lives on the post ({@code analysis}, {@code facets});
  * every model call is a {@code post_analysis_runs} document. Writes made on behalf of the model
  * are guarded so they never overwrite a human decision (CONFIRMED / REJECTED).
  */
@@ -88,8 +88,7 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                         f.getSpecies(), f.getDistrict(), f.getProvince(), Boolean.TRUE.equals(f.getNeedsRescue())),
                 d.getRescueCase() == null ? null : d.getRescueCase().getCaseId(),
                 a == null ? null : a.getModel(),
-                a == null ? null : a.getAnalyzedAt(),
-                d.getRescueSuggestion() == null ? "NONE" : d.getRescueSuggestion());
+                a == null ? null : a.getAnalyzedAt());
     }
 
     @Override
@@ -125,8 +124,7 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                         .set("analysis.lastError", null)
                         .set("analysis.claimToken", null)
                         .set("analysis.suggested", suggestion)
-                        .set("analysis.updatedAt", now)
-                        .set("rescueSuggestion", suggestion.needsRescue() ? "SUGGESTED" : "NONE"),
+                        .set("analysis.updatedAt", now),
                 PostDocument.class);
     }
 
@@ -158,8 +156,7 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                         .set("analysis.status", PostAnalysisStatus.CONFIRMED.name())
                         .set("analysis.confirmedBy", userId)
                         .set("analysis.confirmedAt", now)
-                        .set("analysis.updatedAt", now)
-                        .set("rescueSuggestion", rescueSuggestionAfterConfirm(before, facets)),
+                        .set("analysis.updatedAt", now),
                 PostDocument.class);
 
         // only an ANALYZED suggestion describes the text being confirmed (after an edit it is stale)
@@ -178,21 +175,13 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
         }
     }
 
-    private static String rescueSuggestionAfterConfirm(PostDocument before, PostFacets facets) {
-        if (before != null && before.getRescueCase() != null) {
-            return "ACCEPTED";
-        }
-        return facets.needsRescue() ? "SUGGESTED" : "NONE";
-    }
-
     @Override
     public void reject(UUID postId, UUID userId) {
         LocalDateTime now = LocalDateTime.now();
         mongo.updateFirst(query(where("_id").is(postId)), new Update()
                         .set("analysis.status", PostAnalysisStatus.REJECTED.name())
                         .set("analysis.rejectedBy", userId)
-                        .set("analysis.updatedAt", now)
-                        .set("rescueSuggestion", "DISMISSED"),
+                        .set("analysis.updatedAt", now),
                 PostDocument.class);
     }
 
@@ -204,28 +193,6 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                         .set("analysis.claimToken", null)
                         .set("analysis.lastError", null)
                         .set("analysis.updatedAt", LocalDateTime.now()),
-                PostDocument.class);
-    }
-
-    /** {@code rescueCase: null} also matches a missing field, so this is a single atomic check-and-set. */
-    @Override
-    public boolean reserveRescueCase(UUID postId) {
-        return mongo.updateFirst(query(where("_id").is(postId).and("rescueCase").is(null)),
-                new Update().set("rescueCase", new PostDocument.RescueCaseRefDocument(null, "CREATING")),
-                PostDocument.class).getModifiedCount() == 1;
-    }
-
-    @Override
-    public void releaseRescueCase(UUID postId) {
-        mongo.updateFirst(query(where("_id").is(postId).and("rescueCase.caseId").is(null)),
-                new Update().unset("rescueCase"), PostDocument.class);
-    }
-
-    @Override
-    public void linkRescueCase(UUID postId, UUID caseId, String status) {
-        mongo.updateFirst(query(where("_id").is(postId)), new Update()
-                        .set("rescueCase", new PostDocument.RescueCaseRefDocument(caseId, status))
-                        .set("rescueSuggestion", "ACCEPTED"),
                 PostDocument.class);
     }
 
