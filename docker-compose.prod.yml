@@ -22,7 +22,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
 
       # CORS
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://pet-rescue-community.vercel.app}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://paw-home-ui.vercel.app,https://pet-rescue-community.vercel.app}
 
       # Redis Cloud
       REDIS_HOST: ${REDIS_HOST}
