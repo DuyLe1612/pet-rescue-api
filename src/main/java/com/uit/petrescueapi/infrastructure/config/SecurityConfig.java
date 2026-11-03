@@ -72,6 +72,7 @@ public class SecurityConfig {
                        .requestMatchers(PUBLIC_PATHS).permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/pets/**").permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/rescue-cases/**").permitAll()
+                       .requestMatchers(HttpMethod.GET, "/api/v1/banners/active").permitAll()
                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                        .anyRequest().authenticated()
                )
