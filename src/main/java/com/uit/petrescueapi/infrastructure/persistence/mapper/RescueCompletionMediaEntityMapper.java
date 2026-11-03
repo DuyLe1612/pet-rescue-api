@@ -18,8 +18,6 @@ public interface RescueCompletionMediaEntityMapper {
 
     @Mapping(target = "id.completionId", source = "completionId")
     @Mapping(target = "id.mediaId", source = "mediaId")
-    @Mapping(target = "completion", ignore = true)
-    @Mapping(target = "media", ignore = true)
     RescueCompletionMediaJpaEntity toEntity(
             RescueCompletionMedia domain
     );

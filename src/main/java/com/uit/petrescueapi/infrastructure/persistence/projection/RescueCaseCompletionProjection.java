@@ -20,4 +20,9 @@ public interface RescueCaseCompletionProjection {
     String getVerifiedByName();
 
     LocalDateTime getVerifiedAt();
+    UUID getSubmittedBy();
+    String getSubmittedByName();
+    String getOutcome();
+    String getStatus();
+    String getRejectReason();
 }

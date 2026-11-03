@@ -4,7 +4,6 @@ import com.uit.petrescueapi.domain.entity.AdoptionApplication;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
 import com.uit.petrescueapi.domain.entity.ReclaimLog;
-import com.uit.petrescueapi.domain.entity.UserReputation;
 import com.uit.petrescueapi.domain.exception.ConflictException;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -12,7 +11,6 @@ import com.uit.petrescueapi.domain.exception.UnprocessableEntityException;
 import com.uit.petrescueapi.domain.repository.AdoptionApplicationRepository;
 import com.uit.petrescueapi.domain.repository.PetCurrentOwnerRepository;
 import com.uit.petrescueapi.domain.repository.ReclaimLogRepository;
-import com.uit.petrescueapi.domain.repository.UserReputationRepository;
 import com.uit.petrescueapi.domain.repository.VisualCodeRepository;
 import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
@@ -20,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -49,9 +46,8 @@ public class AdoptionDomainService {
     private final OrganizationDomainService organizationDomainService;
     private final AccessControlDomainService accessControl;
     private final PetCurrentOwnerRepository currentOwnerRepository;
-    private final UserReputationRepository userReputationRepository;
+    private final ReputationDomainService reputationDomainService;
     private final ReclaimLogRepository reclaimLogRepository;
-    private final JdbcTemplate jdbcTemplate;
 
     // ── Queries ─────────────────────────────────────
 
@@ -244,25 +240,6 @@ public class AdoptionDomainService {
     }
 
     private void adjustReputation(UUID userId, int delta, String reason, UUID referenceId, UUID actorId) {
-        UserReputation reputation = userReputationRepository.findByUserId(userId)
-                .orElse(UserReputation.builder()
-                        .userId(userId)
-                        .score(0)
-                        .level("NEW")
-                        .build());
-        reputation.setScore((reputation.getScore() == null ? 0 : reputation.getScore()) + delta);
-        reputation.setUpdatedAt(LocalDateTime.now());
-        userReputationRepository.save(reputation);
-        jdbcTemplate.update("""
-                INSERT INTO reputation_logs (log_id, user_id, delta, reason, reference_type, reference_id, created_at, created_by)
-                VALUES (?, ?, ?, ?, 'ADOPTION_APPLICATION', ?, ?, ?)
-                """,
-                UUID.randomUUID(),
-                userId,
-                delta,
-                reason,
-                referenceId,
-                LocalDateTime.now(),
-                actorId);
+        reputationDomainService.adjust(userId, delta, reason, "ADOPTION_APPLICATION", referenceId, actorId);
     }
 }

@@ -14,7 +14,13 @@ public interface RescueCaseRepository {
 
     RescueCase save(RescueCase rescueCase);
 
+    /** Atomic, so two organizations cannot both win. False when the case already has one. */
+    boolean assignOrganization(UUID caseId, UUID organizationId);
+
     Optional<RescueCase> findById(UUID caseId);
+
+    /** Holds the row until commit, so claims on one case run one after another instead of colliding. */
+    Optional<RescueCase> findByIdForUpdate(UUID caseId);
 
     Page<RescueCase> findAll(Pageable pageable);
 }

@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.presentation.controller;
 
+import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
+import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.*;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.query.RescueCaseQueryPort;
@@ -8,6 +10,7 @@ import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
+import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
 import com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper;
 import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +19,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +38,7 @@ public class RescueCaseController {
     private final RescueCaseCommandPort commandPort;
     private final RescueCaseQueryPort queryPort;
     private final RescueCaseWebMapper mapper;
+    private final PetWebMapper petMapper;
 
     @PostMapping
     @Operation(summary = "Report a new rescue case")
@@ -65,8 +72,74 @@ public class RescueCaseController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get rescue case by ID")
-    public ResponseEntity<ApiResponse<RescueCaseResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
+    public ResponseEntity<ApiResponse<RescueCaseResponseDto>> getById(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id, viewerId(authentication))));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CLAIMS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/{id}/claim")
+    @Operation(summary = "Claim a rescue case",
+            description = "OWNER and STAFF claim for their organization, which locks the case. Anyone else makes a personal claim: "
+                    + "it does not lock the case, expires, and needs safetyAcknowledged=true. "
+                    + "An organization also uses this to accept a rescued animal waiting for handover.")
+    public ResponseEntity<ApiResponse<RescueClaimResponseDto>> claim(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ClaimRescueCaseRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(RescueClaimResponseDto.from(
+                commandPort.claim(id, request, UUID.fromString(authentication.getName())))));
+    }
+
+    @PostMapping("/{id}/claim/extend")
+    @Operation(summary = "Extend my personal claim")
+    public ResponseEntity<ApiResponse<RescueClaimResponseDto>> extendClaim(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(RescueClaimResponseDto.from(
+                commandPort.extendClaim(id, UUID.fromString(authentication.getName())))));
+    }
+
+    @PostMapping("/{id}/claim/release")
+    @Operation(summary = "Give up my claim", description = "The case reopens if nobody else is working on it.")
+    public ResponseEntity<ApiResponse<RescueClaimResponseDto>> releaseClaim(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ReleaseRescueClaimRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(RescueClaimResponseDto.from(
+                commandPort.releaseClaim(id, request, UUID.fromString(authentication.getName())))));
+    }
+
+    @GetMapping("/{id}/claims")
+    @Operation(summary = "Who is working on this case", description = "For the reporter, the handling organization and admins.")
+    public ResponseEntity<ApiResponse<List<RescueClaimResponseDto>>> getClaims(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findClaimsOfCase(id, viewerId(authentication))));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // AFTER THE RESCUE
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @PostMapping("/{id}/intake")
+    @Operation(summary = "Create the pet record for a rescued case held by my organization",
+            description = "The pet starts in FOSTERING. Fails if the case already has a pet.")
+    public ResponseEntity<ApiResponse<PetResponseDto>> intake(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreatePetRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                petMapper.toDto(commandPort.intake(id, request, UUID.fromString(authentication.getName())))));
+    }
+
+    @PostMapping("/{id}/keep-pet")
+    @Operation(summary = "Add the animal I rescued to my pets",
+            description = "Only for the rescuer, after their report with outcome KEPT_BY_RESCUER was confirmed.")
+    public ResponseEntity<ApiResponse<PetResponseDto>> keepPet(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreatePetRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                petMapper.toDto(commandPort.keepPet(id, request, UUID.fromString(authentication.getName())))));
     }
 
     @GetMapping
@@ -173,6 +246,42 @@ public class RescueCaseController {
         return ResponseEntity.ok(ApiResponse.ok( commandPort.approveCompletion(id, userId)));
     }
 
+    @PostMapping("/completions/{id}/confirm")
+    @Operation(summary = "The reporter confirms another person's completion report")
+    public ResponseEntity<ApiResponse<RescueCaseCompletion>> confirmCompletion(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(commandPort.confirmCompletion(id, UUID.fromString(authentication.getName()))));
+    }
+
+    @PostMapping("/completions/{id}/dispute")
+    @Operation(summary = "The reporter disagrees with a completion report", description = "An admin then decides.")
+    public ResponseEntity<ApiResponse<RescueCaseCompletion>> disputeCompletion(
+            @PathVariable UUID id,
+            @Valid @RequestBody RescueCompletionDecisionRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                commandPort.disputeCompletion(id, request.getReason(), UUID.fromString(authentication.getName()))));
+    }
+
+    @PostMapping("/completions/{id}/reject")
+    @Operation(summary = "Reject a completion report", description = "The case can then receive another report.")
+    public ResponseEntity<ApiResponse<RescueCaseCompletion>> rejectCompletion(
+            @PathVariable UUID id,
+            @Valid @RequestBody RescueCompletionDecisionRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                commandPort.rejectCompletion(id, request.getReason(), UUID.fromString(authentication.getName()))));
+    }
+
+    @GetMapping("/completions/review-queue")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Reports waiting for an admin: disputed, overdue, or with nobody else to confirm")
+    public ResponseEntity<ApiResponse<PageResponse<RescueCaseCompletionResponseDto>>> getReviewQueue(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                queryPort.findCompletionReviewQueue(PageRequest.of(page, pageSize)))));
+    }
+
     @GetMapping("/completions")
     @Operation(summary = "List all rescue completions (paginated)")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseCompletionResponseDto>>> getAllCompletions(
@@ -184,5 +293,12 @@ public class RescueCaseController {
         return ResponseEntity.ok(ApiResponse.ok(
             PageResponse.from(queryPort.findAllCompletions(isResolved,PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
-}
 
+    /** Rescue case GET routes are public, so the caller may be anonymous. */
+    private static UUID viewerId(Authentication authentication) {
+        if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        return UUID.fromString(authentication.getName());
+    }
+}

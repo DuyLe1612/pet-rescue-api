@@ -33,5 +33,14 @@ public class RescueCaseResponseDto {
     private Double longitude;
     private LocalDateTime reportedAt;
     private List<String> imageUrls;
+    @Schema(description = "Only for the reporter, people with an active claim, the handling organization and admins")
     private String contactPhone;
+    private UUID organizationId;
+    private UUID petId;
+    private boolean needsHelp;
+    private int activeClaimCount;
+    private boolean viewerIsReporter;
+    private boolean viewerHasActiveClaim;
+    private UUID completionId;
+    private String completionStatus;
 }

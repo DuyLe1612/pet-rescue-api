@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.domain.entity;
 
+import com.uit.petrescueapi.domain.valueobject.RescueCompletionStatus;
+import com.uit.petrescueapi.domain.valueobject.RescueOutcome;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,6 +41,11 @@ public class RescueCaseCompletion extends BaseEntity {
     private UUID verifiedBy;
 
     private LocalDateTime verifiedAt;
+    private UUID submittedBy;
+    private RescueOutcome outcome;
+    private RescueCompletionStatus status;
+    private String rejectReason;
+    private LocalDateTime escalatedAt;
 
 }
 

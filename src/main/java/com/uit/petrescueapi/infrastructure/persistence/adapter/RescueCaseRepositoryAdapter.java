@@ -67,6 +67,16 @@ public class RescueCaseRepositoryAdapter implements RescueCaseRepository {
     }
 
     @Override
+    public Optional<RescueCase> findByIdForUpdate(UUID caseId) {
+        return jpa.findForUpdate(caseId).map(mapper::toDomain);
+    }
+
+    @Override
+    public boolean assignOrganization(UUID caseId, UUID organizationId) {
+        return jpa.assignOrganization(caseId, organizationId) > 0;
+    }
+
+    @Override
     public Optional<RescueCase> findById(UUID caseId) {
         return jpa.findById(caseId)
                 .filter(e -> !e.isDeleted())

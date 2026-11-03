@@ -51,4 +51,8 @@ public interface RescueCaseQueryDataPort {
     RescueCaseCompletionResponseDto findCompletionById(UUID caseId);
 
     Page<RescueCaseCompletionResponseDto> findAllCompletion(boolean isResolved, Pageable pageable);
+
+    Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable);
+
+    Page<com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto> findOrganizationQueue(String provinceCode, Pageable pageable);
 }

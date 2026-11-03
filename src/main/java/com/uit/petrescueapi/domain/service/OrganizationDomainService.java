@@ -168,6 +168,11 @@ public class OrganizationDomainService {
     // ── Helpers ──────────────────────────────────────
 
     @Transactional(readOnly = true)
+    public Organization findById(UUID id) {
+        return findOrThrow(id);
+    }
+
+    @Transactional(readOnly = true)
     private Organization findOrThrow(UUID id) {
         return orgRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", "id", id));

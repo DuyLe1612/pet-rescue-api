@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.rescue.*;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.RescueCaseQueryDataPort;
@@ -214,6 +215,32 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .build();
     }
 
+    @Override
+    public Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable) {
+        return queryRepo.findCompletionReviewQueue(pageable)
+                .map(p -> toCompletionDto(p, buildMediaUrls(queryRepo.findMediaPublicIdsByCompletionId(p.getCompletionId()))));
+    }
+
+    @Override
+    public Page<RescueQueueItemDto> findOrganizationQueue(String provinceCode, Pageable pageable) {
+        return queryRepo.findOrganizationQueue(provinceCode, pageable).map(p -> RescueQueueItemDto.builder()
+                .caseId(p.getCaseId())
+                .caseCode(p.getCaseCode())
+                .species(p.getSpecies())
+                .priority(p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority()))
+                .status(p.getStatus())
+                .description(p.getDescription())
+                .provinceName(p.getProvinceName())
+                .wardName(p.getWardName())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .reportedAt(p.getReportedAt())
+                .needsHelp(p.getNeedsHelp())
+                .awaitingHandover(p.getAwaitingHandover())
+                .activeClaimCount(p.getActiveClaimCount())
+                .build());
+    }
+
     private RescueCaseCompletionResponseDto toCompletionDto(
             RescueCaseCompletionProjection p,
             List<String> imageUrls) {
@@ -228,6 +255,11 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .verifiedByName(p.getVerifiedByName())
                 .verifiedAt(p.getVerifiedAt())
                 .verificationImagesUrl(imageUrls)
+                .submittedBy(p.getSubmittedBy())
+                .submittedByName(p.getSubmittedByName())
+                .outcome(p.getOutcome())
+                .status(p.getStatus())
+                .rejectReason(p.getRejectReason())
                 .build();
     }
 

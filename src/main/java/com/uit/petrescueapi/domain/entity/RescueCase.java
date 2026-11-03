@@ -42,4 +42,7 @@ public class RescueCase extends BaseEntity {
     private LocalDateTime resolvedAt;
     private List<String> imagePublicIds;
     private String contactPhone;
+    private Long version;
+    private String resolutionNote;
+    private boolean needsHelp;
 }

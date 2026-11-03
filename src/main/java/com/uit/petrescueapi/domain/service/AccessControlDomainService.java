@@ -76,36 +76,58 @@ public class AccessControlDomainService {
     }
 
     /**
-     * Changing status: a reporter who is not a handler may only close their own report.
-     * Otherwise they could mark it RESCUED and skip completion approval.
+     * Changing status directly: only admins move a case freely. Everyone else may only close it,
+     * because IN_PROGRESS comes from claiming and RESCUED from an approved completion report.
      */
     public void requireCaseStatusChange(RescueCase rescueCase, RescueCaseStatus newStatus, UUID requesterId) {
-        if (canHandleCase(rescueCase, requesterId)) {
+        if (isAdmin(requesterId)) {
             return;
         }
-        boolean reporterClosing = requesterId != null
-                && requesterId.equals(rescueCase.getReportedBy())
-                && newStatus == RescueCaseStatus.CLOSED;
-        if (!reporterClosing) {
-            throw new ForbiddenException("You are not allowed to change the status of this rescue case");
+        if (newStatus != RescueCaseStatus.CLOSED) {
+            throw new ForbiddenException("Claim the case or send a completion report instead");
         }
+        requireCaseEditor(rescueCase, requesterId);
     }
 
-    /** Approving a completion: handlers only, and a non-admin reporter cannot approve their own case. */
-    public void requireCompletionApprover(RescueCase rescueCase, UUID requesterId) {
+    /**
+     * Approving or rejecting a report as a handler. Reporters use confirm and dispute instead, and
+     * nobody but an admin reviews their own report.
+     */
+    public void requireCompletionApprover(RescueCase rescueCase, UUID submittedBy, UUID requesterId) {
         if (isAdmin(requesterId)) {
             return;
         }
         if (requesterId != null && requesterId.equals(rescueCase.getReportedBy())) {
             throw new ForbiddenException("The reporter cannot approve the completion of their own case");
         }
+        if (requesterId != null && requesterId.equals(submittedBy)) {
+            throw new ForbiddenException("You cannot approve your own report");
+        }
         if (!canHandleCase(rescueCase, requesterId)) {
             throw new ForbiddenException("You are not allowed to approve this rescue completion");
         }
     }
 
+    /** The phone number is shared only with people who need it to reach the animal. */
+    public boolean canViewCaseContact(RescueCase rescueCase, boolean hasActiveClaim, UUID viewerId) {
+        if (viewerId == null) {
+            return false;
+        }
+        return hasActiveClaim
+                || viewerId.equals(rescueCase.getReportedBy())
+                || isAdmin(viewerId)
+                || hasOrgRole(rescueCase.getOrganizationId(), viewerId, CASE_HANDLER_ROLES);
+    }
+
+    /** OWNER or STAFF of this organization, or an admin. A null organization only admits admins. */
+    public void requireOrganizationHandler(UUID organizationId, UUID requesterId) {
+        if (!isAdmin(requesterId) && (requesterId == null || !hasOrgRole(organizationId, requesterId, CASE_HANDLER_ROLES))) {
+            throw new ForbiddenException("Only organization staff can do this");
+        }
+    }
+
     /**
-     * Cases have no assigned organization yet, so an unassigned case can be handled by
+     * An unassigned case can be handled by
      * OWNER or STAFF of any organization. An assigned case is limited to that organization.
      */
     private boolean canHandleCase(RescueCase rescueCase, UUID requesterId) {

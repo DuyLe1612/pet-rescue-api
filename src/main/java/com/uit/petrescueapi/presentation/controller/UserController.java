@@ -32,6 +32,7 @@ public class UserController {
 
     private final UserCommandPort commandPort;
     private final UserQueryPort queryPort;
+    private final com.uit.petrescueapi.application.port.query.RescueCaseQueryPort rescueQueryPort;
     private final UserWebMapper mapper;
 
     @PutMapping("/me/profile")
@@ -62,6 +63,13 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserResponseDto>> getCurrentUser(Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(userId)));
+    }
+
+    @GetMapping("/me/rescue-claims")
+    @Operation(summary = "Rescue cases I am working on")
+    public ResponseEntity<ApiResponse<java.util.List<com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto>>> getMyRescueClaims(
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(rescueQueryPort.findMyActiveClaims(UUID.fromString(authentication.getName()))));
     }
 
     @GetMapping("/{id}")

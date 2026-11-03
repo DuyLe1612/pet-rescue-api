@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.infrastructure.persistence.entity.RescueCaseJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseCompletionProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.RescueQueueItemProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueCaseSummaryProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.RescueMapMarkerProjection;
@@ -267,17 +268,24 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rcc.location_note AS locationNote,
         rcc.verified_by AS verifiedBy,
         u.username AS verifiedByName,
-        rcc.verified_at AS verifiedAt
+        rcc.verified_at AS verifiedAt,
+        rcc.submitted_by AS submittedBy,
+        su.username AS submittedByName,
+        rcc.outcome AS outcome,
+        rcc.status AS status,
+        rcc.reject_reason AS rejectReason
     FROM rescue_case_completions rcc
     JOIN rescue_cases rc
         ON rc.case_id = rcc.case_id
     LEFT JOIN users u
         ON u.user_id = rcc.verified_by
+    LEFT JOIN users su
+        ON su.user_id = rcc.submitted_by
     WHERE
         (
             (:isResolved = true AND rcc.verified_at IS NOT NULL)
             OR
-            (:isResolved = false AND rcc.verified_at IS NULL)
+            (:isResolved = false AND rcc.verified_at IS NULL AND rcc.status <> 'REJECTED')
         )
     ORDER BY rcc.created_at DESC
     """,
@@ -288,7 +296,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         (
             (:isResolved = true AND rcc.verified_at IS NOT NULL)
             OR
-            (:isResolved = false AND rcc.verified_at IS NULL)
+            (:isResolved = false AND rcc.verified_at IS NULL AND rcc.status <> 'REJECTED')
         )
     """,
             nativeQuery = true)
@@ -306,12 +314,19 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rcc.location_note AS locationNote,
         rcc.verified_by AS verifiedBy,
         u.username AS verifiedByName,
-        rcc.verified_at AS verifiedAt
+        rcc.verified_at AS verifiedAt,
+        rcc.submitted_by AS submittedBy,
+        su.username AS submittedByName,
+        rcc.outcome AS outcome,
+        rcc.status AS status,
+        rcc.reject_reason AS rejectReason
     FROM rescue_case_completions rcc
     JOIN rescue_cases rc
         ON rc.case_id = rcc.case_id
     LEFT JOIN users u
         ON u.user_id = rcc.verified_by
+    LEFT JOIN users su
+        ON su.user_id = rcc.submitted_by
     WHERE completion_id = :completionId 
         AND rcc.is_deleted = false
     """,
@@ -326,4 +341,88 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             nativeQuery = true)
 
     List<String> findMediaPublicIdsByCompletionId(@Param("completionId")UUID completionId);
+
+    /** Reports only an admin can settle: disputed, overdue, or with no second person to confirm. */
+    @Query(value = """
+    SELECT
+        rcc.completion_id AS completionId,
+        rcc.case_id AS caseId,
+        rcc.rescued_at AS rescuedAt,
+        rcc.rescue_note AS rescueNote,
+        rcc.location_note AS locationNote,
+        rcc.verified_by AS verifiedBy,
+        CAST(NULL AS VARCHAR) AS verifiedByName,
+        rcc.verified_at AS verifiedAt,
+        rcc.submitted_by AS submittedBy,
+        su.username AS submittedByName,
+        rcc.outcome AS outcome,
+        rcc.status AS status,
+        rcc.reject_reason AS rejectReason
+    FROM rescue_case_completions rcc
+    JOIN rescue_cases rc ON rc.case_id = rcc.case_id
+    LEFT JOIN users su ON su.user_id = rcc.submitted_by
+    WHERE rcc.is_deleted = false
+      AND (rcc.status = 'DISPUTED'
+        OR (rcc.status = 'PENDING' AND (rcc.escalated_at IS NOT NULL
+            OR rc.reported_by IS NULL
+            OR (rc.reported_by = rcc.submitted_by AND rc.organization_id IS NULL))))
+    ORDER BY rcc.created_at
+    """,
+            countQuery = """
+    SELECT COUNT(*)
+    FROM rescue_case_completions rcc
+    JOIN rescue_cases rc ON rc.case_id = rcc.case_id
+    WHERE rcc.is_deleted = false
+      AND (rcc.status = 'DISPUTED'
+        OR (rcc.status = 'PENDING' AND (rcc.escalated_at IS NOT NULL
+            OR rc.reported_by IS NULL
+            OR (rc.reported_by = rcc.submitted_by AND rc.organization_id IS NULL))))
+    """,
+            nativeQuery = true)
+    Page<RescueCaseCompletionProjection> findCompletionReviewQueue(Pageable pageable);
+
+    /** Unassigned open cases, plus rescued animals waiting for an organization. Null province means everywhere. */
+    @Query(value = """
+    SELECT
+        rc.case_id AS caseId,
+        rc.case_code AS caseCode,
+        rc.species AS species,
+        rc.priority AS priority,
+        rc.status AS status,
+        rc.description AS description,
+        rc.province_name AS provinceName,
+        rc.ward_name AS wardName,
+        ST_Y(rc.location) AS latitude,
+        ST_X(rc.location) AS longitude,
+        rc.reported_at AS reportedAt,
+        rc.needs_help AS needsHelp,
+        (rc.status = 'RESCUED') AS awaitingHandover,
+        (SELECT COUNT(*) FROM rescue_case_claims c WHERE c.case_id = rc.case_id AND c.status = 'ACTIVE') AS activeClaimCount
+    FROM rescue_cases rc
+    WHERE rc.is_deleted = false
+      AND rc.organization_id IS NULL
+      AND (CAST(:provinceCode AS VARCHAR) IS NULL OR rc.province_code = :provinceCode OR rc.province_code IS NULL)
+      AND (rc.status IN ('REPORTED', 'IN_PROGRESS')
+        OR (rc.status = 'RESCUED' AND rc.pet_id IS NULL AND EXISTS (
+            SELECT 1 FROM rescue_case_completions rcc
+            WHERE rcc.case_id = rc.case_id AND rcc.status = 'APPROVED'
+              AND rcc.outcome IN ('HANDED_TO_ORG', 'TEMP_HOLDING'))))
+    ORDER BY rc.needs_help DESC,
+        CASE rc.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'NORMAL' THEN 2 ELSE 3 END,
+        rc.reported_at
+    """,
+            countQuery = """
+    SELECT COUNT(*)
+    FROM rescue_cases rc
+    WHERE rc.is_deleted = false
+      AND rc.organization_id IS NULL
+      AND (CAST(:provinceCode AS VARCHAR) IS NULL OR rc.province_code = :provinceCode OR rc.province_code IS NULL)
+      AND (rc.status IN ('REPORTED', 'IN_PROGRESS')
+        OR (rc.status = 'RESCUED' AND rc.pet_id IS NULL AND EXISTS (
+            SELECT 1 FROM rescue_case_completions rcc
+            WHERE rcc.case_id = rc.case_id AND rcc.status = 'APPROVED'
+              AND rcc.outcome IN ('HANDED_TO_ORG', 'TEMP_HOLDING'))))
+    """,
+            nativeQuery = true)
+    Page<RescueQueueItemProjection> findOrganizationQueue(@Param("provinceCode") String provinceCode, Pageable pageable);
 }

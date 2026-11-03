@@ -9,7 +9,6 @@ import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
 import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
-import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.*;
@@ -18,7 +17,6 @@ import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -37,10 +35,13 @@ class Phase0WorkflowRulesTest {
     final RescueCaseRepository cases = mock(RescueCaseRepository.class);
     final RescueCaseCompletionRepository completions = mock(RescueCaseCompletionRepository.class);
     final RescueCaseDomainService rescueDomain = new RescueCaseDomainService(cases, completions,
-            mock(VisualCodeRepository.class), mock(UserRepository.class), mock(ApplicationEventPublisher.class));
+            mock(VisualCodeRepository.class), mock(UserRepository.class), mock(ApplicationEventPublisher.class),
+            mock(RescueClaimDomainService.class), mock(NotificationDomainService.class), mock(ReputationDomainService.class));
 
     private RescueCaseCommandUseCase rescueUseCase(RescueCaseDomainService domain, AccessControlDomainService access) {
-        return new RescueCaseCommandUseCase(domain, access, mock(MediaQueryPort.class), mock(MediaCommandPort.class),
+        return new RescueCaseCommandUseCase(domain, access, mock(RescueClaimDomainService.class),
+                mock(com.uit.petrescueapi.application.port.command.PetCommandPort.class), mock(PetDomainService.class),
+                mock(MediaQueryPort.class), mock(MediaCommandPort.class),
                 mock(RescueCaseMediaRepository.class), mock(RescueCompletionMediaRepository.class));
     }
 
@@ -50,7 +51,8 @@ class Phase0WorkflowRulesTest {
         when(cases.findById(caseId)).thenReturn(Optional.of(RescueCase.builder().caseId(caseId).status(status).build()));
         when(cases.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(completions.findById(completionId)).thenReturn(Optional.of(
-                RescueCaseCompletion.builder().completionId(completionId).caseId(caseId).build()));
+                RescueCaseCompletion.builder().completionId(completionId).caseId(caseId)
+                        .status(com.uit.petrescueapi.domain.valueobject.RescueCompletionStatus.PENDING).build()));
         when(completions.save(any())).thenAnswer(inv -> inv.getArgument(0));
         return completionId;
     }
@@ -80,7 +82,7 @@ class Phase0WorkflowRulesTest {
     void completionCannotBeApprovedOnceClosed() {
         UUID completionId = completionForCaseIn(RescueCaseStatus.CLOSED);
         assertThatThrownBy(() -> rescueDomain.approveCompletion(completionId, UUID.randomUUID()))
-                .isInstanceOf(BusinessException.class);
+                .isInstanceOf(com.uit.petrescueapi.domain.exception.ConflictException.class);
     }
 
     @Test
@@ -96,7 +98,7 @@ class Phase0WorkflowRulesTest {
         UUID completionId = completionForCaseIn(RescueCaseStatus.REPORTED);
         UUID caller = UUID.randomUUID();
         AccessControlDomainService access = mock(AccessControlDomainService.class);
-        doThrow(new ForbiddenException("no")).when(access).requireCompletionApprover(any(), eqUuid(caller));
+        doThrow(new ForbiddenException("no")).when(access).requireCompletionApprover(any(), any(), eqUuid(caller));
 
         assertThatThrownBy(() -> rescueUseCase(rescueDomain, access).approveCompletion(completionId, caller))
                 .isInstanceOf(ForbiddenException.class);
@@ -115,7 +117,7 @@ class Phase0WorkflowRulesTest {
     final AccessControlDomainService adoptionAccess = mock(AccessControlDomainService.class);
     final AdoptionDomainService adoptionDomain = new AdoptionDomainService(applications, pets,
             mock(VisualCodeRepository.class), mock(OrganizationDomainService.class), adoptionAccess, owners,
-            mock(UserReputationRepository.class), mock(ReclaimLogRepository.class), mock(JdbcTemplate.class));
+            mock(ReputationDomainService.class), mock(ReclaimLogRepository.class));
 
     private UUID pendingApplication(UUID orgId, UUID applicantId) {
         UUID id = UUID.randomUUID();

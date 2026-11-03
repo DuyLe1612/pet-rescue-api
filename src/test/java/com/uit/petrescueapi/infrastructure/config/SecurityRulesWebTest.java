@@ -68,6 +68,7 @@ class SecurityRulesWebTest {
     @MockitoBean RescueCaseCommandPort rescueCommandPort;
     @MockitoBean RescueCaseQueryPort rescueQueryPort;
     @MockitoBean RescueCaseWebMapper rescueMapper;
+    @MockitoBean com.uit.petrescueapi.presentation.mapper.PetWebMapper petMapper;
     @MockitoBean AdoptionCommandPort adoptionCommandPort;
     @MockitoBean AdoptionQueryPort adoptionQueryPort;
     @MockitoBean AdoptionWebMapper adoptionMapper;

@@ -100,6 +100,14 @@ public class GlobalExceptionAdvice {
     }
 
     // ── Illegal state (e.g. bad status transition) ─
+    /** Two people acted on the same row at once; the loser can reload and try again. */
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,
+            org.springframework.dao.DataIntegrityViolationException.class})
+    public ResponseEntity<ApiResponse<Void>> handleConcurrentChange(org.springframework.dao.DataAccessException ex) {
+        log.warn("Conflicting write: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "This was just changed by someone else. Reload and try again.");
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage());
