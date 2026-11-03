@@ -30,6 +30,12 @@ public class EmailService {
     @Value("${app.email.password-reset-url:http://localhost:3000/reset-password}")
     private String passwordResetBaseUrl;
 
+    @Value("${app.email.verification-token-expiry-minutes:1440}")
+    private long verificationExpiryMinutes;
+
+    @Value("${app.email.password-reset-token-expiry-minutes:60}")
+    private long passwordResetExpiryMinutes;
+
     /**
      * Send verification email asynchronously.
      */
@@ -45,12 +51,12 @@ public class EmailService {
                   <p><a href="%s" style="display:inline-block;padding:12px 24px;background:#4CAF50;color:#fff;text-decoration:none;border-radius:4px;">Verify Email</a></p>
                   <p>Or copy this link into your browser:</p>
                   <p><code>%s</code></p>
-                  <p>This link expires in 24 hours.</p>
+                  <p>This link expires in %s.</p>
                   <br/>
                   <p style="color:#888;">— Pet Rescue Team</p>
                 </body>
                 </html>
-                """.formatted(username, link, link);
+                """.formatted(username, link, link, formatExpiry(verificationExpiryMinutes));
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -82,13 +88,13 @@ public class EmailService {
                   <p><a href="%s" style="display:inline-block;padding:12px 24px;background:#FF5722;color:#fff;text-decoration:none;border-radius:4px;">Reset Password</a></p>
                   <p>Or copy this link into your browser:</p>
                   <p><code>%s</code></p>
-                  <p><strong>This link expires in 1 hour.</strong></p>
+                  <p><strong>This link expires in %s.</strong></p>
                   <p>If you didn't request this, please ignore this email. Your password will remain unchanged.</p>
                   <br/>
                   <p style="color:#888;">— Pet Rescue Team</p>
                 </body>
                 </html>
-                """.formatted(username, link, link);
+                """.formatted(username, link, link, formatExpiry(passwordResetExpiryMinutes));
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -102,5 +108,14 @@ public class EmailService {
         } catch (MessagingException e) {
             log.error("Failed to send password reset email to {}: {}", to, e.getMessage());
         }
+    }
+
+    /** Whole hours read as hours, anything else as minutes: 1440 is "24 hours", 90 is "90 minutes". */
+    static String formatExpiry(long minutes) {
+        if (minutes >= 60 && minutes % 60 == 0) {
+            long hours = minutes / 60;
+            return hours + (hours == 1 ? " hour" : " hours");
+        }
+        return minutes + (minutes == 1 ? " minute" : " minutes");
     }
 }
