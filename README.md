@@ -412,6 +412,7 @@ docker-compose down -v                          # Stop + remove volumes
 |---------|-------------|--------|----------|
 | `free` *(default)* | `spring.profiles.default=free` | 512 MB container: Hikari 5, Tomcat 30 threads, 1 Rabbit consumer per queue | Local dev, free-tier hosting |
 | `scale` | `SPRING_PROFILES_ACTIVE=scale` | 1.5 GB container: Hikari 10, Tomcat 80 threads, up to 2 consumers | Single-VM prod |
+| `dev` | `SPRING_PROFILES_ACTIVE=dev` | Debug and SQL logs, `/api/v1/dev` endpoints | Local debugging |
 | `production` | `SPRING_PROFILES_ACTIVE=production` | NeonDB + cloud Redis/RabbitMQ (SSL), lazy init, Swagger UI off | Deployment |
 
 ---
