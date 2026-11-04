@@ -122,6 +122,13 @@ public class MongoConversationParticipantRepositoryAdapter implements Conversati
         }
     }
 
+    @Override
+    public void incrementUnreadExcept(UUID conversationId, UUID senderId) {
+        mongo.updateMulti(query(where("conversationId").is(conversationId).and("userId").ne(senderId)),
+                new Update().inc("unread", 1).set("hidden", false),
+                InboxDocument.class);
+    }
+
     private static ConversationParticipant toDomain(InboxDocument d) {
         return ConversationParticipant.builder()
                 .conversationId(d.getConversationId())

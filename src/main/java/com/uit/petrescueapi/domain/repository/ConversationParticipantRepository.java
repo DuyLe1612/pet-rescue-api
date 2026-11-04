@@ -15,4 +15,7 @@ public interface ConversationParticipantRepository {
     List<ConversationParticipant> findByConversationId(UUID conversationId);
 
     void updateUnreadCount(UUID conversationId, UUID userId, int unreadCount, java.time.LocalDateTime lastReadAt);
+
+    /** One more unread message for everyone but the sender. */
+    void incrementUnreadExcept(UUID conversationId, UUID senderId);
 }
