@@ -24,6 +24,9 @@ public class PostResponseDto {
 
     @Schema(example = "johndoe")
     private String authorUsername;
+    private String authorAvatarUrl;
+    private Integer likeCount;
+    private Integer commentCount;
 
     private UUID rescueCaseId;
 

@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo;
 
+import com.uit.petrescueapi.infrastructure.persistence.mongo.document.InboxDocument;
 import com.uit.petrescueapi.application.dto.chat.ChatMessageDto;
 import com.uit.petrescueapi.application.dto.chat.ConversationSummaryDto;
 import com.uit.petrescueapi.application.port.out.ChatQueryDataPort;
@@ -225,6 +226,21 @@ class MongoChatTest extends MongoIntegrationTest {
     }
 
     // ── read state ───────────────────────────────────────────
+
+    @Test
+    void sendingCountsUnreadOnlyForTheOtherParticipant() {
+        Conversation c = direct(ALICE, BOB);
+        chat.sendMessage(c.getId(), ALICE, "one");
+        chat.sendMessage(c.getId(), ALICE, "two");
+
+        assertThat(mongo.findById(InboxDocument.idOf(BOB, c.getId()), InboxDocument.class).getUnread()).isEqualTo(2);
+        assertThat(mongo.findById(InboxDocument.idOf(ALICE, c.getId()), InboxDocument.class).getUnread()).isZero();
+
+        chat.sendMessage(c.getId(), BOB, "three");
+
+        assertThat(mongo.findById(InboxDocument.idOf(ALICE, c.getId()), InboxDocument.class).getUnread()).isEqualTo(1);
+        assertThat(mongo.findById(InboxDocument.idOf(BOB, c.getId()), InboxDocument.class).getUnread()).isZero();
+    }
 
     @Test
     void seenIsDerivedFromRecipientReadWatermark() {

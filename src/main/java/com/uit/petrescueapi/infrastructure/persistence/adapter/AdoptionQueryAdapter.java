@@ -71,6 +71,8 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .experience(p.getExperience())
                 .liveCondition(p.getLiveCondition())
                 .createdAt(p.getCreatedAt())
+                .applicantUsername(p.getApplicantUsername())
+                .readyAt(p.getReadyAt())
                 .build();
     }
 
@@ -85,6 +87,16 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .experience(p.getExperience())
                 .liveCondition(p.getLiveCondition())
                 .createdAt(p.getCreatedAt())
+                .applicantId(p.getApplicantId())
+                .applicantUsername(p.getApplicantUsername())
+                .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
+                .note(p.getNote())
+                .decidedAt(p.getDecidedAt())
+                .decidedBy(p.getDecidedBy())
+                .decidedByUsername(p.getDecidedByUsername())
+                .rejectReason(p.getRejectReason())
+                .readyAt(p.getReadyAt())
                 .build();
     }
 

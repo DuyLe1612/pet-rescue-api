@@ -20,7 +20,7 @@ import java.util.UUID;
  */
 public interface RescueCaseQueryDataPort {
 
-    RescueCaseResponseDto findById(UUID caseId);
+    RescueCaseResponseDto findById(UUID caseId, UUID viewerId);
 
     Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 
@@ -51,4 +51,8 @@ public interface RescueCaseQueryDataPort {
     RescueCaseCompletionResponseDto findCompletionById(UUID caseId);
 
     Page<RescueCaseCompletionResponseDto> findAllCompletion(boolean isResolved, Pageable pageable);
+
+    Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable);
+
+    Page<com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto> findOrganizationQueue(String provinceCode, Pageable pageable);
 }

@@ -56,24 +56,11 @@ public class MediaFileDomainService {
         return mediaFileRepository.save(mediaFile);
     }
 
-    /**
-     * Confirm a temp upload by moving it to permanent storage.
-     * Updates the publicId and status in the database.
-     */
-    public MediaFile confirmUpload(UUID mediaId, String targetFolder) {
-        log.info("Confirming media upload {} to folder {}", mediaId, targetFolder);
+    /** Records a file already moved to permanent storage. The move itself must not run in a transaction. */
+    public MediaFile markPermanent(UUID mediaId, String newPublicId, String targetFolder) {
         MediaFile mediaFile = findById(mediaId);
-        
-        if (!"TEMP".equals(mediaFile.getStatus())) {
-            throw new BusinessException("Media file is not in TEMP status");
-        }
-        
-        // Move file in Cloudinary
-        String newPublicId = cloudStoragePort.moveToPermament(mediaFile.getPublicId(), targetFolder, mediaFile.getResourceType());
-        
-        // Update database record
         mediaFile.setPublicId(newPublicId);
-        mediaFile.setStatus("PERMANENT");
+mediaFile.setStatus("PERMANENT");
         mediaFile.setFolder(targetFolder);
         mediaFile.setUpdatedAt(LocalDateTime.now());
         

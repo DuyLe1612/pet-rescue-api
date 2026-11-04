@@ -17,4 +17,17 @@ import java.util.UUID;
 public interface RescueCaseJpaRepository extends JpaRepository<RescueCaseJpaEntity, UUID> {
 
     Optional<RescueCaseJpaEntity> findByCaseIdAndDeletedFalse(UUID caseId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT c FROM RescueCaseJpaEntity c WHERE c.caseId = :caseId AND c.deleted = false")
+    Optional<RescueCaseJpaEntity> findForUpdate(@org.springframework.data.repository.query.Param("caseId") UUID caseId);
+
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("""
+            UPDATE RescueCaseJpaEntity c
+            SET c.organizationId = :organizationId, c.version = c.version + 1
+            WHERE c.caseId = :caseId AND c.organizationId IS NULL
+            """)
+    int assignOrganization(@org.springframework.data.repository.query.Param("caseId") UUID caseId,
+                           @org.springframework.data.repository.query.Param("organizationId") UUID organizationId);
 }

@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.usecase;
 import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.domain.entity.MediaFile;
+import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.MediaFileDomainService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,7 +71,13 @@ public class MediaCommandUseCase implements MediaCommandPort {
     @Override
     public MediaFile confirmUpload(UUID mediaId, String targetFolder) {
         log.debug("Command: confirm media upload {}", mediaId);
-        return domainService.confirmUpload(mediaId, targetFolder);
+        MediaFile mediaFile = domainService.findById(mediaId);
+        if (!"TEMP".equals(mediaFile.getStatus())) {
+            throw new BusinessException("Media file is not in TEMP status");
+        }
+        // Slow network call: no database connection is held while it runs.
+        String newPublicId = cloudStoragePort.moveToPermament(mediaFile.getPublicId(), targetFolder, mediaFile.getResourceType());
+        return domainService.markPermanent(mediaId, newPublicId, targetFolder);
     }
 
     @Override

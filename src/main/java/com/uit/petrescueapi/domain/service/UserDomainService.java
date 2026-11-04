@@ -179,8 +179,6 @@ public class UserDomainService {
      */
     @Transactional(readOnly = true)
     public boolean hasRole(UUID userId, String roleCode) {
-        User user = findById(userId);
-        return user.getRoles().stream()
-                .anyMatch(role -> roleCode.equals(role.getCode()));
+        return userRepository.hasRole(userId, roleCode);
     }
 }

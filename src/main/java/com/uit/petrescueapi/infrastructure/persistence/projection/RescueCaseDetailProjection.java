@@ -24,16 +24,17 @@ public interface RescueCaseDetailProjection {
     // ── Detail fields ────────────────────────────
     UUID getReportedBy();
     UUID getOrganizationId();
-    String getOrganizationName();
     UUID getPetId();
-    String getPetName();
     String getColor();
-    String getSize();
     String getDescription();
     Double getLocationLat();
     Double getLocationLng();
     String getWardName();
     String getProvinceName();
-    LocalDateTime getResolvedAt();
     String getContactPhone();
+    Boolean getNeedsHelp();
+    Long getActiveClaimCount();
+    Boolean getViewerHasActiveClaim();
+    UUID getCompletionId();
+    String getCompletionStatus();
 }

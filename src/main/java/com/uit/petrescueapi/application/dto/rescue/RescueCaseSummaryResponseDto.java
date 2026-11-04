@@ -9,7 +9,6 @@ import java.util.UUID;
 
 /**
  * Lightweight DTO for rescue case list views.
- * Optimized: excludes unused fields (locationText).
  */
 @Data
 @Builder
@@ -27,4 +26,7 @@ public class RescueCaseSummaryResponseDto {
     private String reporterUsername;
     private LocalDateTime reportedAt;
     private String firstImageUrl;
+    private String locationText;
+    @Schema(description = "Only in nearby results")
+    private Double distanceMeters;
 }

@@ -30,6 +30,9 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
 
+    /** The map endpoints are public: an organization still waiting for approval must be asked for. */
+    private static final List<OrganizationStatus> MAP_DEFAULT_STATUSES = List.of(OrganizationStatus.ACTIVE);
+
     private final OrganizationQueryJpaRepository queryRepo;
     private final OrganizationMemberJpaRepository memberRepo;
 
@@ -54,7 +57,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     @Override
     public List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
-                ? Arrays.stream(OrganizationStatus.values()).toList()
+                ? MAP_DEFAULT_STATUSES
                 : statuses;
         List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
         List<String> normalizedTypes = (types == null || types.isEmpty())
@@ -66,7 +69,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         @Override
         public Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
-            ? Arrays.stream(OrganizationStatus.values()).toList()
+            ? MAP_DEFAULT_STATUSES
             : statuses;
         List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
         return queryRepo.findWithinBoundingBoxSummary(minLat, minLng, maxLat, maxLng, statusNames, search, pageable)
@@ -76,7 +79,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         @Override
         public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
-            ? Arrays.stream(OrganizationStatus.values()).toList()
+            ? MAP_DEFAULT_STATUSES
             : statuses;
         List<String> statusNames = normalizedStatuses.stream().map(Enum::name).toList();
         List<String> normalizedTypes = (types == null || types.isEmpty())
@@ -114,6 +117,11 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .status(p.getStatus())
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
+                .organizationCode(p.getOrganizationCode())
+                .streetAddress(p.getStreetAddress())
+                .phone(p.getPhone())
+                .email(p.getEmail())
+                .imageUrl(p.getImageUrl())
                 .build();
     }
 
@@ -122,8 +130,16 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .organizationId(p.getOrganizationId())
                 .name(p.getName())
                 .type(p.getType())
+                .description(p.getDescription())
+                .streetAddress(p.getStreetAddress())
+                .wardCode(p.getWardCode())
                 .wardName(p.getWardName())
+                .provinceCode(p.getProvinceCode())
                 .provinceName(p.getProvinceName())
+                .phone(p.getPhone())
+                .email(p.getEmail())
+                .imageUrl(p.getImageUrl())
+                .officialLink(p.getOfficialLink())
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
                 .status(p.getStatus())

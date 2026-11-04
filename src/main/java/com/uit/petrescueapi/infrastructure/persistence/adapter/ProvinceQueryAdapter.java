@@ -14,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,12 +25,13 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(readOnly = true)
 public class ProvinceQueryAdapter implements ProvinceQueryDataPort {
 
     private static final String ADDRESS_RESOURCE = "templates/addresssystem.json";
 
     private final ObjectMapper objectMapper;
+
+    private volatile List<ProvinceDetailDto> provinces;
 
     @Override
     public Page<ProvinceSummaryDto> listProvinces(String search, int page, int size) {
@@ -60,13 +60,37 @@ public class ProvinceQueryAdapter implements ProvinceQueryDataPort {
                 .orElseThrow(() -> new ResourceNotFoundException("Province", "code", code));
 
         if (depth == null || depth < 2) {
-            found.setWards(List.of());
+            return ProvinceDetailDto.builder()      // a copy: the loaded list is shared between requests
+                    .code(found.getCode())
+                    .name(found.getName())
+                    .codename(found.getCodename())
+                    .divisionType(found.getDivisionType())
+                    .phoneCode(found.getPhoneCode())
+                    .wards(List.of())
+                    .build();
         }
 
         return found;
     }
 
+    /** The file ships with the app and never changes while it runs. A failed read is tried again. */
     private List<ProvinceDetailDto> loadAll() {
+        List<ProvinceDetailDto> loaded = provinces;
+        if (loaded == null) {
+            synchronized (this) {
+                loaded = provinces;
+                if (loaded == null) {
+                    loaded = readFile();
+                    if (!loaded.isEmpty()) {
+                        provinces = loaded;
+                    }
+                }
+            }
+        }
+        return loaded;
+    }
+
+    private List<ProvinceDetailDto> readFile() {
         try (InputStream input = new ClassPathResource(ADDRESS_RESOURCE).getInputStream()) {
             List<Map<String, Object>> raw = objectMapper.readValue(input, new TypeReference<>() {});
             return raw.stream().map(this::toDetail).toList();

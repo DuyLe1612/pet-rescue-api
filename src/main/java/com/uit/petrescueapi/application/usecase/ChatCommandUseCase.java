@@ -28,8 +28,7 @@ public class ChatCommandUseCase implements ChatCommandPort {
     private final ChatDomainService chatDomainService;
     private final ConversationParticipantRepository participantRepository;
     private final ChatRealtimePort chatRealtimePort;
-    private final com.uit.petrescueapi.application.port.out.PushNotificationPort pushNotificationPort;
-    private final com.uit.petrescueapi.domain.repository.UserRepository userRepository;
+    private final ChatPushSender chatPush;
 
     @Override
     public Conversation createConversation(CreateConversationRequestDto request, UUID requesterId) {
@@ -90,24 +89,7 @@ public class ChatCommandUseCase implements ChatCommandPort {
         chatRealtimePort.publishConversationUpdate(recipients, conversationId, convoPayload);
         chatRealtimePort.publishConversationUpdate(java.util.List.of(senderId), conversationId, convoPayload);
 
-        // collect expo push tokens and send push
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                List<String> tokens = recipients.stream()
-                        .map(userRepository::findExpoPushTokenById)
-                        .flatMap(java.util.Optional::stream)
-                        .filter(token -> token != null && !token.isBlank())
-                        .toList();
-                if (!tokens.isEmpty()) {
-                    String title = "New message";
-                    String body = dto.getContent();
-                    java.util.Map<String, Object> data = java.util.Map.of("conversationId", conversationId.toString());
-                    pushNotificationPort.sendPushToTokens(tokens, title, body, data);
-                }
-            } catch (Exception ex) {
-                log.warn("Failed to send push notifications", ex);
-            }
-        });
+        chatPush.sendNewMessage(recipients, conversationId, dto.getContent());
         return message;
     }
 

@@ -77,7 +77,9 @@ public class MongoSchemaInitializer implements ApplicationRunner {
                         Indexes.ascending("facets.category", "facets.species", "facets.district"),
                         Indexes.descending("createdAt", "_id")),
                 new IndexOptions().partialFilterExpression(new Document("deleted", false)));
-        index(POSTS, "post_tags", Indexes.compoundIndex(Indexes.ascending("tags"), Indexes.descending("createdAt")));
+        dropIndex(POSTS, "post_tags");      // replaced: it could not serve the feed's createdAt + _id order
+        index(POSTS, "post_tags_feed", Indexes.compoundIndex(Indexes.ascending("tags"), Indexes.descending("createdAt", "_id")));
+        index(POSTS, "post_preview_author", Indexes.ascending("previewComments.author.userId"), new IndexOptions().sparse(true));
         index(POSTS, "post_author", Indexes.compoundIndex(Indexes.ascending("author.userId"), Indexes.descending("createdAt")));
         index(POSTS, "post_analysis_status", Indexes.ascending("analysis.status", "createdAt"));
         index(POSTS, "post_rescue_case", Indexes.ascending("rescueCase.caseId"), new IndexOptions().sparse(true));
@@ -95,6 +97,15 @@ public class MongoSchemaInitializer implements ApplicationRunner {
         // DA2 — AI analysis runs (evaluation dataset)
         index(POST_ANALYSIS_RUNS, "run_post", Indexes.compoundIndex(Indexes.ascending("postId"), Indexes.descending("createdAt")));
         index(POST_ANALYSIS_RUNS, "run_prompt_version", Indexes.compoundIndex(Indexes.ascending("promptVersion"), Indexes.descending("createdAt")));
+    }
+
+    private void dropIndex(String collection, String name) {
+        for (Document existing : mongo.getCollection(collection).listIndexes()) {
+            if (name.equals(existing.getString("name"))) {
+                mongo.getCollection(collection).dropIndex(name);
+                return;
+            }
+        }
     }
 
     private void index(String collection, String name, Bson keys) {

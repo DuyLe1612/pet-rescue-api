@@ -29,4 +29,15 @@ public interface UserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
 
     @Query("SELECT u.expoPushToken FROM UserJpaEntity u WHERE u.userId = :id")
     Optional<String> findExpoPushTokenById(@Param("id") UUID id);
+
+    @Query("SELECT u.userId AS userId, u.expoPushToken AS token FROM UserJpaEntity u WHERE u.userId IN :ids AND u.expoPushToken IS NOT NULL AND u.expoPushToken <> ''")
+    java.util.List<PushToken> findExpoPushTokensByIds(@Param("ids") java.util.Collection<UUID> ids);
+
+    @Query("SELECT COUNT(u) > 0 FROM UserJpaEntity u JOIN u.roles r WHERE u.userId = :id AND r.code = :code")
+    boolean hasRole(@Param("id") UUID id, @Param("code") String code);
+
+    interface PushToken {
+        UUID getUserId();
+        String getToken();
+    }
 }

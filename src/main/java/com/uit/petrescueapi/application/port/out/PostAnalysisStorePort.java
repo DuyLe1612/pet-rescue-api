@@ -38,13 +38,6 @@ public interface PostAnalysisStorePort {
     /** Back to PENDING so the worker analyses it again (content changed or manual retry). */
     void resetToPending(UUID postId);
 
-    /** Marks the post as having a rescue case being created; false if one exists or is in progress. */
-    boolean reserveRescueCase(UUID postId);
-
-    void releaseRescueCase(UUID postId);
-
-    void linkRescueCase(UUID postId, UUID caseId, String status);
-
     /**
      * PENDING/FAILED posts last touched before {@code before} with fewer than {@code maxAttempts}
      * attempts for the current text, plus ANALYZING claims older than {@code staleBefore}; posts that
@@ -67,6 +60,6 @@ public interface PostAnalysisStorePort {
 
     record AnalysisTarget(UUID postId, UUID authorId, String content, PostAnalysisStatus status,
                           PostAnalysisSuggestion suggestion, PostFacets facets, UUID rescueCaseId,
-                          String model, LocalDateTime analyzedAt, String rescueSuggestion) {
+                          String model, LocalDateTime analyzedAt) {
     }
 }

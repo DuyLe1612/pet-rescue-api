@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.rescue.*;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.RescueCaseQueryDataPort;
@@ -21,6 +22,10 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
+    /** The map is for finding animals that still need help; closed cases must be asked for. */
+    private static final List<String> MAP_DEFAULT_STATUSES =
+            List.of(RescueCaseStatus.REPORTED.name(), RescueCaseStatus.IN_PROGRESS.name());
+
     private final RescueCaseQueryJpaRepository queryRepo;
     private final CloudStoragePort cloudStoragePort;
 
@@ -36,11 +41,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     @Override
     public Page<RescueCaseCompletionResponseDto> findAllCompletion(boolean isResolved, Pageable pageable) {
-        return queryRepo.findAllCompletion(isResolved, pageable)
-                .map(p -> toCompletionDto(
-                        p,
-                        buildMediaUrls(queryRepo.findMediaPublicIdsByCompletionId(p.getCompletionId()))
-                ));
+        return withImages(queryRepo.findAllCompletion(isResolved, pageable));
     }
 
     @Override
@@ -64,9 +65,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     // ======================================================
 
     @Override
-    public RescueCaseResponseDto findById(UUID caseId) {
+    public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
 
-        RescueCaseDetailProjection proj = queryRepo.findDetailById(caseId)
+        RescueCaseDetailProjection proj = queryRepo.findDetailById(caseId, viewerId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("RescueCase", "caseId", caseId)
                 );
@@ -74,7 +75,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
         List<String> mediaUrls =
                 buildMediaUrls(queryRepo.findMediaPublicIdsByCaseId(caseId));
 
-        return toResponseDto(proj, mediaUrls);
+        return toResponseDto(proj, mediaUrls, viewerId);
     }
 
     @Override
@@ -156,9 +157,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     private List<String> normalizeStatuses(List<RescueCaseStatus> status) {
         if (status == null || status.isEmpty()) {
-            return Arrays.stream(RescueCaseStatus.values())
-                    .map(Enum::name)
-                    .toList();
+            return MAP_DEFAULT_STATUSES;
         }
         return status.stream().map(Enum::name).toList();
     }
@@ -187,13 +186,16 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .status(p.getStatus())
                 .reporterUsername(p.getReporterUsername())
                 .reportedAt(p.getReportedAt())
-                .firstImageUrl(p.getFirstImageUrl())
+                .locationText(p.getLocationText())
+                .distanceMeters(p.getDistance())
+                .firstImageUrl(p.getFirstImageUrl() == null ? null : cloudStoragePort.buildUrl(p.getFirstImageUrl()))
                 .build();
     }
 
     private RescueCaseResponseDto toResponseDto(
             RescueCaseDetailProjection p,
-            List<String> imageUrls) {
+            List<String> imageUrls,
+            UUID viewerId) {
 
         return RescueCaseResponseDto.builder()
                 .caseId(p.getCaseId())
@@ -211,7 +213,55 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .reportedAt(p.getReportedAt())
                 .imageUrls(imageUrls)
                 .contactPhone(p.getContactPhone())
+                .locationText(p.getLocationText())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
+                .organizationId(p.getOrganizationId())
+                .petId(p.getPetId())
+                .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
+                .activeClaimCount(p.getActiveClaimCount() == null ? 0 : p.getActiveClaimCount().intValue())
+                .viewerIsReporter(viewerId != null && viewerId.equals(p.getReportedBy()))
+                .viewerHasActiveClaim(Boolean.TRUE.equals(p.getViewerHasActiveClaim()))
+                .completionId(p.getCompletionId())
+                .completionStatus(p.getCompletionStatus())
                 .build();
+    }
+
+    @Override
+    public Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable) {
+        return withImages(queryRepo.findCompletionReviewQueue(pageable));
+    }
+
+    @Override
+    public Page<RescueQueueItemDto> findOrganizationQueue(String provinceCode, Pageable pageable) {
+        return queryRepo.findOrganizationQueue(provinceCode, pageable).map(p -> RescueQueueItemDto.builder()
+                .caseId(p.getCaseId())
+                .caseCode(p.getCaseCode())
+                .species(p.getSpecies())
+                .priority(p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority()))
+                .status(p.getStatus())
+                .description(p.getDescription())
+                .provinceName(p.getProvinceName())
+                .wardName(p.getWardName())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .reportedAt(p.getReportedAt())
+                .needsHelp(p.getNeedsHelp())
+                .awaitingHandover(p.getAwaitingHandover())
+                .activeClaimCount(p.getActiveClaimCount())
+                .build());
+    }
+
+    private Page<RescueCaseCompletionResponseDto> withImages(Page<RescueCaseCompletionProjection> page) {
+        List<UUID> ids = page.getContent().stream().map(RescueCaseCompletionProjection::getCompletionId).toList();
+        Map<UUID, List<String>> images = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (CompletionMediaProjection media : queryRepo.findMediaByCompletionIds(ids)) {
+                images.computeIfAbsent(media.getCompletionId(), id -> new ArrayList<>())
+                        .add(cloudStoragePort.buildUrl(media.getPublicId()));
+            }
+        }
+        return page.map(p -> toCompletionDto(p, images.getOrDefault(p.getCompletionId(), List.of())));
     }
 
     private RescueCaseCompletionResponseDto toCompletionDto(
@@ -221,6 +271,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
         return RescueCaseCompletionResponseDto.builder()
                 .completionId(p.getCompletionId())
                 .caseId(p.getCaseId())
+                .caseCode(p.getCaseCode())
                 .rescuedAt(p.getRescuedAt())
                 .rescueNote(p.getRescueNote())
                 .locationNote(p.getLocationNote())
@@ -228,6 +279,11 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .verifiedByName(p.getVerifiedByName())
                 .verifiedAt(p.getVerifiedAt())
                 .verificationImagesUrl(imageUrls)
+                .submittedBy(p.getSubmittedBy())
+                .submittedByName(p.getSubmittedByName())
+                .outcome(p.getOutcome())
+                .status(p.getStatus())
+                .rejectReason(p.getRejectReason())
                 .build();
     }
 

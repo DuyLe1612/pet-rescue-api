@@ -4,7 +4,6 @@ import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.TransferOwnershipRequestDto;
 import com.uit.petrescueapi.application.dto.pet.UpdatePetRequestDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
-import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
@@ -22,6 +21,8 @@ import com.uit.petrescueapi.infrastructure.persistence.repository.PetBreedJpaRep
 import com.uit.petrescueapi.infrastructure.persistence.repository.PetSpeciesJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.uit.petrescueapi.domain.event.MediaPromotionRequestedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,7 +46,7 @@ public class PetCommandUseCase implements PetCommandPort {
     private final OrganizationDomainService organizationDomainService;
     private final UserDomainService userDomainService;
 
-    private final MediaCommandPort mediaCommandPort;
+    private final ApplicationEventPublisher events;
     private final MediaQueryPort mediaQueryPort;
 
     private final PetMediaRepository petMediaRepository;
@@ -196,10 +197,10 @@ public class PetCommandUseCase implements PetCommandPort {
                 );
             }
 
-            mediaCommandPort.confirmUpload(
-                    mediaId,
-                    "pets/" + petId
-            );
+            if (!"TEMP".equals(mediaFile.getStatus())) {
+                throw new BusinessException("Media file is not in TEMP status");
+            }
+            events.publishEvent(new MediaPromotionRequestedEvent(mediaId, "pets/" + petId));
 
             PetMedia petMedia = PetMedia.builder()
                     .mediaId(UUID.randomUUID())

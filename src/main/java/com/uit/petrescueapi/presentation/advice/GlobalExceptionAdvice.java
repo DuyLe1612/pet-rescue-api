@@ -13,6 +13,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -84,6 +85,12 @@ public class GlobalExceptionAdvice {
         return build(HttpStatus.BAD_REQUEST, message);
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParameter(MissingServletRequestParameterException ex) {
+        String message = String.format("Missing required parameter '%s'", ex.getParameterName());
+        return build(HttpStatus.BAD_REQUEST, message);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotReadable(HttpMessageNotReadableException ex) {
         String message = ex.getMostSpecificCause() != null
@@ -93,6 +100,14 @@ public class GlobalExceptionAdvice {
     }
 
     // ── Illegal state (e.g. bad status transition) ─
+    /** Two people acted on the same row at once; the loser can reload and try again. */
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,
+            org.springframework.dao.DataIntegrityViolationException.class})
+    public ResponseEntity<ApiResponse<Void>> handleConcurrentChange(org.springframework.dao.DataAccessException ex) {
+        log.warn("Conflicting write: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "This was just changed by someone else. Reload and try again.");
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage());

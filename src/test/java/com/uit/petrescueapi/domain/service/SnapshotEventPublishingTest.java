@@ -57,7 +57,8 @@ class SnapshotEventPublishingTest {
         when(cases.findById(caseId)).thenReturn(Optional.of(RescueCase.builder().caseId(caseId).status(RescueCaseStatus.REPORTED).build()));
         when(cases.save(any())).thenAnswer(inv -> inv.getArgument(0));
         RescueCaseDomainService service = new RescueCaseDomainService(cases, mock(RescueCaseCompletionRepository.class),
-                mock(VisualCodeRepository.class), mock(UserRepository.class), events);
+                mock(VisualCodeRepository.class), mock(UserRepository.class), events,
+                mock(RescueClaimDomainService.class), mock(NotificationDomainService.class), mock(ReputationDomainService.class));
 
         service.changeStatus(caseId, RescueCaseStatus.IN_PROGRESS);
 

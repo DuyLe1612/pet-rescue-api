@@ -17,4 +17,18 @@ import java.util.UUID;
 public interface AdoptionApplicationJpaRepository extends JpaRepository<AdoptionApplicationJpaEntity, UUID> {
 
     long countByApplicantIdAndStatusAndDeletedFalse(UUID applicantId, AdoptionApplicationStatus status);
+
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
+    @org.springframework.data.jpa.repository.Query("""
+            UPDATE AdoptionApplicationJpaEntity a
+            SET a.status = com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus.CANCELED,
+                a.rejectReason = :reason, a.updatedAt = :now
+            WHERE a.petId = :petId AND a.applicationId <> :exceptId AND a.deleted = false
+              AND a.status IN (com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus.PENDING,
+                               com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus.APPROVED)
+            """)
+    int cancelOpenForPet(@org.springframework.data.repository.query.Param("petId") UUID petId,
+                         @org.springframework.data.repository.query.Param("exceptId") UUID exceptId,
+                         @org.springframework.data.repository.query.Param("reason") String reason,
+                         @org.springframework.data.repository.query.Param("now") java.time.LocalDateTime now);
 }

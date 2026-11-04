@@ -214,7 +214,6 @@ class MongoPostTest extends MongoIntegrationTest {
     void newPostIsQueuedForAnalysis() {
         Post p = newPost(ALICE, "Mn ơi ở Q7 có bé cún bị thương");
         assertThat(analysis(p.getPostId())).containsEntry("status", "PENDING");
-        assertThat(raw(p.getPostId()).getString("rescueSuggestion")).isEqualTo("NONE");
     }
 
     @Test
@@ -281,6 +280,34 @@ class MongoPostTest extends MongoIntegrationTest {
                 .extracting(PostSummaryResponseDto::getPostId).containsExactly(rescueDog, taggedOnly);
         assertThat(postQuery.findFeedByCursor(null, null, 10, null, new PostFeedFilter("RESCUE", "DOG", "Quận 7", null)).getItems())
                 .extracting(PostSummaryResponseDto::getPostId).containsExactly(rescueDog);
+    }
+
+    @Test
+    void feedTellsTheViewerWhichPostsTheyLiked() {
+        Post liked = posts.create(Post.builder().authorId(ALICE).content("liked").build());
+        Post other = posts.create(Post.builder().authorId(ALICE).content("other").build());
+        likes.likePost(liked.getPostId(), BOB);
+
+        List<PostSummaryResponseDto> forBob = postQuery.findFeedByCursor(null, null, 10, BOB, PostFeedFilter.none()).getItems();
+        assertThat(forBob).filteredOn(i -> i.getPostId().equals(liked.getPostId())).singleElement()
+                .satisfies(i -> assertThat(i.getLikedByMe()).isTrue());
+        assertThat(forBob).filteredOn(i -> i.getPostId().equals(other.getPostId())).singleElement()
+                .satisfies(i -> assertThat(i.getLikedByMe()).isFalse());
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null, PostFeedFilter.none()).getItems())
+                .allSatisfy(i -> assertThat(i.getLikedByMe()).isNull());
+    }
+
+    @Test
+    void postDetailCarriesCountersAndAvatar() {
+        Post p = posts.create(Post.builder().authorId(ALICE).content("detail").build());
+        counters.addPostLikes(p.getPostId(), 2);
+        counters.addPostComments(p.getPostId(), 3);
+
+        var detail = postQuery.findById(p.getPostId());
+
+        assertThat(detail.getLikeCount()).isEqualTo(2);
+        assertThat(detail.getCommentCount()).isEqualTo(3);
+        assertThat(detail.getAuthorAvatarUrl()).isEqualTo("a.png");
     }
 
     @Test

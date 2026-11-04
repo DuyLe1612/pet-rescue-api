@@ -71,6 +71,15 @@ public class ChatWebSocketNotifier implements ChatRealtimePort {
         broadcast(recipientIds, event);
     }
 
+    @Override
+    public void publishNotification(UUID recipientId, Object notification) {
+        broadcast(List.of(recipientId), ChatSocketEvent.builder()
+                .type("notification")
+                .userId(recipientId)
+                .payload(notification)
+                .build());
+    }
+
     private void broadcast(List<UUID> userIds, ChatSocketEvent event) {
         try {
             String payload = objectMapper.writeValueAsString(event);

@@ -49,7 +49,9 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                    o.description          AS description,
                    o.type                 AS type,
                    o.street_address       AS streetAddress,
+                   o.ward_code            AS wardCode,
                    o.ward_name            AS wardName,
+                   o.province_code        AS provinceCode,
                    o.province_name        AS provinceName,
                    o.phone                AS phone,
                    o.email                AS email,
@@ -107,8 +109,7 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                 FROM organizations o
                                                 WHERE o.is_deleted = false
                                                         AND o.location IS NOT NULL
-                                                        AND ST_Y(o.location) BETWEEN :minLat AND :maxLat
-                                                        AND ST_X(o.location) BETWEEN :minLng AND :maxLng
+                                                        AND ST_Within(o.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
                                                         AND o.status IN (:statuses)
                                                         AND (:search IS NULL OR :search = '' OR
                                                              LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
@@ -120,7 +121,7 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                              LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%')))
                                                 ORDER BY o.created_at DESC
                                                 """,
-                                                countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Y(o.location) BETWEEN :minLat AND :maxLat AND ST_X(o.location) BETWEEN :minLng AND :maxLng AND o.status IN (:statuses) AND (:search IS NULL OR :search = '' OR LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%'))) ",
+                                                countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Within(o.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326)) AND o.status IN (:statuses) AND (:search IS NULL OR :search = '' OR LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%'))) ",
                                                 nativeQuery = true)
                 Page<OrganizationSummaryProjection> findWithinBoundingBoxSummary(@Param("minLat") double minLat,
                                                                                                                                                                                                                                                                                         @Param("minLng") double minLng,
@@ -145,8 +146,7 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                 FROM organizations o
                                                 WHERE o.is_deleted = false
                                                         AND o.location IS NOT NULL
-                                                        AND ST_Y(o.location) BETWEEN :minLat AND :maxLat
-                                                        AND ST_X(o.location) BETWEEN :minLng AND :maxLng
+                                                        AND ST_Within(o.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
                                                         AND o.status IN (:statuses)
                                                         AND o.type IN (:types)
                                                 ORDER BY o.created_at DESC

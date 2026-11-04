@@ -8,9 +8,6 @@ import java.util.UUID;
 
 /**
  * Response DTO for adoption application.
- * Optimized: excludes unused fields (applicantId, applicantUsername, 
- * organizationId, organizationName, note, decidedAt, decidedBy, decidedByUsername, 
- * rejectReason, readyAt).
  */
 @Data
 @Builder
@@ -44,4 +41,14 @@ public class AdoptionResponseDto {
     private String liveCondition;
 
     private LocalDateTime createdAt;
+    private UUID applicantId;
+    private String applicantUsername;
+    private UUID organizationId;
+    private String organizationName;
+    private String note;
+    private LocalDateTime decidedAt;
+    private UUID decidedBy;
+    private String decidedByUsername;
+    private String rejectReason;
+    private LocalDateTime readyAt;
 }

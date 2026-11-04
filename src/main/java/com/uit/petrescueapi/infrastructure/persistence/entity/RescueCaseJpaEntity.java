@@ -29,6 +29,16 @@ public class RescueCaseJpaEntity extends BaseJpaEntity {
     @Column(name = "case_id", updatable = false, nullable = false)
     private UUID caseId;
 
+    @jakarta.persistence.Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    @Column(name = "resolution_note", columnDefinition = "TEXT")
+    private String resolutionNote;
+
+    @Column(name = "needs_help", nullable = false)
+    private boolean needsHelp;
+
     @Column(name = "case_code", nullable = false, updatable = false)
     private String caseCode;
 

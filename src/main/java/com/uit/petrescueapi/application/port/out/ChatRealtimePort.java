@@ -15,5 +15,8 @@ public interface ChatRealtimePort {
 
     void publishPresence(List<UUID> recipientIds, UUID userId, String status);
 
+    /** Same socket as chat, because the client already keeps it open. */
+    void publishNotification(UUID recipientId, Object notification);
+
     void publishConversationUpdate(List<UUID> recipientIds, UUID conversationId, java.util.Map<String, Object> payload);
 }

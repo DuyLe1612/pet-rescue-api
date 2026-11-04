@@ -50,6 +50,20 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public java.util.Map<UUID, String> findExpoPushTokensByIds(java.util.Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return java.util.Map.of();
+        }
+        return jpa.findExpoPushTokensByIds(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(UserJpaRepository.PushToken::getUserId, UserJpaRepository.PushToken::getToken));
+    }
+
+    @Override
+    public boolean hasRole(UUID id, String roleCode) {
+        return jpa.hasRole(id, roleCode);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpa.existsByEmail(email);
     }

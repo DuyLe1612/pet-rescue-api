@@ -1,26 +1,20 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.analysis.ConfirmPostAnalysisRequestDto;
-import com.uit.petrescueapi.application.dto.analysis.CreateRescueCaseFromPostRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisModelDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
-import com.uit.petrescueapi.application.dto.analysis.PostAnalysisSuggestion;
 import com.uit.petrescueapi.application.dto.analysis.PostFacets;
-import com.uit.petrescueapi.application.dto.rescue.CreateRescueCaseRequestDto;
 import com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort;
-import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.out.AnalysisCatalogPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisPort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisPort.Catalog;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort.AnalysisTarget;
 import com.uit.petrescueapi.application.service.PostAnalysisValidator;
-import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus;
-import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -30,13 +24,11 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * DA2 Goal 1 + 3. The model only <b>suggests</b>; the author confirms or corrects, and only the
- * confirmed facets feed search and the Rescue Case workflow. Rescue Case rules stay in
- * {@link RescueCaseCommandPort} (PostgreSQL).
+ * DA2 Goal 1 + 3. The model only <b>classifies</b>; the author confirms or corrects, and only the
+ * confirmed facets feed search. It never creates a rescue case: those come from a direct report.
  *
  * <p>No {@code @Transactional}: every store call is a single-document MongoDB write. Registered by
  * {@code PostAnalysisConfig}.</p>
@@ -53,18 +45,16 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
     private final Optional<PostAnalysisPort> ai;
     private final AnalysisCatalogPort catalog;
     private final PostAnalysisValidator validator;
-    private final RescueCaseCommandPort rescueCases;
     private final String defaultModel;
     private final List<String> allowedModels;
 
     public PostAnalysisUseCase(PostAnalysisStorePort store, Optional<PostAnalysisPort> ai, AnalysisCatalogPort catalog,
-                               PostAnalysisValidator validator, RescueCaseCommandPort rescueCases,
+                               PostAnalysisValidator validator,
                                String defaultModel, List<String> allowedModels) {
         this.store = store;
         this.ai = ai;
         this.catalog = catalog;
         this.validator = validator;
-        this.rescueCases = rescueCases;
         this.defaultModel = defaultModel;
         // the configured default is always selectable, so going back to it can never be rejected
         this.allowedModels = Stream.concat(Stream.of(defaultModel), allowedModels.stream()).distinct().toList();
@@ -148,44 +138,6 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
     }
 
     @Override
-    public RescueCase createRescueCase(UUID postId, CreateRescueCaseFromPostRequestDto request, UUID userId) {
-        AnalysisTarget target = loadOwned(postId, userId);
-        if (target.rescueCaseId() != null) {
-            throw new BusinessException("Post already has a rescue case", "POST_RESCUE_CASE_EXISTS");
-        }
-        if (target.status() != PostAnalysisStatus.CONFIRMED || target.facets() == null || !target.facets().needsRescue()) {
-            throw new BusinessException("Confirm the analysis as a rescue first", "POST_NOT_CONFIRMED_RESCUE");
-        }
-        PostFacets facets = target.facets();
-        PostAnalysisSuggestion suggestion = target.suggestion();
-        RescuePriority priority = suggestion != null && suggestion.urgency() != null ? suggestion.urgency() : RescuePriority.NORMAL;
-
-        CreateRescueCaseRequestDto command = CreateRescueCaseRequestDto.builder()
-                .species(facets.species())
-                .description(target.content())
-                .locationText(Stream.of(facets.district(), facets.province()).filter(Objects::nonNull).collect(Collectors.joining(", ")))
-                .provinceName(facets.province())
-                .priority(priority)
-                .latitude(request == null ? null : request.latitude())
-                .longitude(request == null ? null : request.longitude())
-                .contactPhone(request == null ? null : request.contactPhone())
-                .build();
-        // reserve first: a double tap must not create two public rescue cases
-        if (!store.reserveRescueCase(postId)) {
-            throw new BusinessException("A rescue case is already being created for this post", "POST_RESCUE_CASE_EXISTS");
-        }
-        RescueCase created;
-        try {
-            created = rescueCases.report(command, userId);
-        } catch (RuntimeException e) {
-            store.releaseRescueCase(postId);
-            throw e;
-        }
-        store.linkRescueCase(postId, created.getCaseId(), created.getStatus() == null ? null : created.getStatus().name());
-        return created;
-    }
-
-    @Override
     public List<PostAnalysisMetricsDto> metrics() {
         return store.metrics();
     }
@@ -243,7 +195,6 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
                 .analyzedAt(t.analyzedAt())
                 .suggestion(t.suggestion())
                 .facets(t.facets())
-                .rescueSuggestion(t.rescueSuggestion())
                 .rescueCaseId(t.rescueCaseId())
                 .build();
     }

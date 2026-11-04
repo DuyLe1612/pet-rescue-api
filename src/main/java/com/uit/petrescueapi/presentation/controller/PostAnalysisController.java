@@ -1,15 +1,12 @@
 package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.analysis.ConfirmPostAnalysisRequestDto;
-import com.uit.petrescueapi.application.dto.analysis.CreateRescueCaseFromPostRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisModelDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
 import com.uit.petrescueapi.application.dto.analysis.SwitchPostAnalysisModelRequestDto;
-import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
-import com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,7 +30,6 @@ import java.util.UUID;
 public class PostAnalysisController {
 
     private final PostAnalysisCommandPort analysis;
-    private final RescueCaseWebMapper rescueCaseMapper;
 
     @GetMapping("/posts/{id}/analysis")
     @Operation(summary = "Get the AI analysis of a post", description = "suggestion = AI output, facets = what the author confirmed.")
@@ -59,16 +55,6 @@ public class PostAnalysisController {
     @Operation(summary = "Queue the post for another AI analysis (author only)")
     public ResponseEntity<ApiResponse<PostAnalysisResponseDto>> retry(@PathVariable UUID id, Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.ok(analysis.retry(id, userId(authentication))));
-    }
-
-    @PostMapping("/posts/{id}/rescue-case")
-    @Operation(summary = "Create a Rescue Case from a confirmed rescue post (author only)",
-            description = "Species, description, location and priority are prefilled from the confirmed analysis.")
-    public ResponseEntity<ApiResponse<RescueCaseResponseDto>> createRescueCase(@PathVariable UUID id,
-                                                                               @RequestBody(required = false) CreateRescueCaseFromPostRequestDto body,
-                                                                               Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
-                rescueCaseMapper.toDto(analysis.createRescueCase(id, body, userId(authentication)))));
     }
 
     @GetMapping("/admin/ai/post-analysis/metrics")

@@ -14,14 +14,4 @@ public class RescueCompletionMediaJpaEntity {
 
     @EmbeddedId
     private RescueCompletionMediaId id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("completionId")
-    @JoinColumn(name = "completion_id")
-    private RescueCaseCompletionJpaEntity completion;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("mediaId")
-    @JoinColumn(name = "media_id")
-    private MediaFileJpaEntity media;
 }

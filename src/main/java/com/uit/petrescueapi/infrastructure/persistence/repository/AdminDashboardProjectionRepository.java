@@ -12,31 +12,49 @@ import java.util.UUID;
 
 public interface AdminDashboardProjectionRepository extends Repository<PetJpaEntity, UUID> {
 
+    /**
+     * Each table is aggregated on its own: joining them multiplies the rows.
+     * Totals and open work are as at the end of the period. No status history is kept, so the
+     * previous value of a status count is today's status of what existed back then, not a snapshot.
+     * Completed adoptions are the ones completed during the period.
+     */
     @Query(value = """
-        SELECT 
-            COUNT(DISTINCT o.organization_id) AS totalOrganizations,
-            COUNT(DISTINCT CASE WHEN o.status = 'PENDING' THEN o.organization_id END) AS pendingOrganizations,
-            COUNT(DISTINCT p.pet_id) AS totalPets,
-            COUNT(DISTINCT CASE WHEN rc.status = 'IN_PROGRESS' THEN rc.case_id END) AS openRescueCases,
-            COUNT(DISTINCT CASE WHEN aa.status = 'PENDING' THEN aa.application_id END) AS pendingAdoptions,
-            COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.application_id END) AS completedAdoptions,
-
-            COUNT(DISTINCT prev_o.organization_id) AS prevTotalOrganizations,
-            COUNT(DISTINCT CASE WHEN prev_o.status = 'PENDING' THEN prev_o.organization_id END) AS prevPendingOrganizations,
-            COUNT(DISTINCT prev_p.pet_id) AS prevTotalPets,
-            COUNT(DISTINCT CASE WHEN prev_rc.status = 'IN_PROGRESS' THEN prev_rc.case_id END) AS prevOpenRescueCases,
-            COUNT(DISTINCT CASE WHEN prev_aa.status = 'PENDING' THEN prev_aa.application_id END) AS prevPendingAdoptions,
-            COUNT(DISTINCT CASE WHEN prev_aa.status = 'COMPLETED' THEN prev_aa.application_id END) AS prevCompletedAdoptions
-        FROM (SELECT 1 AS dummy) d
-        LEFT JOIN organizations o ON o.is_deleted = false AND o.created_at >= :startDate AND o.created_at < :endDate
-        LEFT JOIN pets p ON p.is_deleted = false AND p.created_at >= :startDate AND p.created_at < :endDate
-        LEFT JOIN rescue_cases rc ON rc.is_deleted = false AND rc.created_at >= :startDate AND rc.created_at < :endDate
-        LEFT JOIN adoption_applications aa ON aa.is_deleted = false AND aa.created_at >= :startDate AND aa.created_at < :endDate
-
-        LEFT JOIN organizations prev_o ON prev_o.is_deleted = false AND prev_o.created_at >= :prevStartDate AND prev_o.created_at < :prevEndDate
-        LEFT JOIN pets prev_p ON prev_p.is_deleted = false AND prev_p.created_at >= :prevStartDate AND prev_p.created_at < :prevEndDate
-        LEFT JOIN rescue_cases prev_rc ON prev_rc.is_deleted = false AND prev_rc.created_at >= :prevStartDate AND prev_rc.created_at < :prevEndDate
-        LEFT JOIN adoption_applications prev_aa ON prev_aa.is_deleted = false AND prev_aa.created_at >= :prevStartDate AND prev_aa.created_at < :prevEndDate
+        WITH o AS (
+            SELECT COUNT(*) FILTER (WHERE created_at < :endDate) AS total,
+                   COUNT(*) FILTER (WHERE created_at < :endDate AND status = 'PENDING') AS pending,
+                   COUNT(*) FILTER (WHERE created_at < :prevEndDate) AS prev_total,
+                   COUNT(*) FILTER (WHERE created_at < :prevEndDate AND status = 'PENDING') AS prev_pending
+            FROM organizations WHERE is_deleted = false
+        ), p AS (
+            SELECT COUNT(*) FILTER (WHERE created_at < :endDate) AS total,
+                   COUNT(*) FILTER (WHERE created_at < :prevEndDate) AS prev_total
+            FROM pets WHERE is_deleted = false
+        ), rc AS (
+            SELECT COUNT(*) FILTER (WHERE created_at < :endDate) AS open,
+                   COUNT(*) FILTER (WHERE created_at < :prevEndDate) AS prev_open
+            FROM rescue_cases WHERE is_deleted = false AND status IN ('REPORTED', 'IN_PROGRESS')
+        ), aa AS (
+            SELECT COUNT(*) FILTER (WHERE status = 'PENDING' AND created_at < :endDate) AS pending,
+                   COUNT(*) FILTER (WHERE status = 'PENDING' AND created_at < :prevEndDate) AS prev_pending,
+                   COUNT(*) FILTER (WHERE status = 'COMPLETED' AND COALESCE(updated_at, created_at) >= :startDate
+                                      AND COALESCE(updated_at, created_at) < :endDate) AS completed,
+                   COUNT(*) FILTER (WHERE status = 'COMPLETED' AND COALESCE(updated_at, created_at) >= :prevStartDate
+                                      AND COALESCE(updated_at, created_at) < :prevEndDate) AS prev_completed
+            FROM adoption_applications WHERE is_deleted = false
+        )
+        SELECT o.total AS totalOrganizations,
+               o.pending AS pendingOrganizations,
+               p.total AS totalPets,
+               rc.open AS openRescueCases,
+               aa.pending AS pendingAdoptions,
+               aa.completed AS completedAdoptions,
+               o.prev_total AS prevTotalOrganizations,
+               o.prev_pending AS prevPendingOrganizations,
+               p.prev_total AS prevTotalPets,
+               rc.prev_open AS prevOpenRescueCases,
+               aa.prev_pending AS prevPendingAdoptions,
+               aa.prev_completed AS prevCompletedAdoptions
+        FROM o, p, rc, aa
     """, nativeQuery = true)
     DashboardProjection getDashboardOverview(
             @Param("startDate") LocalDateTime startDate,
@@ -80,23 +98,39 @@ public interface AdminDashboardProjectionRepository extends Repository<PetJpaEnt
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
+    /** Pets and open work as at the end of the month, adoptions completed during it. */
     @Query(value = """
-        SELECT 
+        SELECT
             o.organization_id AS organizationId,
             o.name AS organizationName,
             CAST(o.status AS VARCHAR) AS status,
-            COUNT(DISTINCT p.pet_id) AS totalPets,
-            COUNT(DISTINCT CASE WHEN rc.status = 'IN_PROGRESS' THEN rc.case_id END) AS openRescueCases,
-            COUNT(DISTINCT CASE WHEN aa.status = 'PENDING' THEN aa.application_id END) AS pendingAdoptions,
-            COUNT(DISTINCT CASE WHEN aa.status = 'COMPLETED' THEN aa.application_id END) AS completedAdoptions,
+            COALESCE(p.total, 0) AS totalPets,
+            COALESCE(rc.open, 0) AS openRescueCases,
+            COALESCE(aa.pending, 0) AS pendingAdoptions,
+            COALESCE(aa.completed, 0) AS completedAdoptions,
             0 AS healthAlerts
         FROM organizations o
-        LEFT JOIN pets p ON p.shelter_id = o.organization_id AND p.is_deleted = false AND p.created_at >= :startDate AND p.created_at < :endDate
-        LEFT JOIN rescue_cases rc ON rc.organization_id = o.organization_id AND rc.is_deleted = false AND rc.created_at >= :startDate AND rc.created_at < :endDate
-        LEFT JOIN adoption_applications aa ON aa.organization_id = o.organization_id AND aa.is_deleted = false AND aa.created_at >= :startDate AND aa.created_at < :endDate
-        WHERE o.is_deleted = false AND o.created_at >= :startDate AND o.created_at < :endDate
-        GROUP BY o.organization_id, o.name, o.status
-        ORDER BY totalPets DESC
+        LEFT JOIN (
+            SELECT shelter_id, COUNT(*) AS total FROM pets
+            WHERE is_deleted = false AND created_at < :endDate
+            GROUP BY shelter_id
+        ) p ON p.shelter_id = o.organization_id
+        LEFT JOIN (
+            SELECT organization_id, COUNT(*) AS open FROM rescue_cases
+            WHERE is_deleted = false AND status IN ('REPORTED', 'IN_PROGRESS') AND created_at < :endDate
+            GROUP BY organization_id
+        ) rc ON rc.organization_id = o.organization_id
+        LEFT JOIN (
+            SELECT organization_id,
+                   COUNT(*) FILTER (WHERE status = 'PENDING' AND created_at < :endDate) AS pending,
+                   COUNT(*) FILTER (WHERE status = 'COMPLETED' AND COALESCE(updated_at, created_at) >= :startDate
+                                      AND COALESCE(updated_at, created_at) < :endDate) AS completed
+            FROM adoption_applications
+            WHERE is_deleted = false
+            GROUP BY organization_id
+        ) aa ON aa.organization_id = o.organization_id
+        WHERE o.is_deleted = false AND o.created_at < :endDate
+        ORDER BY totalPets DESC, organizationName
         LIMIT :limit
     """, nativeQuery = true)
     List<TopOrganizationProjection> getTopOrganizations(
@@ -115,7 +149,7 @@ public interface AdminDashboardProjectionRepository extends Repository<PetJpaEnt
             o.created_at AS createdAt,
             CONCAT('/quan-ly-trung-tam/', o.organization_id) AS actionUrl
         FROM organizations o
-        WHERE o.is_deleted = false AND o.status = 'PENDING' AND o.created_at >= :startDate AND o.created_at < :endDate
+        WHERE o.is_deleted = false AND o.status = 'PENDING' AND o.created_at < :endDate
         UNION ALL
         SELECT 
             CAST(aa.application_id AS VARCHAR) AS taskId,
@@ -128,11 +162,9 @@ public interface AdminDashboardProjectionRepository extends Repository<PetJpaEnt
             CONCAT('/quan-ly-nhan-nuoi/', aa.application_id) AS actionUrl
         FROM adoption_applications aa
         LEFT JOIN pets p ON p.pet_id = aa.pet_id
-        WHERE aa.is_deleted = false AND aa.status = 'PENDING' AND aa.created_at >= :startDate AND aa.created_at < :endDate
-        ORDER BY createdAt DESC
+        WHERE aa.is_deleted = false AND aa.status = 'PENDING' AND aa.created_at < :endDate
+        ORDER BY createdAt ASC
         LIMIT 100
     """, nativeQuery = true)
-    List<PendingTaskProjection> getPendingTasks(
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate);
+    List<PendingTaskProjection> getPendingTasks(@Param("endDate") LocalDateTime endDate);
 }

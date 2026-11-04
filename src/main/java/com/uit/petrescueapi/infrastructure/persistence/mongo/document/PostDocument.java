@@ -44,8 +44,6 @@ public class PostDocument {
     private FacetsDocument facets;
     /** AI analysis state + suggestion (never used for filtering until confirmed into {@link #facets}). */
     private AnalysisDocument analysis;
-    /** NONE | SUGGESTED | ACCEPTED | DISMISSED */
-    private String rescueSuggestion;
     private LocalDateTime createdAt;
     private UUID createdBy;
     private LocalDateTime updatedAt;

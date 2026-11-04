@@ -43,10 +43,13 @@ public class RescueCaseCompletionRepositoryAdapter
                 .map(mapper::toDomain);
     }
     @Override
-    public Optional<RescueCaseCompletion> findByCaseId(
-            UUID caseId) {
+    public Optional<RescueCaseCompletion> findOpenByCaseId(UUID caseId) {
+        return jpa.findOpenByCaseId(caseId).map(mapper::toDomain);
+    }
 
-        return jpa.findByCaseIdAndDeletedFalse(caseId)
-                .map(mapper::toDomain);
+    @Override
+    public java.util.List<RescueCaseCompletion> findPendingToEscalate(java.time.LocalDateTime createdBefore, int limit) {
+        return jpa.findPendingToEscalate(createdBefore, org.springframework.data.domain.PageRequest.of(0, limit)).stream()
+                .map(mapper::toDomain).toList();
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -26,9 +28,7 @@ import java.util.Map;
  *   The counts users see are stored in MongoDB ({@code stats.*}), not read from Redis.
  *
  * <p>The {@link GenericJackson2JsonRedisSerializer} is exposed as a singleton
- * bean so it is created once and reused by both {@code redisTemplate()} and
- * {@code cacheManager()} — the previous implementation allocated a fresh
- * serializer instance inside each {@code @Bean} method.</p>
+ * bean so it is created once. {@code cacheManager()} does not use it, see {@link #cacheValueSerializer()}.</p>
  */
 @Configuration
 @EnableCaching
@@ -63,43 +63,30 @@ public class RedisConfig {
     }
 
     @Bean
-    public RedisCacheManager cacheManager(RedisConnectionFactory factory,
-                                          GenericJackson2JsonRedisSerializer redisJsonSerializer) {
-        RedisSerializationContext.SerializationPair<Object> jsonPair =
-                RedisSerializationContext.SerializationPair.fromSerializer(redisJsonSerializer);
-
+    public RedisCacheManager cacheManager(RedisConnectionFactory factory) {
         Map<String, RedisCacheConfiguration> configs = new HashMap<>();
-
-        configs.put(
-                "admin:dashboard",
-                RedisCacheConfiguration.defaultCacheConfig()
-                        .entryTtl(Duration.ofMinutes(5))
-                        .serializeValuesWith(jsonPair)
-        );
-
-        configs.put(
-                "admin:rescue-stats",
-                RedisCacheConfiguration.defaultCacheConfig()
-                        .entryTtl(Duration.ofMinutes(15))
-                        .serializeValuesWith(jsonPair)
-        );
-
-        configs.put(
-                "admin:province-stats",
-                RedisCacheConfiguration.defaultCacheConfig()
-                        .entryTtl(Duration.ofHours(1))
-                        .serializeValuesWith(jsonPair)
-        );
-
-        configs.put(
-                "admin:pending-tasks",
-                RedisCacheConfiguration.defaultCacheConfig()
-                        .entryTtl(Duration.ofMinutes(2))
-                        .serializeValuesWith(jsonPair)
-        );
+        configs.put("admin:dashboard", cacheConfig(Duration.ofMinutes(5)));
+        configs.put("admin:rescue-stats", cacheConfig(Duration.ofMinutes(15)));
+        configs.put("admin:province-stats", cacheConfig(Duration.ofHours(1)));
+        configs.put("admin:pending-tasks", cacheConfig(Duration.ofMinutes(2)));
 
         return RedisCacheManager.builder(factory)
                 .withInitialCacheConfigurations(configs)
                 .build();
+    }
+
+    /**
+     * JDK serialization, because the JSON serializer returned a {@code LinkedHashMap} that failed
+     * with a ClassCastException on every cache hit. Cached dashboard DTOs must be {@code Serializable}.
+     */
+    RedisSerializer<Object> cacheValueSerializer() {
+        return new JdkSerializationRedisSerializer(getClass().getClassLoader());
+    }
+
+    private RedisCacheConfiguration cacheConfig(Duration ttl) {
+        return RedisCacheConfiguration.defaultCacheConfig()
+                .entryTtl(ttl)
+                .prefixCacheNameWith("v2:")     // values written in the old format stay unread until they expire
+                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(cacheValueSerializer()));
     }
 }

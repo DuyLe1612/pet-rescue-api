@@ -29,6 +29,9 @@ public class CreateRescueCompletionRequestDto {
 
     private String locationNote;
 
+    @Schema(description = "What happened to the animal. TEMP_HOLDING when omitted.")
+    private com.uit.petrescueapi.domain.valueobject.RescueOutcome outcome;
+
     @AssertTrue(message = "You must confirm rescue completion")
     private Boolean confirmRescued;
 }

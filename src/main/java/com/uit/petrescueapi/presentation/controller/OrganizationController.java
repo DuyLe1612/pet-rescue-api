@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.presentation.controller;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.organization.*;
 import com.uit.petrescueapi.application.port.command.OrganizationCommandPort;
 import com.uit.petrescueapi.application.port.query.OrganizationQueryPort;
@@ -39,6 +40,7 @@ public class OrganizationController {
 
     private final OrganizationCommandPort commandPort;
     private final OrganizationQueryPort queryPort;
+    private final com.uit.petrescueapi.application.port.query.RescueCaseQueryPort rescueQueryPort;
     private final OrganizationWebMapper mapper;
     private final OrganizationDomainService orgDomainService;
     private final UserDomainService userDomainService;
@@ -215,6 +217,18 @@ public class OrganizationController {
             throw new BusinessException("User does not belong to any organization", "ORG_NOT_FOUND");
         }
         return ResponseEntity.ok(ApiResponse.ok(result));
+    }
+
+    @GetMapping("/me/rescue-queue")
+    @Operation(summary = "Rescue cases my organization can take",
+            description = "Unassigned open cases in the organization's province, most urgent first, plus rescued animals "
+                    + "waiting for handover. Admins see every province.")
+    public ResponseEntity<ApiResponse<PageResponse<RescueQueueItemDto>>> getRescueQueue(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(rescueQueryPort.findOrganizationQueue(
+                UUID.fromString(authentication.getName()), org.springframework.data.domain.PageRequest.of(page, pageSize)))));
     }
 
     @GetMapping("/map/markers")

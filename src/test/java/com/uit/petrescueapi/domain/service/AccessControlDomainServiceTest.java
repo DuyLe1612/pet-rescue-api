@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
@@ -85,6 +86,35 @@ class AccessControlDomainServiceTest {
     }
 
     @Test
+    void onlyAdminsMoveStatusFreely() {
+        requesterHasRoleInOrg("STAFF");
+        assertThatThrownBy(() -> access.requireCaseStatusChange(assignedCase(), RescueCaseStatus.RESCUED, requester))
+                .isInstanceOf(ForbiddenException.class);
+        assertThatCode(() -> access.requireCaseStatusChange(assignedCase(), RescueCaseStatus.CLOSED, requester))
+                .doesNotThrowAnyException();
+        requesterIsAdmin();
+        assertThatCode(() -> access.requireCaseStatusChange(assignedCase(), RescueCaseStatus.RESCUED, requester))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nobodyApprovesTheirOwnReport() {
+        requesterHasRoleInOrg("STAFF");
+        assertThatThrownBy(() -> access.requireCompletionApprover(assignedCase(), requester, requester))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void contactIsForPeopleWhoNeedIt() {
+        assertThat(access.canViewCaseContact(unassignedCase(), false, null)).isFalse();
+        assertThat(access.canViewCaseContact(unassignedCase(), false, requester)).isFalse();
+        assertThat(access.canViewCaseContact(unassignedCase(), true, requester)).isTrue();
+        assertThat(access.canViewCaseContact(unassignedCase(), false, reporter)).isTrue();
+        requesterHasRoleInOrg("STAFF");
+        assertThat(access.canViewCaseContact(assignedCase(), false, requester)).isTrue();
+    }
+
+    @Test
     void reporterCanCloseButNotMarkOwnCaseRescued() {
         assertThatCode(() -> access.requireCaseStatusChange(unassignedCase(), RescueCaseStatus.CLOSED, reporter))
                 .doesNotThrowAnyException();
@@ -95,14 +125,14 @@ class AccessControlDomainServiceTest {
     @Test
     void reporterCannotApproveOwnCompletionEvenAsStaff() {
         when(members.findOrgRoleByUserId(reporter)).thenReturn("OWNER");
-        assertThatThrownBy(() -> access.requireCompletionApprover(unassignedCase(), reporter))
+        assertThatThrownBy(() -> access.requireCompletionApprover(unassignedCase(), UUID.randomUUID(), reporter))
                 .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
     void orgStaffCanApproveCompletion() {
         requesterHasRoleInOrg("STAFF");
-        assertThatCode(() -> access.requireCompletionApprover(assignedCase(), requester)).doesNotThrowAnyException();
+        assertThatCode(() -> access.requireCompletionApprover(assignedCase(), UUID.randomUUID(), requester)).doesNotThrowAnyException();
     }
 
     @Test

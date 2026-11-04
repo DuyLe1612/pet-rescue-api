@@ -16,6 +16,7 @@ import java.util.UUID;
 public class RescueCaseCompletionResponseDto {
     private UUID completionId;
     private UUID caseId;
+    private String caseCode;
     private LocalDateTime rescuedAt;
     private String rescueNote;
     private String locationNote;
@@ -23,6 +24,11 @@ public class RescueCaseCompletionResponseDto {
     private String verifiedByName;
     private LocalDateTime verifiedAt;
     private List<String> verificationImagesUrl;
+    private UUID submittedBy;
+    private String submittedByName;
+    private String outcome;
+    private String status;
+    private String rejectReason;
 
     @Data
     @Builder

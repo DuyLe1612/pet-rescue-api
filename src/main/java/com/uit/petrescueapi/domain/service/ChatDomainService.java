@@ -120,15 +120,8 @@ public class ChatDomainService {
         conversation.setLastMessageSeq(saved.getMessageSeq());
         conversationRepository.save(conversation);
 
-        List<ConversationParticipant> participants = participantRepository.findByConversationId(conversationId);
-        for (ConversationParticipant participant : participants) {
-            if (participant.getUserId().equals(senderId)) {
-                participantRepository.updateUnreadCount(conversationId, senderId, 0, now);
-            } else {
-                int newUnread = Math.max(0, participant.getUnreadCount()) + 1;
-                participantRepository.updateUnreadCount(conversationId, participant.getUserId(), newUnread, participant.getLastReadAt());
-            }
-        }
+        participantRepository.updateUnreadCount(conversationId, senderId, 0, now);
+        participantRepository.incrementUnreadExcept(conversationId, senderId);
 
         return saved;
     }

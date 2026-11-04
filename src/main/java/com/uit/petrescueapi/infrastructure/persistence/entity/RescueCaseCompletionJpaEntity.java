@@ -38,6 +38,21 @@ public class RescueCaseCompletionJpaEntity extends BaseJpaEntity {
     @Column(name = "verified_at", columnDefinition = "TIMESTAMPTZ")
     private LocalDateTime verifiedAt;
 
+    @Column(name = "submitted_by")
+    private UUID submittedBy;
+
+    @Column(name = "outcome", length = 30)
+    private String outcome;
+
+    @Column(name = "status", nullable = false, length = 20)
+    private String status;
+
+    @Column(name = "reject_reason", columnDefinition = "TEXT")
+    private String rejectReason;
+
+    @Column(name = "escalated_at", columnDefinition = "TIMESTAMPTZ")
+    private LocalDateTime escalatedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "case_id", insertable = false, updatable = false)
     private RescueCaseJpaEntity rescueCase;

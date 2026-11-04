@@ -43,23 +43,16 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
                u.avatar_url AS ownerAvatarUrl,
-               COALESCE(u.phone, own_org.phone) AS ownerPhone,
-               pco.caretaker_user_id AS caretakerUserId,
-               COALESCE(NULLIF(caretaker.full_name, ''), caretaker.username) AS caretakerName,
-               caretaker.avatar_url AS caretakerAvatarUrl,
-               caretaker.phone AS caretakerPhone,
+               own_org.phone AS ownerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
                o.official_link AS organizationUrl,
                o.province_name AS provinceName,
-               CAST(NULLIF(o.province_code, '') AS INTEGER) AS provinceCode,
-               o.ward_name AS wardName,
-               CAST(NULLIF(o.ward_code, '') AS INTEGER) AS wardCode
+               o.ward_name AS wardName
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         LEFT JOIN users u ON pco.owner_type = 'USER' AND pco.owner_id = u.user_id
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
-        LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
@@ -114,23 +107,16 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
                u.avatar_url AS ownerAvatarUrl,
-               COALESCE(u.phone, own_org.phone) AS ownerPhone,
-               pco.caretaker_user_id AS caretakerUserId,
-               COALESCE(NULLIF(caretaker.full_name, ''), caretaker.username) AS caretakerName,
-               caretaker.avatar_url AS caretakerAvatarUrl,
-               caretaker.phone AS caretakerPhone,
+               own_org.phone AS ownerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
                o.official_link AS organizationUrl,
                o.province_name AS provinceName,
-               CAST(o.province_code AS INTEGER) AS provinceCode,
-               o.ward_name AS wardName,
-               CAST(o.ward_code AS INTEGER) AS wardCode
+               o.ward_name AS wardName
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         LEFT JOIN users u ON pco.owner_type = 'USER' AND pco.owner_id = u.user_id
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
-        LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
@@ -188,23 +174,16 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,
                u.avatar_url AS ownerAvatarUrl,
-               COALESCE(u.phone, own_org.phone) AS ownerPhone,
-               pco.caretaker_user_id AS caretakerUserId,
-               COALESCE(NULLIF(caretaker.full_name, ''), caretaker.username) AS caretakerName,
-               caretaker.avatar_url AS caretakerAvatarUrl,
-               caretaker.phone AS caretakerPhone,
+               own_org.phone AS ownerPhone,
                o.organization_id AS organizationId,
                o.name AS organizationName,
                o.official_link AS organizationUrl,
                o.province_name AS provinceName,
-               CAST(o.province_code AS INTEGER) AS provinceCode,
-               o.ward_name AS wardName,
-               CAST(o.ward_code AS INTEGER) AS wardCode
+               o.ward_name AS wardName
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         LEFT JOIN users u ON pco.owner_type = 'USER' AND pco.owner_id = u.user_id
         LEFT JOIN organizations own_org ON pco.owner_type = 'ORGANIZATION' AND pco.owner_id = own_org.organization_id
-        LEFT JOIN users caretaker ON pco.owner_type = 'ORGANIZATION' AND pco.caretaker_user_id = caretaker.user_id
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
@@ -275,9 +254,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                o.name AS organizationName,
                o.official_link AS organizationUrl,
                o.province_name AS provinceName,
-               CAST(o.province_code AS INTEGER) AS provinceCode,
-               o.ward_name AS wardName,
-               CAST(o.ward_code AS INTEGER) AS wardCode
+               o.ward_name AS wardName
         FROM pets p
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         LEFT JOIN users u ON pco.owner_type = 'USER' AND pco.owner_id = u.user_id
@@ -303,13 +280,4 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             """, nativeQuery = true)
     List<String> findImagePublicIdsById(@Param("id") UUID id);
 
-        @Query(value = """
-          SELECT mf.public_id
-          FROM pet_media pm
-          JOIN media_files mf ON pm.media_file_id = mf.media_id
-          JOIN pets p ON pm.pet_id = p.pet_id
-          WHERE p.pet_id = :id AND p.is_deleted = false AND pm.is_primary = TRUE
-          LIMIT 1
-          """, nativeQuery = true)
-        Optional<String> findPrimaryImagePublicIdById(@Param("id") UUID id);
 }

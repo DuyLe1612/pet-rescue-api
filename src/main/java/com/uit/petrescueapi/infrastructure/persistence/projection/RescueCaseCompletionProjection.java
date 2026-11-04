@@ -8,6 +8,7 @@ public interface RescueCaseCompletionProjection {
     UUID getCompletionId();
 
     UUID getCaseId();
+    String getCaseCode();
 
     LocalDateTime getRescuedAt();
 
@@ -20,4 +21,9 @@ public interface RescueCaseCompletionProjection {
     String getVerifiedByName();
 
     LocalDateTime getVerifiedAt();
+    UUID getSubmittedBy();
+    String getSubmittedByName();
+    String getOutcome();
+    String getStatus();
+    String getRejectReason();
 }

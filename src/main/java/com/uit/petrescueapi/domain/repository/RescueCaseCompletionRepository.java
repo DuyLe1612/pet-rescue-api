@@ -14,5 +14,8 @@ public interface RescueCaseCompletionRepository {
     RescueCaseCompletion save(RescueCaseCompletion rescueCaseCompletion);
     Optional<RescueCaseCompletion> findById(UUID id);
     Page<RescueCaseCompletion> findAll(Pageable pageable);
-    Optional<RescueCaseCompletion> findByCaseId(UUID caseId);
+    /** The report that is not rejected; a case has at most one. */
+    Optional<RescueCaseCompletion> findOpenByCaseId(UUID caseId);
+
+    java.util.List<RescueCaseCompletion> findPendingToEscalate(java.time.LocalDateTime createdBefore, int limit);
 }

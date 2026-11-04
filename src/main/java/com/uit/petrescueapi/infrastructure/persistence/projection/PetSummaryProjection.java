@@ -32,10 +32,6 @@ public interface PetSummaryProjection {
     String getOwnerName();
     String getOwnerAvatarUrl();
     String getOwnerPhone();
-    UUID getCaretakerUserId();
-    String getCaretakerName();
-    String getCaretakerAvatarUrl();
-    String getCaretakerPhone();
 
     // ── Organization fields (for nested OrganizationMinimalDto) ─
     UUID getOrganizationId();
@@ -44,7 +40,5 @@ public interface PetSummaryProjection {
 
     // ── Location fields (from organization) ─
     String getProvinceName();
-    Integer getProvinceCode();
     String getWardName();
-    Integer getWardCode();
 }

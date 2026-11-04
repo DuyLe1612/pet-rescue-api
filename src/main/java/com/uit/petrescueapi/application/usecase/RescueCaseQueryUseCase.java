@@ -1,5 +1,14 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
+import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
+import com.uit.petrescueapi.domain.entity.RescueCaseClaim;
+import com.uit.petrescueapi.domain.repository.OrganizationMemberRepository;
+import com.uit.petrescueapi.domain.service.AccessControlDomainService;
+import com.uit.petrescueapi.domain.service.OrganizationDomainService;
+import com.uit.petrescueapi.domain.service.RescueCaseDomainService;
+import com.uit.petrescueapi.domain.service.RescueClaimDomainService;
+import com.uit.petrescueapi.domain.service.UserDomainService;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
@@ -30,10 +39,20 @@ import java.util.UUID;
 public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
     private final RescueCaseQueryDataPort queryDataPort;
+    private final RescueCaseDomainService caseDomainService;
+    private final RescueClaimDomainService claimDomainService;
+    private final OrganizationDomainService organizationDomainService;
+    private final UserDomainService userDomainService;
+    private final OrganizationMemberRepository memberRepository;
+    private final AccessControlDomainService accessControl;
     @Override
-    public RescueCaseResponseDto findById(UUID caseId) {
+    public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
         log.debug("Query: find rescue case by id {}", caseId);
-        return queryDataPort.findById(caseId);
+        RescueCaseResponseDto dto = queryDataPort.findById(caseId, viewerId);
+        if (!accessControl.canViewCaseContact(dto.isViewerIsReporter(), dto.getOrganizationId(), dto.isViewerHasActiveClaim(), viewerId)) {
+            dto.setContactPhone(null);
+        }
+        return dto;
     }
 
     @Override
@@ -87,5 +106,39 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     public Page<RescueCaseCompletionResponseDto> findAllCompletions(boolean isResolved,Pageable pageable) {
         log.debug("Query: find all completions");
         return queryDataPort.findAllCompletion(isResolved,pageable);
+    }
+
+    @Override
+    public Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable) {
+        return queryDataPort.findCompletionReviewQueue(pageable);
+    }
+
+    @Override
+    public Page<RescueQueueItemDto> findOrganizationQueue(UUID requesterId, Pageable pageable) {
+        if (accessControl.isAdmin(requesterId)) {
+            return queryDataPort.findOrganizationQueue(null, pageable);
+        }
+        UUID organizationId = memberRepository.findOrganizationIdByUserId(requesterId);
+        accessControl.requireOrganizationHandler(organizationId, requesterId);
+        return queryDataPort.findOrganizationQueue(organizationDomainService.findById(organizationId).getProvinceCode(), pageable);
+    }
+
+    @Override
+    public List<RescueClaimResponseDto> findClaimsOfCase(UUID caseId, UUID requesterId) {
+        accessControl.requireCaseEditor(caseDomainService.findById(caseId), requesterId);
+        return claimDomainService.findActiveByCase(caseId).stream().map(claim -> {
+            RescueClaimResponseDto dto = RescueClaimResponseDto.from(claim);
+            dto.setUsername(userDomainService.findById(claim.getUserId()).getUsername());
+            return dto;
+        }).toList();
+    }
+
+    @Override
+    public List<RescueClaimResponseDto> findMyActiveClaims(UUID userId) {
+        return claimDomainService.findActiveByUser(userId).stream().map(claim -> {
+            RescueClaimResponseDto dto = RescueClaimResponseDto.from(claim);
+            dto.setCaseCode(caseDomainService.findById(claim.getCaseId()).getCaseCode());
+            return dto;
+        }).toList();
     }
 }

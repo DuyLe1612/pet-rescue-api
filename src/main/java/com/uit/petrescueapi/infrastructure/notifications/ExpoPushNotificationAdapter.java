@@ -25,6 +25,9 @@ public class ExpoPushNotificationAdapter implements PushNotificationPort {
     private final ObjectMapper objectMapper;
 
     private static final String EXPO_URL = "https://exp.host/--/api/v2/push/send";
+    private static final java.time.Duration REQUEST_TIMEOUT = java.time.Duration.ofSeconds(10);
+    /** Shared: every client owns a selector thread, and without timeouts a dead host holds an async thread forever. */
+    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
 
     @Override
     public void sendPushToTokens(List<String> expoPushTokens, String title, String body, Map<String, Object> data) {
@@ -46,16 +49,16 @@ public class ExpoPushNotificationAdapter implements PushNotificationPort {
             String payload = objectMapper.writeValueAsString(messages);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(EXPO_URL))
+                    .timeout(REQUEST_TIMEOUT)
                     .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                     .POST(HttpRequest.BodyPublishers.ofString(payload))
                     .build();
 
-            HttpClient client = HttpClient.newHttpClient();
             int maxAttempts = 3;
             long backoff = 500L;
             for (int attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    HttpResponse<String> resp = client.send(request, HttpResponse.BodyHandlers.ofString());
+                    HttpResponse<String> resp = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
                     int status = resp.statusCode();
                     String bodyResp = resp.body();
                     if (status >= 200 && status < 300) {

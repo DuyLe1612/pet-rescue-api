@@ -73,8 +73,7 @@ public class MongoPostRepositoryAdapter implements PostRepository {
                     .setOnInsert("createdAt", post.getCreatedAt())
                     .setOnInsert("createdBy", post.getCreatedBy())
                     // DA2: every new post is queued for AI analysis
-                    .setOnInsert("analysis", AnalysisDocument.pending(LocalDateTime.now()))
-                    .setOnInsert("rescueSuggestion", "NONE");
+                    .setOnInsert("analysis", AnalysisDocument.pending(LocalDateTime.now()));
         } else if (!Objects.equals(existing.getContent(), post.getContent()) && !isFinal(existing.getAnalysis())) {
             // the suggestion described the old text; a human decision is never discarded
             update.set("analysis.status", PostAnalysisStatus.PENDING.name())

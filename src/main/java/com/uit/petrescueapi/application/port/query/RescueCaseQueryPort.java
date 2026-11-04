@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.port.query;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
+import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto;
@@ -13,7 +15,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface RescueCaseQueryPort {
-    RescueCaseResponseDto findById(UUID caseId);
+    /** {@code viewerId} is null for an anonymous caller. */
+    RescueCaseResponseDto findById(UUID caseId, UUID viewerId);
     Page<RescueCaseSummaryResponseDto> findAll(String search, Pageable pageable);
     Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, Pageable pageable);
     Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, Pageable pageable);
@@ -33,5 +36,14 @@ public interface RescueCaseQueryPort {
 
     RescueCaseCompletionResponseDto getCompletionDetails(UUID caseId);
     Page<RescueCaseCompletionResponseDto> findAllCompletions(boolean isResolved,Pageable pageable);
+
+    Page<RescueCaseCompletionResponseDto> findCompletionReviewQueue(Pageable pageable);
+
+    /** Admins see every province; members see their organization's province. */
+    Page<RescueQueueItemDto> findOrganizationQueue(UUID requesterId, Pageable pageable);
+
+    List<RescueClaimResponseDto> findClaimsOfCase(UUID caseId, UUID requesterId);
+
+    List<RescueClaimResponseDto> findMyActiveClaims(UUID userId);
 }
 

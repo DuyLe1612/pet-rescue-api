@@ -7,9 +7,9 @@ import java.util.UUID;
 
 /**
  * Response DTO for organization (shelter or vet center).
- * Optimized: excludes unused fields (organizationCode, description, streetAddress, phone, 
- * email, imageUrl, officialLink, requestedByUserId, requestedByUsername, createdBy, 
- * createdAt, updatedAt).
+ * Carries every field the edit form sends back in {@link CreateOrganizationRequestDto}.
+ * Excludes organizationCode, requestedByUserId, requestedByUsername, createdBy,
+ * createdAt, updatedAt.
  */
 @Data
 @Builder
@@ -27,11 +27,35 @@ public class OrganizationResponseDto {
     @Schema(example = "SHELTER", allowableValues = {"SHELTER", "VET_CENTER"})
     private String type;
 
+    @Schema(example = "A shelter dedicated to rescuing and rehoming abandoned pets.")
+    private String description;
+
+    @Schema(example = "123 Nguyen Trai")
+    private String streetAddress;
+
+    @Schema(example = "00001")
+    private String wardCode;
+
     @Schema(example = "Phuong 1")
     private String wardName;
 
+    @Schema(example = "79")
+    private String provinceCode;
+
     @Schema(example = "Ho Chi Minh")
     private String provinceName;
+
+    @Schema(example = "+84-28-1234-5678")
+    private String phone;
+
+    @Schema(example = "contact@shelter.vn")
+    private String email;
+
+    @Schema(example = "https://cdn.example.com/organizations/org-cover.jpg")
+    private String imageUrl;
+
+    @Schema(example = "https://facebook.com/happypaws")
+    private String officialLink;
 
     @Schema(example = "10.762622")
     private Double latitude;
