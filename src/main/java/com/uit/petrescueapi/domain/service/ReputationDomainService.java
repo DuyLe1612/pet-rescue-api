@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.domain.service;
 
-import com.uit.petrescueapi.domain.entity.UserReputation;
 import com.uit.petrescueapi.domain.repository.UserReputationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,15 +19,7 @@ public class ReputationDomainService {
     private final JdbcTemplate jdbcTemplate;
 
     public void adjust(UUID userId, int delta, String reason, String referenceType, UUID referenceId, UUID actorId) {
-        UserReputation reputation = userReputationRepository.findByUserId(userId)
-                .orElse(UserReputation.builder()
-                        .userId(userId)
-                        .score(0)
-                        .level("NEW")
-                        .build());
-        reputation.setScore((reputation.getScore() == null ? 0 : reputation.getScore()) + delta);
-        reputation.setUpdatedAt(LocalDateTime.now());
-        userReputationRepository.save(reputation);
+        userReputationRepository.addToScore(userId, delta, LocalDateTime.now());
         jdbcTemplate.update("""
                 INSERT INTO reputation_logs (log_id, user_id, delta, reason, reference_type, reference_id, created_at, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)

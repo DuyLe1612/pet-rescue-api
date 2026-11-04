@@ -23,6 +23,11 @@ public class UserReputationRepositoryAdapter implements UserReputationRepository
     }
 
     @Override
+    public void addToScore(UUID userId, int delta, java.time.LocalDateTime now) {
+        jpa.addToScore(userId, delta, now);
+    }
+
+    @Override
     public Optional<UserReputation> findByUserId(UUID userId) {
         // The @Id of UserReputationJpaEntity is userId, so findById works
         return jpa.findById(userId).map(mapper::toDomain);
