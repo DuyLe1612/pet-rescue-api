@@ -107,7 +107,7 @@ public class AdminDashboardQueryAdapter implements DashboardDataPort {
     private String mapPriorityLabel(String priority) {
         return switch (priority) {
             case "LOW" -> "Thấp";
-            case "MEDIUM" -> "Trung bình";
+            case "NORMAL" -> "Bình thường";
             case "HIGH" -> "Cao";
             case "CRITICAL" -> "Khẩn cấp";
             default -> priority;
@@ -138,7 +138,7 @@ public class AdminDashboardQueryAdapter implements DashboardDataPort {
     public PendingTasksDto getPendingTasks(int month, int year) {
         LocalDateTime[] range = monthRange(month, year);
 
-        var projs = projectionRepository.getPendingTasks(range[0], range[1]);
+        var projs = projectionRepository.getPendingTasks(range[1]);
         return PendingTasksDto.builder()
                 .items(projs.stream()
                         .map(p -> new PendingTaskItemDto(
