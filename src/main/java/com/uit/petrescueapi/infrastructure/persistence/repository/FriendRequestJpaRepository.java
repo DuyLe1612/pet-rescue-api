@@ -62,24 +62,8 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
                  LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY COALESCE(fr.responded_at, fr.created_at) DESC
             """,
-            countQuery = """
-            SELECT COUNT(*)
-            FROM friend_requests fr
-            JOIN users u
-              ON u.user_id = CASE
-                  WHEN fr.requester_id = :userId THEN fr.addressee_id
-                  ELSE fr.requester_id
-              END
-            WHERE (fr.requester_id = :userId OR fr.addressee_id = :userId)
-              AND fr.status = 'ACCEPTED'
-              AND fr.is_deleted = false
-              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR COALESCE(fr.responded_at, fr.created_at) < CAST(:cursor AS TIMESTAMP))
-              AND (:search IS NULL OR :search = '' OR
-                   LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR
-                   LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
-            """,
             nativeQuery = true)
-    Page<FriendSummaryProjection> findFriendsByUserCursor(@Param("userId") UUID userId,
+    org.springframework.data.domain.Slice<FriendSummaryProjection> findFriendsByUserCursor(@Param("userId") UUID userId,
                                                           @Param("cursor") java.time.LocalDateTime cursor,
                                                           @Param("search") String search,
                                                           Pageable pageable);
@@ -103,20 +87,8 @@ public interface FriendRequestJpaRepository extends JpaRepository<FriendRequestJ
                    LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
             ORDER BY fr.created_at DESC
             """,
-            countQuery = """
-            SELECT COUNT(*)
-            FROM friend_requests fr
-            JOIN users u ON u.user_id = fr.requester_id
-            WHERE fr.addressee_id = :userId
-              AND fr.status = :status
-              AND fr.is_deleted = false
-              AND (CAST(:cursor AS TIMESTAMP) IS NULL OR fr.created_at < CAST(:cursor AS TIMESTAMP))
-              AND (:search IS NULL OR :search = '' OR
-                   LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR
-                   LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
-            """,
             nativeQuery = true)
-    Page<FriendRequestProjection> findPendingByAddresseeCursor(@Param("userId") UUID userId,
+    org.springframework.data.domain.Slice<FriendRequestProjection> findPendingByAddresseeCursor(@Param("userId") UUID userId,
                                    @Param("status") String status,
                                    @Param("cursor") java.time.LocalDateTime cursor,
                                    @Param("search") String search,

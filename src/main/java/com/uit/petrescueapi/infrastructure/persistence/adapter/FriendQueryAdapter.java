@@ -23,20 +23,20 @@ public class FriendQueryAdapter implements FriendQueryDataPort {
 
         @Override
         public Page<FriendSummaryDto> listFriendsByCursor(UUID userId, java.time.LocalDateTime cursor, String search, Pageable pageable) {
-        return friendRequestRepository.findFriendsByUserCursor(userId, cursor, search, pageable)
+        return new org.springframework.data.domain.PageImpl<>(friendRequestRepository.findFriendsByUserCursor(userId, cursor, search, pageable)
             .map(friend -> FriendSummaryDto.builder()
                 .userId(friend.getUserId())
                 .username(friend.getUsername())
                 .fullName(friend.getFullName())
                 .avatarUrl(friend.getAvatarUrl())
                 .createdAt(friend.getCreatedAt())
-                .build());
+                .build()).getContent());
         }
 
         @Override
         public Page<FriendRequestDto> listPendingRequestsByCursor(UUID userId, java.time.LocalDateTime cursor, String search, Pageable pageable) {
-        return friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING.name(), cursor, search, pageable)
-            .map(this::toRequestDto);
+        return new org.springframework.data.domain.PageImpl<>(friendRequestRepository.findPendingByAddresseeCursor(userId, FriendRequestStatus.PENDING.name(), cursor, search, pageable)
+            .map(this::toRequestDto).getContent());
         }
 
         private FriendRequestDto toRequestDto(FriendRequestProjection request) {
