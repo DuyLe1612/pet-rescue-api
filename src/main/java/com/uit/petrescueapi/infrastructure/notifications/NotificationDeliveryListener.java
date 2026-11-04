@@ -15,6 +15,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /** Best effort: the notification is already stored, so a failed delivery loses nothing. */
 @Component
@@ -29,13 +30,17 @@ public class NotificationDeliveryListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void deliver(NotificationsCreatedEvent event) {
+        Map<UUID, String> tokens = users.findExpoPushTokensByIds(
+                event.notifications().stream().map(Notification::getUserId).distinct().toList());
         for (Notification notification : event.notifications()) {
             try {
                 realtime.publishNotification(notification.getUserId(), NotificationResponseDto.from(notification));
-                users.findExpoPushTokenById(notification.getUserId()).ifPresent(token ->
-                        push.sendPushToTokens(List.of(token), notification.getTitle(), notification.getBody(),
-                                Map.of("type", notification.getType().name(),
-                                        "data", notification.getData() == null ? Map.of() : notification.getData())));
+                String token = tokens.get(notification.getUserId());
+                if (token != null) {
+                    push.sendPushToTokens(List.of(token), notification.getTitle(), notification.getBody(),
+                            Map.of("type", notification.getType().name(),
+                                    "data", notification.getData() == null ? Map.of() : notification.getData()));
+                }
             } catch (RuntimeException e) {
                 log.warn("Could not deliver notification {}: {}", notification.getNotificationId(), e.getMessage());
             }
