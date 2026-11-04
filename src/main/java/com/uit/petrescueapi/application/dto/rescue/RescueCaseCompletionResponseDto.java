@@ -16,6 +16,7 @@ import java.util.UUID;
 public class RescueCaseCompletionResponseDto {
     private UUID completionId;
     private UUID caseId;
+    private String caseCode;
     private LocalDateTime rescuedAt;
     private String rescueNote;
     private String locationNote;

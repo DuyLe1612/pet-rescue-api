@@ -8,6 +8,7 @@ public interface RescueCaseCompletionProjection {
     UUID getCompletionId();
 
     UUID getCaseId();
+    String getCaseCode();
 
     LocalDateTime getRescuedAt();
 

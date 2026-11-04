@@ -20,7 +20,7 @@ import java.util.UUID;
  */
 public interface RescueCaseQueryDataPort {
 
-    RescueCaseResponseDto findById(UUID caseId);
+    RescueCaseResponseDto findById(UUID caseId, UUID viewerId);
 
     Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
 

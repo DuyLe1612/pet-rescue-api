@@ -2,7 +2,6 @@ package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
-import com.uit.petrescueapi.domain.entity.RescueCase;
 import com.uit.petrescueapi.domain.entity.RescueCaseClaim;
 import com.uit.petrescueapi.domain.repository.OrganizationMemberRepository;
 import com.uit.petrescueapi.domain.service.AccessControlDomainService;
@@ -49,24 +48,10 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     @Override
     public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
         log.debug("Query: find rescue case by id {}", caseId);
-        RescueCaseResponseDto dto = queryDataPort.findById(caseId);
-        RescueCase rescueCase = caseDomainService.findById(caseId);
-        List<RescueCaseClaim> claims = claimDomainService.findActiveByCase(caseId);
-        boolean viewerHasClaim = viewerId != null && claims.stream().anyMatch(c -> viewerId.equals(c.getUserId()));
-
-        if (!accessControl.canViewCaseContact(rescueCase, viewerHasClaim, viewerId)) {
+        RescueCaseResponseDto dto = queryDataPort.findById(caseId, viewerId);
+        if (!accessControl.canViewCaseContact(dto.isViewerIsReporter(), dto.getOrganizationId(), dto.isViewerHasActiveClaim(), viewerId)) {
             dto.setContactPhone(null);
         }
-        dto.setOrganizationId(rescueCase.getOrganizationId());
-        dto.setPetId(rescueCase.getPetId());
-        dto.setNeedsHelp(rescueCase.isNeedsHelp());
-        dto.setActiveClaimCount(claims.size());
-        dto.setViewerIsReporter(viewerId != null && viewerId.equals(rescueCase.getReportedBy()));
-        dto.setViewerHasActiveClaim(viewerHasClaim);
-        caseDomainService.findOpenCompletion(caseId).ifPresent(completion -> {
-            dto.setCompletionId(completion.getCompletionId());
-            dto.setCompletionStatus(completion.getStatus() == null ? null : completion.getStatus().name());
-        });
         return dto;
     }
 

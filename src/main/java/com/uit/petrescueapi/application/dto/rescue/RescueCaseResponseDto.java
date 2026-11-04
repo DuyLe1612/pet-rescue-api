@@ -10,8 +10,7 @@ import java.util.UUID;
 
 /**
  * Response DTO for rescue case.
- * Optimized: excludes unused fields (petId, petName, reportedBy, organizationId, 
- * organizationName, size, locationText, wardName, provinceName, resolvedAt, createdAt).
+ * Excludes petName, reportedBy, organizationName, size, resolvedAt and createdAt.
  */
 @Data
 @Builder
@@ -31,6 +30,9 @@ public class RescueCaseResponseDto {
     private String status;
     private Double latitude;
     private Double longitude;
+    private String locationText;
+    private String wardName;
+    private String provinceName;
     private LocalDateTime reportedAt;
     private List<String> imageUrls;
     @Schema(description = "Only for the reporter, people with an active claim, the handling organization and admins")

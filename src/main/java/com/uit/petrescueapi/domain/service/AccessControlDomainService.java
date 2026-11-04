@@ -110,13 +110,18 @@ public class AccessControlDomainService {
 
     /** The phone number is shared only with people who need it to reach the animal. */
     public boolean canViewCaseContact(RescueCase rescueCase, boolean hasActiveClaim, UUID viewerId) {
+        return canViewCaseContact(viewerId != null && viewerId.equals(rescueCase.getReportedBy()),
+                rescueCase.getOrganizationId(), hasActiveClaim, viewerId);
+    }
+
+    public boolean canViewCaseContact(boolean viewerIsReporter, UUID organizationId, boolean hasActiveClaim, UUID viewerId) {
         if (viewerId == null) {
             return false;
         }
         return hasActiveClaim
-                || viewerId.equals(rescueCase.getReportedBy())
+                || viewerIsReporter
                 || isAdmin(viewerId)
-                || hasOrgRole(rescueCase.getOrganizationId(), viewerId, CASE_HANDLER_ROLES);
+                || hasOrgRole(organizationId, viewerId, CASE_HANDLER_ROLES);
     }
 
     /** OWNER or STAFF of this organization, or an admin. A null organization only admits admins. */
