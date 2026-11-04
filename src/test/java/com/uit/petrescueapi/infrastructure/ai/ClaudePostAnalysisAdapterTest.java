@@ -19,15 +19,29 @@ class ClaudePostAnalysisAdapterTest {
     @Test
     void outputSchemaPassesTheSdkStructuredOutputValidation() {
         // class initialisation runs the SDK's local schema validation for ModelOutput
-        assertThatCode(() -> ClaudePostAnalysisAdapter.OUTPUT_FORMAT.validate()).doesNotThrowAnyException();
-        assertThat(ClaudePostAnalysisAdapter.OUTPUT_FORMAT.schema().toString())
+        assertThatCode(() -> PostAnalysisContract.OUTPUT_FORMAT.validate()).doesNotThrowAnyException();
+        assertThat(PostAnalysisContract.OUTPUT_FORMAT.schema().toString())
                 .contains("category").contains("needsRescue").contains("RESCUE");
     }
 
     @Test
+    void requestUsesTheChosenModel() {
+        assertThat(ClaudePostAnalysisAdapter.requestParams("x", catalog, "claude-sonnet-5-5").model().asString())
+                .isEqualTo("claude-sonnet-5-5");
+    }
+
+    @Test
+    void serverFallbackIsSentOnlyForModelsThatHaveIt() {
+        assertThat(ClaudePostAnalysisAdapter.requestParams("x", catalog, "claude-opus-5-5")._additionalBodyProperties())
+                .containsKey("fallbacks");
+        assertThat(ClaudePostAnalysisAdapter.requestParams("x", catalog, "claude-haiku-5-5")._additionalBodyProperties())
+                .doesNotContainKey("fallbacks");
+    }
+
+    @Test
     void systemPromptIsDeterministicAndListsTheCatalog() {
-        String a = ClaudePostAnalysisAdapter.systemPrompt(catalog);
-        String b = ClaudePostAnalysisAdapter.systemPrompt(new Catalog(List.of("Cat", "Dog"), List.of("injured", "rescue")));
+        String a = PostAnalysisContract.systemPrompt(catalog);
+        String b = PostAnalysisContract.systemPrompt(new Catalog(List.of("Cat", "Dog"), List.of("injured", "rescue")));
 
         assertThat(a).isEqualTo(b);                     // byte-stable → cacheable prefix
         assertThat(a).contains("Cat, Dog").contains("injured, rescue");
@@ -42,7 +56,7 @@ class ClaudePostAnalysisAdapterTest {
                  "tags":["injured"],"categoryConfidence":0.95,"speciesConfidence":0.9,"locationConfidence":0.8}
                 """;
 
-        PostAnalysisSuggestion s = ClaudePostAnalysisAdapter.toSuggestion(ClaudePostAnalysisAdapter.parse(json));
+        PostAnalysisSuggestion s = PostAnalysisContract.toSuggestion(PostAnalysisContract.parse(json));
 
         assertThat(s.category()).isEqualTo(PostCategory.RESCUE);
         assertThat(s.species()).isEqualTo("Dog");
@@ -54,10 +68,10 @@ class ClaudePostAnalysisAdapterTest {
 
     @Test
     void emptyStringsMeanUnknown() {
-        var out = new ClaudePostAnalysisAdapter.ModelOutput(PostCategory.GENERAL, "", "", "", "", false, "",
-                ClaudePostAnalysisAdapter.Urgency.NONE, List.of(), 0.6, 0.0, 0.0);
+        var out = new PostAnalysisContract.ModelOutput(PostCategory.GENERAL, "", "", "", "", false, "",
+                PostAnalysisContract.Urgency.NONE, List.of(), 0.6, 0.0, 0.0);
 
-        PostAnalysisSuggestion s = ClaudePostAnalysisAdapter.toSuggestion(out);
+        PostAnalysisSuggestion s = PostAnalysisContract.toSuggestion(out);
 
         assertThat(s.species()).isNull();
         assertThat(s.district()).isNull();

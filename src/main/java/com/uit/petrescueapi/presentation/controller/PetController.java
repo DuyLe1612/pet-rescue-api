@@ -77,21 +77,25 @@ public class PetController {
     @PutMapping("/{id}")
     @Operation(summary = "Update an existing pet")
     public ResponseEntity<ApiResponse<PetResponseDto>> update(@PathVariable UUID id,
-                                                       @Valid @RequestBody UpdatePetRequestDto cmd) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(petCommandPort.update(id, cmd))));
+                                                       @Valid @RequestBody UpdatePetRequestDto cmd,
+                                                       Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(petCommandPort.update(id, cmd, requesterId))));
     }
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Change pet status")
     public ResponseEntity<ApiResponse<PetResponseDto>> changeStatus(@PathVariable UUID id,
-                                                             @RequestParam PetStatus status) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(petCommandPort.changeStatus(id, status))));
+                                                             @RequestParam PetStatus status,
+                                                             Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(petCommandPort.changeStatus(id, status, requesterId))));
     }
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Soft-delete a pet")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        petCommandPort.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id, Authentication authentication) {
+        petCommandPort.delete(id, UUID.fromString(authentication.getName()));
         return ResponseEntity.ok(ApiResponse.ok(null, "Pet deleted"));
     }
 

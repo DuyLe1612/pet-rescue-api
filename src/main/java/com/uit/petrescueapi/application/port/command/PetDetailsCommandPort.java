@@ -9,7 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.UUID;
 
 public interface PetDetailsCommandPort {
-    PetMedicalRecord addMedicalRecord(UUID petId, CreateMedicalRecordRequestDto cmd);
+    PetMedicalRecord addMedicalRecord(UUID petId, CreateMedicalRecordRequestDto cmd, UUID requesterId);
 
     PetMedia addMedia(UUID petId, MultipartFile file, boolean primary, UUID requesterId);
 

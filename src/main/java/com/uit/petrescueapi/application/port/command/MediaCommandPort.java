@@ -20,4 +20,10 @@ public interface MediaCommandPort {
     MediaFile confirmUpload(UUID mediaId, String targetFolder);
     
     void delete(UUID mediaId);
+
+    /** Confirm requested over the API: only the uploader or an admin. */
+    MediaFile confirmUpload(UUID mediaId, String targetFolder, UUID requesterId);
+
+    /** Delete requested over the API: only the uploader or an admin. */
+    void delete(UUID mediaId, UUID requesterId);
 }

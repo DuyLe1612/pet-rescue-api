@@ -17,7 +17,7 @@ class CommentCommandUseCaseTest {
     void createCommentPublishesCreatedEvent() {
         CommentDomainService domain = mock(CommentDomainService.class);
         EventPublisher publisher = mock(EventPublisher.class);
-        CommentCommandUseCase useCase = new CommentCommandUseCase(domain, publisher);
+        CommentCommandUseCase useCase = new CommentCommandUseCase(domain, mock(com.uit.petrescueapi.domain.service.AccessControlDomainService.class), publisher);
 
         UUID postId = UUID.randomUUID();
         UUID authorId = UUID.randomUUID();

@@ -8,10 +8,12 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * Redis-backed counter and membership service for social features.
+ * Redis-backed de-duplication for the social counter listeners.
  *
- * <p>Likes are stored as ZSETs where member = userId and score = timestamp.
- * Idempotency is guaranteed by ZADD NX semantics (addIfAbsent).</p>
+ * <p>Likes are stored as ZSETs where member = userId and score = timestamp. ZADD NX
+ * ({@code addIfAbsent}) returns true only the first time, so a redelivered RabbitMQ message does
+ * not increment the MongoDB counter twice. Comment/reply counts are plain INCR keys and are not
+ * idempotent. The displayed counts live in MongoDB; the read methods here are currently unused.</p>
  */
 @Service
 @RequiredArgsConstructor

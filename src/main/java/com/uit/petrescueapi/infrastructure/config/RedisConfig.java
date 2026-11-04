@@ -18,11 +18,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Redis configuration for caching and counter management.
- * Used for:
- * - Denormalized like counters (ZSET for idempotency)
- * - Comment counters
- * - Fast read-path for social media features
+ * Redis configuration. Redis is used for:
+ * - Spring Cache for the admin dashboard ({@code @Cacheable} in {@code AdminDashboardUsecase},
+ *   per-cache TTLs below)
+ * - Login lockout counters ({@code LoginAttemptService}, uses {@code StringRedisTemplate})
+ * - Like de-duplication for the RabbitMQ counter listeners ({@code RedisCounterService}, ZSET).
+ *   The counts users see are stored in MongoDB ({@code stats.*}), not read from Redis.
  *
  * <p>The {@link GenericJackson2JsonRedisSerializer} is exposed as a singleton
  * bean so it is created once and reused by both {@code redisTemplate()} and

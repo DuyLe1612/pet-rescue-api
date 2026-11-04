@@ -14,9 +14,9 @@ import java.util.UUID;
  */
 public interface PetDetailsQueryPort {
 
-    Page<PetMedicalRecordResponseDto> findMedicalRecords(UUID petId, Pageable pageable);
+    Page<PetMedicalRecordResponseDto> findMedicalRecords(UUID petId, Pageable pageable, UUID requesterId);
 
-    Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable);
+    Page<PetOwnershipHistoryDisplayDto> findOwnerships(UUID petId, Pageable pageable, UUID requesterId);
 
     Page<PetMediaResponseDto> findDiaryMedia(UUID petId, Pageable pageable);
 }

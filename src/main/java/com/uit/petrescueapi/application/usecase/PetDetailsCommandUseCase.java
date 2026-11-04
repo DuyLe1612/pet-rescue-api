@@ -8,11 +8,10 @@ import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetMedicalRecord;
 import com.uit.petrescueapi.domain.entity.PetMedia;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
-import com.uit.petrescueapi.domain.repository.PetCurrentOwnerRepository;
 import com.uit.petrescueapi.domain.repository.PetMedicalRecordRepository;
 import com.uit.petrescueapi.domain.repository.PetMediaRepository;
+import com.uit.petrescueapi.domain.service.AccessControlDomainService;
 import com.uit.petrescueapi.domain.service.PetDomainService;
-import com.uit.petrescueapi.domain.service.UserDomainService;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,12 +37,12 @@ public class PetDetailsCommandUseCase implements PetDetailsCommandPort {
     private final MediaCommandPort mediaCommandPort;
     private final MediaQueryPort mediaQueryPort;
     private final PetDomainService petDomainService;
-    private final UserDomainService userDomainService;
-    private final PetCurrentOwnerRepository currentOwnerRepository;
+    private final AccessControlDomainService accessControl;
 
     @Override
-    public PetMedicalRecord addMedicalRecord(UUID petId, CreateMedicalRecordRequestDto cmd) {
+    public PetMedicalRecord addMedicalRecord(UUID petId, CreateMedicalRecordRequestDto cmd, UUID requesterId) {
         log.debug("Command: add medical record for pet {}", petId);
+        ensureCanManagePet(petId, requesterId);
         PetMedicalRecord record = PetMedicalRecord.builder()
                 .recordId(UUID.randomUUID())
                 .petId(petId)
@@ -123,18 +122,7 @@ public class PetDetailsCommandUseCase implements PetDetailsCommandPort {
     }
 
     private void ensureCanManagePet(UUID petId, UUID requesterId) {
-        Pet pet = petDomainService.findById(petId);
-        boolean isAdmin = userDomainService.hasRole(requesterId, "ADMIN");
-        if (isAdmin) return;
-
-        var currentOwner = currentOwnerRepository.findByPetId(petId)
-                .orElseThrow(() -> new ForbiddenException("Pet has no current owner"));
-        if ("USER".equals(currentOwner.getOwnerType()) && requesterId.equals(currentOwner.getOwnerId())) {
-            return;
-        }
-        if ("ORGANIZATION".equals(currentOwner.getOwnerType()) && requesterId.equals(currentOwner.getCaretakerUserId())) {
-            return;
-        }
-        throw new ForbiddenException("You are not allowed to manage media for this pet");
+        petDomainService.findById(petId);
+        accessControl.requirePetManager(petId, requesterId);
     }
 }

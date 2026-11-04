@@ -29,6 +29,7 @@ public class TagController {
     private final TagWebMapper mapper;
 
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Create a new tag")
     public ResponseEntity<ApiResponse<TagResponseDto>> create(
             @Valid @RequestBody CreateTagRequestDto cmd) {
@@ -37,6 +38,7 @@ public class TagController {
     }
 
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Delete a tag")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         commandPort.delete(id);

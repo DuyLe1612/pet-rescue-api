@@ -252,4 +252,25 @@ class MongoPostAnalysisStoreTest extends MongoIntegrationTest {
         assertThat(m.districtAccuracy()).isEqualTo(1.0);
         assertThat(m.needsRescueAccuracy()).isEqualTo(0.5);
     }
+
+    @Test
+    void metricsAreSeparatedByModel() {
+        store.saveRun(pendingPost(), new PostAnalysisPort.Result("claude-haiku-5-5", 1, "{}", null, "x", 1, 0, 0), List.of());
+        store.saveRun(pendingPost(), new PostAnalysisPort.Result("claude-opus-5-5", 1, "{}", null, "x", 1, 0, 0), List.of());
+
+        assertThat(store.metrics()).extracting(PostAnalysisMetricsDto::model)
+                .containsExactly("claude-haiku-5-5", "claude-opus-5-5");
+    }
+
+    @Test
+    void modelOverrideIsStoredAndCleared() {
+        assertThat(store.findModelOverride()).isEmpty();
+
+        store.saveModelOverride("claude-haiku-5-5", AUTHOR);
+        store.saveModelOverride("claude-sonnet-5-5", AUTHOR);
+        assertThat(store.findModelOverride()).contains("claude-sonnet-5-5");
+
+        store.clearModelOverride();
+        assertThat(store.findModelOverride()).isEmpty();
+    }
 }

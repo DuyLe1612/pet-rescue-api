@@ -94,8 +94,8 @@ public class CommentController {
             summary = "Delete a comment",
             description = "Soft-deletes a comment by id."
     )
-    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable UUID id) {
-        commentCommandPort.deleteComment(id);
+    public ResponseEntity<ApiResponse<Void>> deleteComment(@PathVariable UUID id, Authentication authentication) {
+        commentCommandPort.deleteComment(id, UUID.fromString(authentication.getName()));
         return ResponseEntity.ok(ApiResponse.noContent());
     }
 }

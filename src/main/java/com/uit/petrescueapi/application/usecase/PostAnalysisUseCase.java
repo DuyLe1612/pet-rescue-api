@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.usecase;
 import com.uit.petrescueapi.application.dto.analysis.ConfirmPostAnalysisRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.CreateRescueCaseFromPostRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
+import com.uit.petrescueapi.application.dto.analysis.PostAnalysisModelDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisSuggestion;
 import com.uit.petrescueapi.application.dto.analysis.PostFacets;
@@ -53,14 +54,20 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
     private final AnalysisCatalogPort catalog;
     private final PostAnalysisValidator validator;
     private final RescueCaseCommandPort rescueCases;
+    private final String defaultModel;
+    private final List<String> allowedModels;
 
     public PostAnalysisUseCase(PostAnalysisStorePort store, Optional<PostAnalysisPort> ai, AnalysisCatalogPort catalog,
-                               PostAnalysisValidator validator, RescueCaseCommandPort rescueCases) {
+                               PostAnalysisValidator validator, RescueCaseCommandPort rescueCases,
+                               String defaultModel, List<String> allowedModels) {
         this.store = store;
         this.ai = ai;
         this.catalog = catalog;
         this.validator = validator;
         this.rescueCases = rescueCases;
+        this.defaultModel = defaultModel;
+        // the configured default is always selectable, so going back to it can never be rejected
+        this.allowedModels = Stream.concat(Stream.of(defaultModel), allowedModels.stream()).distinct().toList();
     }
 
     @Override
@@ -76,7 +83,7 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
         }
         UUID token = claim.token();
         Catalog values = catalog();
-        PostAnalysisPort.Result result = ai.get().analyze(claim.target().content(), values);
+        PostAnalysisPort.Result result = ai.get().analyze(claim.target().content(), values, activeModel());
 
         if (!result.succeeded()) {
             UUID runId = store.saveRun(postId, result, List.of());
@@ -181,6 +188,35 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
     @Override
     public List<PostAnalysisMetricsDto> metrics() {
         return store.metrics();
+    }
+
+    @Override
+    public PostAnalysisModelDto modelSettings() {
+        String active = activeModel();
+        return new PostAnalysisModelDto(active, defaultModel, !active.equals(defaultModel), allowedModels, ai.isPresent());
+    }
+
+    @Override
+    public PostAnalysisModelDto switchModel(String model, UUID userId) {
+        String requested = model == null ? "" : model.trim();
+        if (!allowedModels.contains(requested)) {
+            throw new BusinessException("Model not allowed: " + requested + " (allowed: " + allowedModels + ")",
+                    "POST_ANALYSIS_MODEL_NOT_ALLOWED");
+        }
+        store.saveModelOverride(requested, userId);
+        log.info("Post analysis model switched to {} by {}", requested, userId);
+        return modelSettings();
+    }
+
+    @Override
+    public PostAnalysisModelDto resetModel() {
+        store.clearModelOverride();
+        return modelSettings();
+    }
+
+    /** Read on every call so all app instances follow a switch; an override no longer allowed is ignored. */
+    private String activeModel() {
+        return store.findModelOverride().filter(allowedModels::contains).orElse(defaultModel);
     }
 
     private Catalog catalog() {

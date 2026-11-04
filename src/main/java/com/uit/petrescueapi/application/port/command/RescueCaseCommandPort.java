@@ -10,8 +10,8 @@ import java.util.UUID;
 
 public interface RescueCaseCommandPort {
     RescueCase report(CreateRescueCaseRequestDto cmd, UUID reporterId);
-    RescueCase update(UUID caseId, CreateRescueCaseRequestDto cmd);
-    RescueCase changeStatus(UUID caseId, UpdateRescueCaseStatusRequestDto cmd);
+    RescueCase update(UUID caseId, CreateRescueCaseRequestDto cmd, UUID requesterId);
+    RescueCase changeStatus(UUID caseId, UpdateRescueCaseStatusRequestDto cmd, UUID requesterId);
     RescueCaseCompletion complete(UUID caseId, CreateRescueCompletionRequestDto cmd, UUID userId);
     RescueCaseCompletion approveCompletion(UUID completionId, UUID userId);
 }

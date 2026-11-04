@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,8 +41,10 @@ public class PetDetailsController {
     @Operation(summary = "Add a medical record for a pet")
     public ResponseEntity<ApiResponse<PetMedicalRecordResponseDto>> addMedicalRecord(
             @PathVariable UUID petId,
-            @Valid @RequestBody CreateMedicalRecordRequestDto cmd) {
-        PetMedicalRecord record = commandPort.addMedicalRecord(petId, cmd);
+            @Valid @RequestBody CreateMedicalRecordRequestDto cmd,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        PetMedicalRecord record = commandPort.addMedicalRecord(petId, cmd, requesterId);
         PetMedicalRecordResponseDto dto = PetMedicalRecordResponseDto.builder()
                 .recordId(record.getRecordId())
                 .petId(record.getPetId())
@@ -62,10 +65,11 @@ public class PetDetailsController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
         Sort.Direction direction = "asc".equalsIgnoreCase(sortOrder) ? Sort.Direction.ASC : Sort.Direction.DESC;
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findMedicalRecords(petId, PageRequest.of(page, pageSize, Sort.by(direction, sortBy))))));
+                PageResponse.from(queryPort.findMedicalRecords(petId, PageRequest.of(page, pageSize, Sort.by(direction, sortBy)), requesterIdOrNull(authentication)))));
     }
 
     @GetMapping("/ownerships")
@@ -75,9 +79,10 @@ public class PetDetailsController {
             @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "20") int pageSize,
                         @RequestParam(defaultValue = "fromTime") String sortBy,
-                        @RequestParam(defaultValue = "desc") String sortOrder) {
+                        @RequestParam(defaultValue = "desc") String sortOrder,
+                        Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.ok(
-                                PageResponse.from(queryPort.findOwnerships(petId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+                                PageResponse.from(queryPort.findOwnerships(petId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder), requesterIdOrNull(authentication)))));
     }
 
     @GetMapping("/media")
@@ -137,6 +142,14 @@ public class PetDetailsController {
                 UUID requesterId = UUID.fromString(authentication.getName());
                 commandPort.deleteMedia(petId, mediaId, requesterId);
                 return ResponseEntity.ok(ApiResponse.noContent());
+        }
+
+        /** These GET routes are reachable anonymously, so the caller may be absent. */
+        private UUID requesterIdOrNull(Authentication authentication) {
+                if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+                        return null;
+                }
+                return UUID.fromString(authentication.getName());
         }
 
         private PetMediaResponseDto toDto(PetMedia petMedia) {

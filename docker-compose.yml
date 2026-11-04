@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
 
   # ── Redis ─────────────────────────────────────────────
-  # Fast cache for denormalized counters (likes, comments)
+  # Login lockout, admin dashboard cache, like de-duplication for the RabbitMQ listeners
   redis:
     image: redis:7-alpine
     container_name: petrescue-redis
@@ -123,6 +123,9 @@ services:
       # directConnection: the replica set advertises localhost:27017, which is only valid inside the mongo container
       MONGO_URI: mongodb://mongo:27017/petrescue?replicaSet=rs0&directConnection=true
       AI_POST_ANALYSIS_ENABLED: ${AI_POST_ANALYSIS_ENABLED:-false}
+      AI_POST_ANALYSIS_MODEL: ${AI_POST_ANALYSIS_MODEL:-claude-opus-5-5}
+      AI_POST_ANALYSIS_ALLOWED_MODELS: ${AI_POST_ANALYSIS_ALLOWED_MODELS:-claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,gemini-3.8-flash,gemini-3.5-flash-lite}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     restart: on-failure
 

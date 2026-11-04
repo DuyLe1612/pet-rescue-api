@@ -64,8 +64,11 @@ public class AdoptionController {
 
     @PatchMapping("/{id}/cancel")
     @Operation(summary = "Cancel an adoption application")
-    public ResponseEntity<ApiResponse<AdoptionResponseDto>> cancel(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.cancel(id))));
+    public ResponseEntity<ApiResponse<AdoptionResponseDto>> cancel(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(commandPort.cancel(id, requesterId))));
     }
 
     @PatchMapping("/{id}/complete")
@@ -91,8 +94,11 @@ public class AdoptionController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get adoption application by ID")
-    public ResponseEntity<ApiResponse<AdoptionResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
+    public ResponseEntity<ApiResponse<AdoptionResponseDto>> getById(
+            @PathVariable UUID id,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id, requesterId)));
     }
 
     @GetMapping
@@ -103,9 +109,11 @@ public class AdoptionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findAll(status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder), requesterId))));
     }
 
     @GetMapping("/user/{userId}")
@@ -117,9 +125,11 @@ public class AdoptionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findByApplicantId(userId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findByApplicantId(userId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder), requesterId))));
     }
 
     @GetMapping("/organization/{orgId}")
@@ -131,9 +141,11 @@ public class AdoptionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findByOrganizationId(orgId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findByOrganizationId(orgId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder), requesterId))));
     }
 
     @GetMapping("/reclaims")
@@ -143,7 +155,9 @@ public class AdoptionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "reclaimedAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
+        queryPort.requireReclaimLogAccess(organizationId, UUID.fromString(authentication.getName()));
         var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder);
         var logs = (organizationId == null
                 ? reclaimLogRepository.findAll(pageable)

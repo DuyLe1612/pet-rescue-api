@@ -19,6 +19,7 @@ import java.util.UUID;
 public class CommentCommandUseCase implements CommentCommandPort {
 
     private final CommentDomainService commentDomainService;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
     private final EventPublisher eventPublisher;
 
     @Override
@@ -44,8 +45,9 @@ public class CommentCommandUseCase implements CommentCommandPort {
     }
 
     @Override
-    public void deleteComment(UUID commentId) {
+    public void deleteComment(UUID commentId, UUID requesterId) {
         log.debug("Command: delete comment {}", commentId);
+        accessControl.requireSelfOrAdmin(commentDomainService.findById(commentId).getAuthorId(), requesterId);
         commentDomainService.deleteComment(commentId);
     }
 }

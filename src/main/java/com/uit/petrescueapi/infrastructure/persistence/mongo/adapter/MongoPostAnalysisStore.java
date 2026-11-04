@@ -41,6 +41,8 @@ import static org.springframework.data.mongodb.core.query.Query.query;
 @RequiredArgsConstructor
 public class MongoPostAnalysisStore implements PostAnalysisStorePort {
 
+    private static final String MODEL_SETTING_ID = "post-analysis-model";
+
     private static final List<String> FINAL = List.of(PostAnalysisStatus.CONFIRMED.name(), PostAnalysisStatus.REJECTED.name());
 
     private final MongoTemplate mongo;
@@ -249,7 +251,7 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
     @Override
     public List<PostAnalysisMetricsDto> metrics() {
         Document labelled = and(exists("$humanLabel"), exists("$parsed"));
-        Document group = new Document("_id", "$promptVersion")
+        Document group = new Document("_id", new Document("promptVersion", "$promptVersion").append("model", "$model"))
                 .append("runs", new Document("$sum", 1))
                 .append("failed", count(exists("$failure")))
                 .append("invalid", count(new Document("$gt", List.of(new Document("$size",
@@ -259,13 +261,16 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                 .append("speciesOk", count(and(labelled, eq("$parsed.species", "$humanLabel.species"))))
                 .append("districtOk", count(and(labelled, eq("$parsed.district", "$humanLabel.district"))))
                 .append("rescueOk", count(and(labelled, eq("$parsed.needsRescue", "$humanLabel.needsRescue"))));
-        List<Document> pipeline = List.of(new Document("$group", group), new Document("$sort", new Document("_id", 1)));
+        List<Document> pipeline = List.of(new Document("$group", group),
+                new Document("$sort", new Document("_id.promptVersion", 1).append("_id.model", 1)));
 
         List<PostAnalysisMetricsDto> result = new ArrayList<>();
         for (Document d : mongo.getCollection(MongoCollections.POST_ANALYSIS_RUNS).aggregate(pipeline)) {
             long n = number(d, "labelled");
+            Document key = d.get("_id", Document.class);
             result.add(new PostAnalysisMetricsDto(
-                    d.getInteger("_id", 0),
+                    key.getInteger("promptVersion", 0),
+                    key.getString("model"),
                     number(d, "runs"),
                     number(d, "failed"),
                     number(d, "invalid"),
@@ -276,6 +281,24 @@ public class MongoPostAnalysisStore implements PostAnalysisStorePort {
                     ratio(number(d, "rescueOk"), n)));
         }
         return result;
+    }
+
+    @Override
+    public Optional<String> findModelOverride() {
+        Document setting = mongo.getCollection(MongoCollections.APP_SETTINGS).find(new Document("_id", MODEL_SETTING_ID)).first();
+        return Optional.ofNullable(setting).map(s -> s.getString("value"));
+    }
+
+    @Override
+    public void saveModelOverride(String model, UUID changedBy) {
+        mongo.upsert(query(where("_id").is(MODEL_SETTING_ID)),
+                new Update().set("value", model).set("changedBy", changedBy).set("changedAt", LocalDateTime.now()),
+                MongoCollections.APP_SETTINGS);
+    }
+
+    @Override
+    public void clearModelOverride() {
+        mongo.remove(query(where("_id").is(MODEL_SETTING_ID)), MongoCollections.APP_SETTINGS);
     }
 
     private Query claimedBy(UUID postId, UUID token) {

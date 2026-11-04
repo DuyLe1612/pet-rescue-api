@@ -32,6 +32,8 @@ import static org.mockito.Mockito.*;
 
 class PostAnalysisUseCaseTest {
 
+    static final String OPUS = "claude-opus-5-5";
+    static final String HAIKU = "claude-haiku-5-5";
     static final UUID AUTHOR = UUID.randomUUID();
     static final UUID OTHER = UUID.randomUUID();
     static final String CONTENT = "Mn ơi ở Q7 có bé cún bị thương ở chân nằm lâu rồi, ai ở gần có thể giúp bé với ạ.";
@@ -45,6 +47,7 @@ class PostAnalysisUseCaseTest {
         List<String> confirmedTags;
         boolean reserved;
         int claims;
+        String modelOverride;
 
         @Override public Optional<AnalysisTarget> findTarget(UUID postId) { return Optional.ofNullable(posts.get(postId)); }
         @Override public Optional<Claim> claim(UUID postId, int maxLifetimeAttempts, LocalDateTime staleBefore) {
@@ -80,6 +83,9 @@ class PostAnalysisUseCaseTest {
         }
         @Override public List<UUID> findRetryable(int maxAttempts, int maxLifetimeAttempts, LocalDateTime before, LocalDateTime staleBefore, int limit) { return List.of(); }
         @Override public List<PostAnalysisMetricsDto> metrics() { return List.of(); }
+        @Override public Optional<String> findModelOverride() { return Optional.ofNullable(modelOverride); }
+        @Override public void saveModelOverride(String model, UUID changedBy) { modelOverride = model; }
+        @Override public void clearModelOverride() { modelOverride = null; }
 
         static AnalysisTarget with(AnalysisTarget t, PostAnalysisStatus status, PostAnalysisSuggestion s, PostFacets f, UUID caseId) {
             return new AnalysisTarget(t.postId(), t.authorId(), t.content(), status, s, f, caseId, t.model(), t.analyzedAt(), t.rescueSuggestion());
@@ -106,11 +112,12 @@ class PostAnalysisUseCaseTest {
         when(catalog.speciesNames()).thenReturn(List.of("Dog", "Cat"));
         when(catalog.tagCodes()).thenReturn(List.of("injured", "dog"));
         rescueCases = mock(RescueCaseCommandPort.class);
-        useCase = new PostAnalysisUseCase(store, Optional.of(ai), catalog, new PostAnalysisValidator(), rescueCases);
+        useCase = new PostAnalysisUseCase(store, Optional.of(ai), catalog, new PostAnalysisValidator(), rescueCases,
+                OPUS, List.of(HAIKU, OPUS));
     }
 
     private void aiReturns(PostAnalysisSuggestion s, String failure) {
-        when(ai.analyze(eq(CONTENT), any())).thenReturn(new PostAnalysisPort.Result("claude-opus-5-5", 1, "{}", s, failure, 120, 900, 80));
+        when(ai.analyze(eq(CONTENT), any(), any())).thenReturn(new PostAnalysisPort.Result("claude-opus-5-5", 1, "{}", s, failure, 120, 900, 80));
     }
 
     // ── analyze ─────────────────────────────────────────────
@@ -165,7 +172,7 @@ class PostAnalysisUseCaseTest {
             useCase.analyze(postId);
             store.resetToPending(postId);
         }
-        verify(ai, times(PostAnalysisUseCase.MAX_LIFETIME_ATTEMPTS)).analyze(any(), any());
+        verify(ai, times(PostAnalysisUseCase.MAX_LIFETIME_ATTEMPTS)).analyze(any(), any(), any());
     }
 
     @Test
@@ -177,9 +184,47 @@ class PostAnalysisUseCaseTest {
 
     @Test
     void withoutModelAnalyzeIsANoOp() {
-        var noAi = new PostAnalysisUseCase(store, Optional.empty(), mock(AnalysisCatalogPort.class), new PostAnalysisValidator(), rescueCases);
+        var noAi = new PostAnalysisUseCase(store, Optional.empty(), mock(AnalysisCatalogPort.class), new PostAnalysisValidator(), rescueCases,
+                OPUS, List.of(OPUS));
         noAi.analyze(postId);
         assertThat(store.posts.get(postId).status()).isEqualTo(PostAnalysisStatus.PENDING);
+    }
+
+    // ── model switch ────────────────────────────────────────
+
+    @Test
+    void usesTheConfiguredDefaultModelUntilSwitched() {
+        aiReturns(good, null);
+        useCase.analyze(postId);
+        verify(ai).analyze(eq(CONTENT), any(), eq(OPUS));
+        assertThat(useCase.modelSettings().overridden()).isFalse();
+    }
+
+    @Test
+    void switchAppliesToTheNextCallAndResetGoesBack() {
+        aiReturns(good, null);
+        var switched = useCase.switchModel(HAIKU, AUTHOR);
+        assertThat(switched.activeModel()).isEqualTo(HAIKU);
+        assertThat(switched.overridden()).isTrue();
+
+        useCase.analyze(postId);
+        verify(ai).analyze(eq(CONTENT), any(), eq(HAIKU));
+
+        assertThat(useCase.resetModel().activeModel()).isEqualTo(OPUS);
+    }
+
+    @Test
+    void modelOutsideTheAllowedListIsRejected() {
+        assertThatThrownBy(() -> useCase.switchModel("claude-fable-5-1", AUTHOR))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Model not allowed");
+        assertThat(store.modelOverride).isNull();
+    }
+
+    @Test
+    void storedOverrideNoLongerAllowedFallsBackToDefault() {
+        store.modelOverride = "claude-removed-from-config";
+        assertThat(useCase.modelSettings().activeModel()).isEqualTo(OPUS);
     }
 
     // ── confirm / reject ────────────────────────────────────

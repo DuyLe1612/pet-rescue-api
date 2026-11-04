@@ -7,21 +7,13 @@ import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 /**
- * WebSocket configuration for real-time notifications.
- * 
- * Clients connect via STOMP protocol and subscribe to topics:
- * - /topic/post/{postId}/likes       - New like on a post
- * - /topic/post/{postId}/comments    - New comment on a post
- * - /topic/comment/{commentId}/likes - New like on a comment
- * 
- * Example client connection:
- * const socket = new SockJS('http://localhost:8080/ws');
- * const stompClient = Stomp.over(socket);
- * stompClient.connect({}, () => {
- *   stompClient.subscribe('/topic/post/123/likes', (message) => {
- *     console.log('New like:', JSON.parse(message.body));
- *   });
- * });
+ * STOMP endpoint {@code /ws} (SockJS fallback) with an in-memory simple broker on
+ * {@code /topic} and {@code /queue}.
+ *
+ * <p>No server code publishes to this broker yet (there is no {@code SimpMessagingTemplate}
+ * user): like/comment counters are updated by the RabbitMQ listeners only. Realtime chat does
+ * not use STOMP; it runs on the raw WebSocket endpoint {@code /chat-ws}
+ * ({@link com.uit.petrescueapi.infrastructure.websocket.ChatWebSocketConfig}).</p>
  */
 @Configuration
 @EnableWebSocketMessageBroker

@@ -131,32 +131,31 @@ public class RescueCaseDomainService {
     public RescueCaseCompletion approveCompletion(UUID completionId, UUID userId) {
         log.debug("Approving rescue case completion {} by user {}", completionId,userId);
 
-        Optional<RescueCaseCompletion> completion = findCompletionById(completionId);
-        if (completion.get().getVerifiedAt() != null) {
+        RescueCaseCompletion completion = findCompletionById(completionId)
+                .orElseThrow(() -> new ResourceNotFoundException("RescueCaseCompletion", "completionId", completionId));
+        if (completion.getVerifiedAt() != null) {
             throw new BusinessException(
                     "Completion already approved"
             );
         }
 
-        RescueCase rescueCase = findById(completion.get().getCaseId());
+        RescueCase rescueCase = findById(completion.getCaseId());
 
-        if (rescueCase.getStatus()
-                != RescueCaseStatus.REPORTED) {
+        if (rescueCase.getStatus() != RescueCaseStatus.REPORTED
+                && rescueCase.getStatus() != RescueCaseStatus.IN_PROGRESS) {
 
             throw new BusinessException(
                     "Case is not awaiting approval"
             );
         }
-        if  (completion.isPresent()) {
-            rescueCase.setStatus(RescueCaseStatus.RESCUED);
-            completion.get().setUpdatedAt(LocalDateTime.now());
-            completion.get().setVerifiedAt(LocalDateTime.now());
-            completion.get().setVerifiedBy(userId);
-        }
+        rescueCase.setStatus(RescueCaseStatus.RESCUED);
+        completion.setUpdatedAt(LocalDateTime.now());
+        completion.setVerifiedAt(LocalDateTime.now());
+        completion.setVerifiedBy(userId);
         rescueCaseRepository.save(rescueCase);
         events.publishEvent(new com.uit.petrescueapi.domain.event.RescueCaseStatusChangedEvent(
                 rescueCase.getCaseId(), rescueCase.getStatus().name()));
-        return  rescueCaseCompletionRepository.save(completion.get());
+        return  rescueCaseCompletionRepository.save(completion);
     }
 
     // ── Private helpers ─────────────────────────────

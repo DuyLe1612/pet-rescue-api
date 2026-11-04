@@ -67,9 +67,9 @@ public class AdoptionCommandUseCase implements AdoptionCommandPort {
     }
 
     @Override
-    public AdoptionApplication cancel(UUID applicationId) {
+    public AdoptionApplication cancel(UUID applicationId, UUID requesterId) {
         log.debug("Command: cancel adoption application {}", applicationId);
-        return domainService.cancel(applicationId);
+        return domainService.cancel(applicationId, requesterId);
     }
 
     @Override

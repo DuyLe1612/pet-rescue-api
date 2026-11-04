@@ -3,7 +3,9 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.analysis.ConfirmPostAnalysisRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.CreateRescueCaseFromPostRequestDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisMetricsDto;
+import com.uit.petrescueapi.application.dto.analysis.PostAnalysisModelDto;
 import com.uit.petrescueapi.application.dto.analysis.PostAnalysisResponseDto;
+import com.uit.petrescueapi.application.dto.analysis.SwitchPostAnalysisModelRequestDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto;
 import com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
@@ -71,9 +73,32 @@ public class PostAnalysisController {
 
     @GetMapping("/admin/ai/post-analysis/metrics")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "AI analysis accuracy vs. author-confirmed labels, per prompt version (DA2 Goal 4)")
+    @Operation(summary = "AI analysis accuracy vs. author-confirmed labels, per prompt version and model (DA2 Goal 4)")
     public ResponseEntity<ApiResponse<List<PostAnalysisMetricsDto>>> metrics() {
         return ResponseEntity.ok(ApiResponse.ok(analysis.metrics()));
+    }
+
+    @GetMapping("/admin/ai/post-analysis/model")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Model used for post analysis, the configured default and the allowed list")
+    public ResponseEntity<ApiResponse<PostAnalysisModelDto>> model() {
+        return ResponseEntity.ok(ApiResponse.ok(analysis.modelSettings()));
+    }
+
+    @PutMapping("/admin/ai/post-analysis/model")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Switch the post analysis model without a restart",
+            description = "Applies from the next model call and survives restarts. Must be in the allowed list.")
+    public ResponseEntity<ApiResponse<PostAnalysisModelDto>> switchModel(@Valid @RequestBody SwitchPostAnalysisModelRequestDto body,
+                                                                         Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(analysis.switchModel(body.model(), userId(authentication))));
+    }
+
+    @DeleteMapping("/admin/ai/post-analysis/model")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Drop the runtime switch and go back to the configured default model")
+    public ResponseEntity<ApiResponse<PostAnalysisModelDto>> resetModel() {
+        return ResponseEntity.ok(ApiResponse.ok(analysis.resetModel()));
     }
 
     private static UUID userId(Authentication authentication) {

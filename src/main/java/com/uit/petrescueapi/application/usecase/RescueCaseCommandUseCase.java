@@ -8,8 +8,10 @@ import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.*;
 import com.uit.petrescueapi.domain.exception.BusinessException;
+import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.RescueCaseMediaRepository;
 import com.uit.petrescueapi.domain.repository.RescueCompletionMediaRepository;
+import com.uit.petrescueapi.domain.service.AccessControlDomainService;
 import com.uit.petrescueapi.domain.service.RescueCaseDomainService;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ import java.util.UUID;
 public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
 
     private final RescueCaseDomainService domainService;
+    private final AccessControlDomainService accessControl;
     private final MediaQueryPort mediaQueryPort;
     private final MediaCommandPort mediaCommandPort;
     private final RescueCaseMediaRepository rescueCaseMediaRepository;
@@ -47,6 +50,7 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
 
         RescueCase rescueCase = buildFromDto(cmd);
         rescueCase.setCaseId(caseId);
+        rescueCase.setReportedBy(reporterId);
 
         RescueCase created = domainService.report(rescueCase);
 
@@ -56,9 +60,11 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     }
 
     @Override
-    public RescueCase update(UUID caseId,CreateRescueCaseRequestDto cmd) {
+    public RescueCase update(UUID caseId, CreateRescueCaseRequestDto cmd, UUID requesterId) {
 
         log.debug( "Command: update rescue case {}",caseId);
+
+        accessControl.requireCaseEditor(domainService.findById(caseId), requesterId);
 
         RescueCase patch = buildFromDto(cmd);
 
@@ -66,9 +72,10 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     }
 
     @Override
-    public RescueCase changeStatus(UUID caseId, UpdateRescueCaseStatusRequestDto cmd) {
+    public RescueCase changeStatus(UUID caseId, UpdateRescueCaseStatusRequestDto cmd, UUID requesterId) {
         log.debug("Command: change status of rescue case {} to {}", caseId, cmd.getStatus());
         RescueCaseStatus newStatus = RescueCaseStatus.valueOf(cmd.getStatus());
+        accessControl.requireCaseStatusChange(domainService.findById(caseId), newStatus, requesterId);
         return domainService.changeStatus(caseId, newStatus);
     }
 
@@ -146,6 +153,9 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
 
     public RescueCaseCompletion approveCompletion(UUID completionId, UUID userId) {
         log.debug("Command: approve rescue case by user {}", userId);
+        RescueCaseCompletion completion = domainService.findCompletionById(completionId)
+                .orElseThrow(() -> new ResourceNotFoundException("RescueCaseCompletion", "completionId", completionId));
+        accessControl.requireCompletionApprover(domainService.findById(completion.getCaseId()), userId);
         return domainService.approveCompletion(completionId,userId);
     }
 
