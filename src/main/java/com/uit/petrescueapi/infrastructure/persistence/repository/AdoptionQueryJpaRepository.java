@@ -31,15 +31,18 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.adoptionCode    AS adoptionCode,
                a.petId           AS petId,
                p.name            AS petName,
-               (SELECT MIN(mf.publicId)
+               (SELECT mf.publicId
                 FROM PetMediaJpaEntity pm
                 JOIN MediaFileJpaEntity mf ON pm.mediaFileId = mf.mediaId
-                WHERE pm.petId = p.id) AS petPrimaryImageUrl,
+                WHERE pm.petId = p.id
+                ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
+                LIMIT 1) AS petPrimaryImageUrl,
                u.username        AS applicantUsername,
                a.status          AS status,
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
-               a.createdAt       AS createdAt
+               a.createdAt       AS createdAt,
+               a.readyAt         AS readyAt
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
@@ -62,10 +65,12 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.adoptionCode    AS adoptionCode,
                a.petId           AS petId,
                p.name            AS petName,
-               (SELECT MIN(mf.publicId)
+               (SELECT mf.publicId
                 FROM PetMediaJpaEntity pm
                 JOIN MediaFileJpaEntity mf ON pm.mediaFileId = mf.mediaId
-                WHERE pm.petId = p.id) AS petPrimaryImageUrl,
+                WHERE pm.petId = p.id
+                ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
+                LIMIT 1) AS petPrimaryImageUrl,
                u.username        AS applicantUsername,
                a.status          AS status,
                a.experience      AS experience,
@@ -94,10 +99,12 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.adoptionCode    AS adoptionCode,
                a.petId           AS petId,
                p.name            AS petName,
-               (SELECT MIN(mf.publicId)
+               (SELECT mf.publicId
                 FROM PetMediaJpaEntity pm
                 JOIN MediaFileJpaEntity mf ON pm.mediaFileId = mf.mediaId
-                WHERE pm.petId = p.id) AS petPrimaryImageUrl,
+                WHERE pm.petId = p.id
+                ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
+                LIMIT 1) AS petPrimaryImageUrl,
                u.username        AS applicantUsername,
                a.status          AS status,
                a.experience      AS experience,
@@ -126,10 +133,12 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.adoptionCode    AS adoptionCode,
                a.petId           AS petId,
                p.name            AS petName,
-               (SELECT MIN(mf.publicId)
+               (SELECT mf.publicId
                 FROM PetMediaJpaEntity pm
                 JOIN MediaFileJpaEntity mf ON pm.mediaFileId = mf.mediaId
-                WHERE pm.petId = p.id) AS petPrimaryImageUrl,
+                WHERE pm.petId = p.id
+                ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
+                LIMIT 1) AS petPrimaryImageUrl,
                u.username        AS applicantUsername,
                a.status          AS status,
                a.experience      AS experience,

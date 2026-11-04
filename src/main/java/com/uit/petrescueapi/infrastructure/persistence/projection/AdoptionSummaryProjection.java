@@ -21,4 +21,5 @@ public interface AdoptionSummaryProjection {
     String getExperience();
     String getLiveCondition();
     LocalDateTime getCreatedAt();
+    LocalDateTime getReadyAt();
 }

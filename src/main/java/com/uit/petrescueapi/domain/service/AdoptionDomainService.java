@@ -179,9 +179,12 @@ public class AdoptionDomainService {
         app.setStatus(AdoptionApplicationStatus.COMPLETED);
         app.setUpdatedAt(LocalDateTime.now());
         log.info("Adoption completed: pet {} transferred to user {}", app.getPetId(), app.getApplicantId());
-        
-        return applicationRepository.save(app);
-    }
+
+        AdoptionApplication saved = applicationRepository.save(app);
+        // Left open they could never succeed, and PENDING ones would use up the applicants' limit.
+        applicationRepository.cancelOpenForPet(app.getPetId(), app.getApplicationId(), "Thú cưng đã được người khác nhận nuôi", LocalDateTime.now());
+        return saved;
+}
 
     public ReclaimLog reclaim(UUID applicationId, String reason, UUID proofId, UUID reclaimedBy) {
         log.info("Reclaiming adopted pet from application {}", applicationId);

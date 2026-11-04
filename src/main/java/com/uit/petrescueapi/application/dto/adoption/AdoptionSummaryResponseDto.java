@@ -8,7 +8,6 @@ import java.util.UUID;
 
 /**
  * Lightweight response DTO for adoption application list views.
- * Optimized: excludes applicantUsername (not used by FE).
  */
 @Data
 @Builder
@@ -42,4 +41,6 @@ public class AdoptionSummaryResponseDto {
     private String liveCondition;
 
     private LocalDateTime createdAt;
+    private String applicantUsername;
+    private LocalDateTime readyAt;
 }
