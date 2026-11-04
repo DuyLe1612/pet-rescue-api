@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -33,6 +34,8 @@ public class MongoSnapshotSyncListener {
     private final MongoTemplate mongo;
     private final UserSnapshotPort userSnapshots;
 
+    /** Touches every post, comment and inbox of the user: too slow to keep the request and its connection waiting. */
+    @Async
     @TransactionalEventListener(fallbackExecution = true)
     public void onUserProfileChanged(UserProfileChangedEvent event) {
         resyncUser(event.userId());

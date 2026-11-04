@@ -283,6 +283,34 @@ class MongoPostTest extends MongoIntegrationTest {
     }
 
     @Test
+    void feedTellsTheViewerWhichPostsTheyLiked() {
+        Post liked = posts.create(Post.builder().authorId(ALICE).content("liked").build());
+        Post other = posts.create(Post.builder().authorId(ALICE).content("other").build());
+        likes.likePost(liked.getPostId(), BOB);
+
+        List<PostSummaryResponseDto> forBob = postQuery.findFeedByCursor(null, null, 10, BOB, PostFeedFilter.none()).getItems();
+        assertThat(forBob).filteredOn(i -> i.getPostId().equals(liked.getPostId())).singleElement()
+                .satisfies(i -> assertThat(i.getLikedByMe()).isTrue());
+        assertThat(forBob).filteredOn(i -> i.getPostId().equals(other.getPostId())).singleElement()
+                .satisfies(i -> assertThat(i.getLikedByMe()).isFalse());
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null, PostFeedFilter.none()).getItems())
+                .allSatisfy(i -> assertThat(i.getLikedByMe()).isNull());
+    }
+
+    @Test
+    void postDetailCarriesCountersAndAvatar() {
+        Post p = posts.create(Post.builder().authorId(ALICE).content("detail").build());
+        counters.addPostLikes(p.getPostId(), 2);
+        counters.addPostComments(p.getPostId(), 3);
+
+        var detail = postQuery.findById(p.getPostId());
+
+        assertThat(detail.getLikeCount()).isEqualTo(2);
+        assertThat(detail.getCommentCount()).isEqualTo(3);
+        assertThat(detail.getAuthorAvatarUrl()).isEqualTo("a.png");
+    }
+
+    @Test
     void feedItemsCarryImagesAndPreviewCommentsWithoutExtraLookups() {
         Post p = posts.create(Post.builder().authorId(ALICE).content("feed").mediaIds(List.of(MEDIA_1)).build());
         comment(p.getPostId(), null, BOB, "first");

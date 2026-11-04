@@ -34,7 +34,7 @@ class MongoSchemaInitializerTest extends MongoIntegrationTest {
         assertThat(indexNames(MongoCollections.COMMENTS)).contains("comment_replies");                 // replies are queried by parentId alone
         assertThat(indexNames(MongoCollections.CONVERSATIONS)).contains("conversation_direct_key");
         assertThat(indexNames(MongoCollections.MESSAGE_BUCKETS)).contains("bucket_message_id");
-        assertThat(indexNames(MongoCollections.POSTS)).contains("post_feed", "post_facets", "post_tags",
+        assertThat(indexNames(MongoCollections.POSTS)).contains("post_feed", "post_facets", "post_tags_feed", "post_preview_author",
                 "post_author", "post_analysis_status", "post_rescue_case", "post_text");
         assertThat(indexNames(MongoCollections.COMMENTS)).contains("comment_thread", "comment_author");
         assertThat(indexNames(MongoCollections.POST_LIKES)).contains("post_like_user");

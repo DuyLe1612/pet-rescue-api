@@ -33,6 +33,8 @@ public class PostSummaryResponseDto {
     private List<String> tags;
     private Integer likeCount;
     private Integer commentCount;
+    /** Null for anonymous viewers. */
+    private Boolean likedByMe;
 
     private LocalDateTime createdAt;
     private List<String> imageUrls;

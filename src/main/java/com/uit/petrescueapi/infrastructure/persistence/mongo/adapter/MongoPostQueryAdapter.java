@@ -9,6 +9,8 @@ import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.AuthorDocument;
+import com.uit.petrescueapi.infrastructure.persistence.mongo.document.LikeDocuments.PostLikeDocument;
+import com.uit.petrescueapi.infrastructure.persistence.mongo.document.LikeDocuments.PostLikeKey;
 import com.uit.petrescueapi.infrastructure.persistence.mongo.document.PostDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,7 +26,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 import static org.springframework.data.mongodb.core.query.Criteria.where;
@@ -59,6 +63,9 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .postId(d.getId())
                 .authorId(author == null ? null : author.getUserId())
                 .authorUsername(author == null ? null : author.getUsername())
+                .authorAvatarUrl(author == null ? null : author.getAvatarUrl())
+                .likeCount(d.getStats() == null ? 0 : d.getStats().getLikes())
+                .commentCount(d.getStats() == null ? 0 : d.getStats().getComments())
                 .rescueCaseId(d.getRescueCase() == null ? null : d.getRescueCase().getCaseId())
                 .content(d.getContent())
                 .imageUrls(imageUrls(d))
@@ -80,6 +87,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         Query q = query(criteria).with(mapSort(pageable.getSort()))
                 .skip(pageable.getOffset())
                 .limit(pageable.getPageSize());
+        q.fields().exclude("analysis");
         List<PostSummaryResponseDto> items = mongo.find(q, PostDocument.class).stream().map(this::toSummary).toList();
         return new PageImpl<>(items, pageable, total);
     }
@@ -104,7 +112,9 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         Query q = query(new Criteria().andOperator(and))
                 .with(Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("_id")))
                 .limit(size);
+        q.fields().exclude("analysis");
         List<PostSummaryResponseDto> items = mongo.find(q, PostDocument.class).stream().map(this::toSummary).toList();
+        markLikedBy(viewerId, items);
 
         PostSummaryResponseDto last = items.isEmpty() ? null : items.get(items.size() - 1);
         return PostCursorResponseDto.builder()
@@ -113,6 +123,18 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .nextCursorId(last == null ? null : last.getPostId())
                 .hasMore(items.size() == size)
                 .build();
+    }
+
+    /** One lookup for the whole page. Anonymous viewers get no value at all. */
+    private void markLikedBy(UUID viewerId, List<PostSummaryResponseDto> items) {
+        if (viewerId == null || items.isEmpty()) {
+            return;
+        }
+        List<PostLikeKey> keys = items.stream().map(item -> new PostLikeKey(item.getPostId(), viewerId)).toList();
+        Set<UUID> liked = mongo.find(query(where("_id").in(keys)), PostLikeDocument.class).stream()
+                .map(like -> like.getId().getPostId())
+                .collect(Collectors.toSet());
+        items.forEach(item -> item.setLikedByMe(liked.contains(item.getPostId())));
     }
 
     private Sort mapSort(Sort sort) {
