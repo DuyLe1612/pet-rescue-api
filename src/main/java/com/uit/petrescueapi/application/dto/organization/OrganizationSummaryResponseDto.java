@@ -7,7 +7,6 @@ import java.util.UUID;
 
 /**
  * Lightweight response DTO for organization list views.
- * Optimized: excludes unused fields (organizationCode, streetAddress, phone, email, imageUrl).
  */
 @Data
 @Builder
@@ -33,4 +32,10 @@ public class OrganizationSummaryResponseDto {
 
     @Schema(example = "Hà Nội")
     private String provinceName;
+
+    private String organizationCode;
+    private String streetAddress;
+    private String phone;
+    private String email;
+    private String imageUrl;
 }
