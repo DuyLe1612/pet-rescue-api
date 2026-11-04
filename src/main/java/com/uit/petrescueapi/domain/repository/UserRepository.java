@@ -23,6 +23,11 @@ public interface UserRepository {
 
     Optional<String> findExpoPushTokenById(UUID id);
 
+    /** Token per user; users without a token are absent. */
+    java.util.Map<UUID, String> findExpoPushTokensByIds(java.util.Collection<UUID> ids);
+
+    boolean hasRole(UUID id, String roleCode);
+
     boolean existsByEmail(String email);
 
     boolean existsByUsername(String username);

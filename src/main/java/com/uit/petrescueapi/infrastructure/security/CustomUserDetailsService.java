@@ -25,28 +25,10 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)  // ← CRITICAL: Keeps Hibernate session open
     public UserDetails loadUserByUsername(String userIdOrEmail) throws UsernameNotFoundException {
-        // Try to load user with roles eagerly fetched to avoid LazyInitializationException
-        java.util.Optional<UserJpaEntity> opt = userJpaRepository.findByEmailWithRoles(userIdOrEmail);
-        if (opt.isEmpty()) {
-            try {
-                java.util.UUID id = java.util.UUID.fromString(userIdOrEmail);
-                opt = userJpaRepository.findByIdWithRoles(id);
-            } catch (IllegalArgumentException ignored) {
-                // not a UUID, continue
-            }
-        }
-
-        // Fallback to the original lookups if necessary
-        if (opt.isEmpty()) {
-            opt = userJpaRepository.findByEmail(userIdOrEmail)
-                    .or(() -> {
-                        try {
-                            return userJpaRepository.findById(java.util.UUID.fromString(userIdOrEmail));
-                        } catch (IllegalArgumentException e) {
-                            return java.util.Optional.empty();
-                        }
-                    });
-        }
+        // This runs on every authenticated request, and a JWT subject is always a UUID.
+        java.util.Optional<UserJpaEntity> opt = parseUuid(userIdOrEmail)
+                .map(userJpaRepository::findByIdWithRoles)
+                .orElseGet(() -> userJpaRepository.findByEmailWithRoles(userIdOrEmail));
 
         UserJpaEntity entity = opt.orElseThrow(() -> new UsernameNotFoundException("User not found: " + userIdOrEmail));
 
@@ -63,5 +45,13 @@ public class CustomUserDetailsService implements UserDetailsService {
                 !"BANNED".equals(entity.getStatus().name()) && !"LOCKED".equals(entity.getStatus().name()),
                 authorities
         );
+    }
+
+    private static java.util.Optional<java.util.UUID> parseUuid(String value) {
+        try {
+            return java.util.Optional.of(java.util.UUID.fromString(value));
+        } catch (IllegalArgumentException notAUuid) {
+            return java.util.Optional.empty();
+        }
     }
 }
