@@ -89,16 +89,9 @@ public class PetQueryAdapter implements PetQueryDataPort {
         PetDetailProjection proj = queryRepo.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pet", "id", id));
 
-        String primaryImageUrl = queryRepo.findPrimaryImagePublicIdById(id)
-                .map(cloudStoragePort::buildUrl)
-                .orElse(null);
+        List<String> imageUrls = imageUrls(id);
 
-        List<String> imageUrls = queryRepo.findImagePublicIdsById(id).stream()
-                .filter(publicId -> publicId != null)
-                .map(cloudStoragePort::buildUrl)
-                .toList();
-
-        return toResponseDto(proj, primaryImageUrl, imageUrls);
+        return toResponseDto(proj, imageUrls.isEmpty() ? null : imageUrls.get(0), imageUrls);
     }
 
     @Override
@@ -106,16 +99,17 @@ public class PetQueryAdapter implements PetQueryDataPort {
         PetDetailProjection proj = queryRepo.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pet", "id", id));
 
-        String primaryImageUrl = queryRepo.findPrimaryImagePublicIdById(id)
-                .map(cloudStoragePort::buildUrl)
-                .orElse(null);
+        List<String> imageUrls = imageUrls(id);
 
-        List<String> imageUrls = queryRepo.findImagePublicIdsById(id).stream()
+        return toAdminResponseDto(proj, imageUrls.isEmpty() ? null : imageUrls.get(0), imageUrls);
+    }
+
+    /** Primary image first. */
+    private List<String> imageUrls(UUID petId) {
+        return queryRepo.findImagePublicIdsById(petId).stream()
                 .filter(publicId -> publicId != null)
                 .map(cloudStoragePort::buildUrl)
                 .toList();
-
-        return toAdminResponseDto(proj, primaryImageUrl, imageUrls);
     }
 
     // ── Projection → DTO mappers ───────────────
@@ -179,7 +173,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
                         p.getOwnerId(),
                         p.getOwnerName(),
                         p.getOwnerAvatarUrl(),
-                        p.getOwnerPhone()
+                        "ORGANIZATION".equals(p.getOwnerType()) ? p.getOwnerPhone() : null
                 ))
                 .organization(p.getOrganizationId() != null ? OrganizationMinimalDto.builder()
                         .organizationId(p.getOrganizationId())

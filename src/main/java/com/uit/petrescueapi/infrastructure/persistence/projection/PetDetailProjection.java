@@ -56,7 +56,5 @@ public interface PetDetailProjection {
 
     // ── Location fields (from organization) ─
     String getProvinceName();
-    Integer getProvinceCode();
     String getWardName();
-    Integer getWardCode();
 }
