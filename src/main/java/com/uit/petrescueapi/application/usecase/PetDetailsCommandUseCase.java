@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -58,30 +59,16 @@ public class PetDetailsCommandUseCase implements PetDetailsCommandPort {
         return medicalRecordRepository.save(record);
     }
 
+    /** Uploading can take seconds, so this runs outside a transaction; only the final link needs one. */
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public PetMedia addMedia(UUID petId, MultipartFile file, boolean primary, UUID requesterId) {
         ensureCanManagePet(petId, requesterId);
-        Pet pet = petDomainService.findById(petId);
-
         var mediaFile = mediaCommandPort.uploadTemp(file, requesterId, "pets/" + petId);
         mediaCommandPort.confirmUpload(mediaFile.getMediaId(), "pets/" + petId);
-
-        if (primary) {
-            petMediaRepository.clearPrimary(petId);
-        }
-
-        PetMedia petMedia = PetMedia.builder()
-                .mediaId(UUID.randomUUID())
-                .petId(pet.getId())
-                .mediaFileId(mediaFile.getMediaId())
-                .type(mediaFile.getResourceType())
-                .primaryMedia(primary)
-                .createdAt(LocalDateTime.now())
-                .build();
-        return petMediaRepository.save(petMedia);
+        return petDomainService.linkMedia(petId, mediaFile.getMediaId(), mediaFile.getResourceType(), primary);
     }
-
-    @Override
+@Override
     public PetMedia attachMedia(UUID petId, UUID mediaFileId, boolean primary, UUID requesterId) {
         ensureCanManagePet(petId, requesterId);
         var media = mediaQueryPort.findById(mediaFileId);

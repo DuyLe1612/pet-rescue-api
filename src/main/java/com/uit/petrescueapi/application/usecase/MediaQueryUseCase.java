@@ -34,6 +34,7 @@ public class MediaQueryUseCase implements MediaQueryPort {
             .publicId(media.getPublicId())
             .url(cloudStoragePort.buildUrl(media.getPublicId()))
             .type(media.getResourceType())
+            .status(media.getStatus())
             .createdAt(media.getCreatedAt())
             .build();
     }

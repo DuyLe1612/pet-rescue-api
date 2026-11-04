@@ -7,7 +7,6 @@ import com.uit.petrescueapi.infrastructure.persistence.entity.MediaFileJpaEntity
 import com.uit.petrescueapi.infrastructure.persistence.repository.MediaFileJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,8 +24,8 @@ public class PostMediaJpaAdapter implements PostMediaPort {
     private final MediaFileJpaRepository mediaFileJpaRepository;
     private final CloudStoragePort cloudStoragePort;
 
+    /** Not transactional: no connection is held during the cloud calls. */
     @Override
-    @Transactional
     public List<AttachedMedia> attach(UUID postId, List<UUID> mediaIds) {
         List<MediaFileJpaEntity> entities = new ArrayList<>();
         for (UUID mediaId : mediaIds) {

@@ -2,9 +2,11 @@ package com.uit.petrescueapi.domain.service;
 
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
+import com.uit.petrescueapi.domain.entity.PetMedia;
 import com.uit.petrescueapi.domain.entity.PetOwnership;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.PetCurrentOwnerRepository;
+import com.uit.petrescueapi.domain.repository.PetMediaRepository;
 import com.uit.petrescueapi.domain.repository.PetOwnershipRepository;
 import com.uit.petrescueapi.domain.repository.PetRepository;
 import com.uit.petrescueapi.domain.repository.VisualCodeRepository;
@@ -41,6 +43,7 @@ public class PetDomainService {
     private final PetOwnershipRepository ownershipRepository;
     private final PetCurrentOwnerRepository currentOwnerRepository;
     private final VisualCodeRepository visualCodeRepository;
+    private final PetMediaRepository petMediaRepository;
 
     // ── Status-transition matrix ───────────────────
     private static final Map<PetStatus, Set<PetStatus>> ALLOWED_TRANSITIONS = Map.of(
@@ -205,6 +208,20 @@ public class PetDomainService {
         pet.setStatus(newStatus);
         pet.setUpdatedAt(LocalDateTime.now());
         return petRepository.save(pet);
+    }
+
+    public PetMedia linkMedia(UUID petId, UUID mediaFileId, String type, boolean primary) {
+        if (primary) {
+            petMediaRepository.clearPrimary(petId);
+        }
+        return petMediaRepository.save(PetMedia.builder()
+                .mediaId(UUID.randomUUID())
+                .petId(petId)
+                .mediaFileId(mediaFileId)
+                .type(type)
+                .primaryMedia(primary)
+                .createdAt(LocalDateTime.now())
+                .build());
     }
 
     // ── Private helpers ─────────────────────────────

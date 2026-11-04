@@ -7,10 +7,10 @@ import com.uit.petrescueapi.application.dto.rescue.ReleaseRescueClaimRequestDto;
 import com.uit.petrescueapi.application.port.command.PetCommandPort;
 import com.uit.petrescueapi.application.dto.rescue.CreateRescueCompletionRequestDto;
 import com.uit.petrescueapi.application.dto.rescue.UpdateRescueCaseStatusRequestDto;
-import com.uit.petrescueapi.application.port.command.MediaCommandPort;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
 import com.uit.petrescueapi.application.port.query.MediaQueryPort;
 import com.uit.petrescueapi.domain.entity.*;
+import com.uit.petrescueapi.domain.event.MediaPromotionRequestedEvent;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.RescueCaseMediaRepository;
@@ -27,6 +27,7 @@ import com.uit.petrescueapi.domain.service.RescueCaseDomainService;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +52,7 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     private final PetCommandPort petCommandPort;
     private final PetDomainService petDomainService;
     private final MediaQueryPort mediaQueryPort;
-    private final MediaCommandPort mediaCommandPort;
+    private final ApplicationEventPublisher events;
     private final RescueCaseMediaRepository rescueCaseMediaRepository;
     private final RescueCompletionMediaRepository rescueCompletionMediaRepository;
 
@@ -135,9 +136,8 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
                 throw new BusinessException("Media not found: " + mediaId);
             }
 
-            if(Objects.equals(media.getStatus(), "TEMP")){
-            mediaCommandPort.confirmUpload(mediaId,"rescue-cases/" + caseId
-            );
+            if (Objects.equals(media.getStatus(), "TEMP")) {
+                events.publishEvent(new MediaPromotionRequestedEvent(mediaId, "rescue-cases/" + caseId));
             }
 
             rescueCaseMediaRepository.save(RescueMedia.builder()
@@ -164,7 +164,7 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
             accessControl.requireSelfOrAdmin(media.getUploaderId(), userId);
 
             if (Objects.equals(media.getStatus(), "TEMP")) {
-                mediaCommandPort.confirmUpload(mediaId, "rescue-completions/" + completionId);
+                events.publishEvent(new MediaPromotionRequestedEvent(mediaId, "rescue-completions/" + completionId));
             }
 
             rescueCompletionMediaRepository.save( RescueCompletionMedia.builder()
