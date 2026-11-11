@@ -144,7 +144,8 @@ public class RescueCaseController {
 
     @GetMapping
     @Operation(summary = "List all rescue cases (paginated, with optional filters)",
-            description = "Unified endpoint for listing rescue cases. Supports geo filtering with lat/lng/distance for nearby results " +
+            description = "Unified endpoint for listing rescue cases. status, priority, species and province (code or name) " +
+                    "apply to every mode. Supports geo filtering with lat/lng/distance for nearby results " +
                     "or minLat/minLng/maxLat/maxLng for bounding box results. Use lat=X&lng=Y&distance=Z for nearby. " +
                     "Use minLat=X&minLng=Y&maxLat=Z&maxLng=W for bounding box.")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getAll(
@@ -156,6 +157,7 @@ public class RescueCaseController {
             @RequestParam(required = false) List<RescueCaseStatus> status,
             @RequestParam(required = false) List<RescuePriority> priority,
             @RequestParam(required = false) String species,
+            @RequestParam(required = false) String province,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) Double distance,
@@ -164,22 +166,24 @@ public class RescueCaseController {
             @RequestParam(required = false) Double maxLat,
             @RequestParam(required = false) Double maxLng) {
 
+        RescueCaseFilter filter = new RescueCaseFilter(status, priority, species, province);
+
         // Geo filter: bounding box
         if (minLat != null && minLng != null && maxLat != null && maxLng != null) {
             return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
         }
 
         // Geo filter: nearby
         if (lat != null && lng != null) {
             double dist = distance != null ? distance : 5000;
             return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findNearby(lat, lng, dist, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findNearby(lat, lng, dist, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
         }
 
         // Standard list
         return ResponseEntity.ok(ApiResponse.ok(
-            PageResponse.from(queryPort.findAll(search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+            PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

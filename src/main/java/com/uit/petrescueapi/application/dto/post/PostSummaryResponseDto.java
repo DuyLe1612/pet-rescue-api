@@ -31,6 +31,9 @@ public class PostSummaryResponseDto {
     private String content;
 
     private List<String> tags;
+
+    @Schema(description = "Labels confirmed by the author (category, species, area, needsRescue). Null until confirmed.")
+    private com.uit.petrescueapi.application.dto.analysis.PostFacets facets;
     private Integer likeCount;
     private Integer commentCount;
     /** Null for anonymous viewers. */

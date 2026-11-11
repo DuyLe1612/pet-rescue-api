@@ -37,6 +37,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.time.LocalDateTime;
@@ -245,6 +246,41 @@ class MongoPostTest extends MongoIntegrationTest {
                 .createdAt(createdAt)
                 .build();
         mongo.insert(doc);
+    }
+
+    @Test
+    void postsFilterByConfirmedProvinceAndNeedsRescueAndCarryTheirLabels() {
+        LocalDateTime t = LocalDateTime.now();
+        UUID needsRescue = UUID.randomUUID();
+        UUID confirmedCalm = UUID.randomUUID();
+        UUID unconfirmed = UUID.randomUUID();
+        insertPost(needsRescue, t, List.of(), "RESCUE");
+        insertPost(confirmedCalm, t.minusSeconds(1), List.of(), "GENERAL");
+        insertPost(unconfirmed, t.minusSeconds(2), List.of(), null);
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(org.springframework.data.mongodb.core.query.Criteria.where("_id").is(needsRescue)),
+                new Update().set("facets.province", "Hồ Chí Minh").set("facets.needsRescue", true), PostDocument.class);
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(org.springframework.data.mongodb.core.query.Criteria.where("_id").is(confirmedCalm)),
+                new Update().set("facets.province", "Hà Nội"), PostDocument.class);
+
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, "Hồ Chí Minh", null, null)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(needsRescue);
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, null, true, null)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(needsRescue);
+        // "does not need rescue" is a confirmed answer, so a post nobody confirmed is not in it
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, null, false, null)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(confirmedCalm);
+
+        assertThat(postQuery.findAllSummaries(null, new PostFeedFilter("RESCUE", null, null, null, null, null),
+                PageRequest.of(0, 10)).getContent())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(needsRescue);
+
+        List<PostSummaryResponseDto> all = postQuery.findFeedByCursor(null, null, 10, null, PostFeedFilter.none()).getItems();
+        assertThat(all.get(0).getFacets().category().name()).isEqualTo("RESCUE");
+        assertThat(all.get(0).getFacets().needsRescue()).isTrue();
+        assertThat(all.get(2).getFacets()).isNull();
     }
 
     @Test

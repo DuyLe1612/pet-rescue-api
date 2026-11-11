@@ -2,7 +2,9 @@ package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
 import com.uit.petrescueapi.application.dto.post.CommentPreviewDto;
 import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
+import com.uit.petrescueapi.application.dto.analysis.PostFacets;
 import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
+import com.uit.petrescueapi.domain.valueobject.PostCategory;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
@@ -70,19 +72,23 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .content(d.getContent())
                 .imageUrls(imageUrls(d))
                 .tags(d.getTags())
+                .facets(facets(d))
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
                 .build();
     }
 
     @Override
-    public Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
-        Criteria criteria = where("deleted").is(false);
+    public Page<PostSummaryResponseDto> findAllSummaries(String search, PostFeedFilter filter, Pageable pageable) {
+        List<Criteria> and = new ArrayList<>();
+        and.add(where("deleted").is(false));
+        and.addAll(facetCriteria(filter));
         if (search != null && !search.isBlank()) {
             // substring + case-insensitive, like the old LOWER(..) LIKE '%..%'; input is matched literally
             Pattern pattern = Pattern.compile(Pattern.quote(search.trim()), Pattern.CASE_INSENSITIVE);
-            criteria = criteria.orOperator(where("content").regex(pattern), where("author.username").regex(pattern));
+            and.add(new Criteria().orOperator(where("content").regex(pattern), where("author.username").regex(pattern)));
         }
+        Criteria criteria = new Criteria().andOperator(and);
         long total = mongo.count(query(criteria), PostDocument.class);
         Query q = query(criteria).with(mapSort(pageable.getSort()))
                 .skip(pageable.getOffset())
@@ -96,12 +102,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
     public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter) {
         List<Criteria> and = new ArrayList<>();
         and.add(where("deleted").is(false));
-        if (filter != null) {
-            if (filter.category() != null) and.add(where("facets.category").is(filter.category()));
-            if (filter.species() != null) and.add(where("facets.species").is(filter.species()));
-            if (filter.district() != null) and.add(where("facets.district").is(filter.district()));
-            if (filter.tag() != null) and.add(where("tags").is(filter.tag()));
-        }
+        and.addAll(facetCriteria(filter));
         if (cursor != null) {
             and.add(cursorId == null
                     ? where("createdAt").lt(cursor)
@@ -123,6 +124,40 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .nextCursorId(last == null ? null : last.getPostId())
                 .hasMore(items.size() == size)
                 .build();
+    }
+
+    /** Only confirmed facets are filterable: an unconfirmed AI suggestion never decides what people see. */
+    private static List<Criteria> facetCriteria(PostFeedFilter filter) {
+        List<Criteria> criteria = new ArrayList<>();
+        if (filter == null) {
+            return criteria;
+        }
+        if (filter.category() != null) criteria.add(where("facets.category").is(filter.category()));
+        if (filter.species() != null) criteria.add(where("facets.species").is(filter.species()));
+        if (filter.district() != null) criteria.add(where("facets.district").is(filter.district()));
+        if (filter.province() != null) criteria.add(where("facets.province").is(filter.province()));
+        if (filter.needsRescue() != null) {
+            // Posts confirmed before the flag existed have no value; they count as "does not need rescue".
+            criteria.add(filter.needsRescue()
+                    ? where("facets.needsRescue").is(true)
+                    : where("facets").ne(null).and("facets.needsRescue").ne(true));
+        }
+        if (filter.tag() != null) criteria.add(where("tags").is(filter.tag()));
+        return criteria;
+    }
+
+    private static PostFacets facets(PostDocument d) {
+        PostDocument.FacetsDocument f = d.getFacets();
+        if (f == null || f.getCategory() == null) {
+            return null;
+        }
+        PostCategory category;
+        try {
+            category = PostCategory.valueOf(f.getCategory());
+        } catch (IllegalArgumentException unknownValue) {
+            return null;
+        }
+        return new PostFacets(category, f.getSpecies(), f.getDistrict(), f.getProvince(), Boolean.TRUE.equals(f.getNeedsRescue()));
     }
 
     /** One lookup for the whole page. Anonymous viewers get no value at all. */
@@ -160,6 +195,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .authorAvatarUrl(author == null ? null : author.getAvatarUrl())
                 .content(d.getContent())
                 .tags(d.getTags())
+                .facets(facets(d))
                 .likeCount(d.getStats() == null ? 0 : d.getStats().getLikes())
                 .commentCount(d.getStats() == null ? 0 : d.getStats().getComments())
                 .createdAt(d.getCreatedAt())

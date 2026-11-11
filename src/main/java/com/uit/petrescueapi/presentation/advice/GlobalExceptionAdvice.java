@@ -34,7 +34,8 @@ public class GlobalExceptionAdvice {
     @ExceptionHandler(BaseException.class)
     public ResponseEntity<ApiResponse<Void>> handleBase(BaseException ex) {
         log.warn("{}: {}", ex.getErrorCode(), ex.getMessage());
-        return build(ex.getStatus(), ex.getMessage());
+        return ResponseEntity.status(ex.getStatus())
+                .body(ApiResponse.error(ex.getStatus().value(), ex.getMessage(), ex.getErrorCode()));
     }
 
     // ── Account status exceptions ─────────────────

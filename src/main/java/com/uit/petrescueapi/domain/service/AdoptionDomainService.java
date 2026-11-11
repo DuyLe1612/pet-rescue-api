@@ -4,6 +4,7 @@ import com.uit.petrescueapi.domain.entity.AdoptionApplication;
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
 import com.uit.petrescueapi.domain.entity.ReclaimLog;
+import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ConflictException;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -13,6 +14,7 @@ import com.uit.petrescueapi.domain.repository.PetCurrentOwnerRepository;
 import com.uit.petrescueapi.domain.repository.ReclaimLogRepository;
 import com.uit.petrescueapi.domain.repository.VisualCodeRepository;
 import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
+import com.uit.petrescueapi.domain.valueobject.NotificationType;
 import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -48,6 +52,7 @@ public class AdoptionDomainService {
     private final PetCurrentOwnerRepository currentOwnerRepository;
     private final ReputationDomainService reputationDomainService;
     private final ReclaimLogRepository reclaimLogRepository;
+    private final NotificationDomainService notifications;
 
     // ── Queries ─────────────────────────────────────
 
@@ -89,7 +94,10 @@ public class AdoptionDomainService {
         application.setAdoptionCode(visualCodeRepository.nextAdoptionCode());
         application.setStatus(AdoptionApplicationStatus.PENDING);
         application.setCreatedAt(LocalDateTime.now());
-        return applicationRepository.save(application);
+        AdoptionApplication saved = applicationRepository.save(application);
+        notifications.notifyOrganizationHandlers(saved.getOrganizationId(), NotificationType.ADOPTION_SUBMITTED,
+                "Có đơn nhận nuôi mới " + code(saved), "Một người dùng vừa nộp đơn nhận nuôi. Hãy xem và phản hồi.", data(saved));
+        return saved;
     }
 
     /**
@@ -103,7 +111,7 @@ public class AdoptionDomainService {
         validateStatus(app, AdoptionApplicationStatus.PENDING, AdoptionApplicationStatus.APPROVED);
 
         if (readyAt == null) {
-            throw new IllegalArgumentException("readyAt is required when approving adoption");
+            throw new BusinessException("readyAt is required when approving adoption", "ADOPTION_READY_AT_REQUIRED");
         }
 
         app.setStatus(AdoptionApplicationStatus.APPROVED);
@@ -111,7 +119,10 @@ public class AdoptionDomainService {
         app.setDecidedAt(LocalDateTime.now());
         app.setReadyAt(readyAt);
         app.setUpdatedAt(LocalDateTime.now());
-        return applicationRepository.save(app);
+        AdoptionApplication saved = applicationRepository.save(app);
+        notifyApplicant(saved, NotificationType.ADOPTION_APPROVED, "Đơn nhận nuôi " + code(saved) + " đã được duyệt",
+                "Tổ chức sẽ liên hệ để hẹn ngày đón bé.");
+        return saved;
     }
 
     /**
@@ -125,7 +136,7 @@ public class AdoptionDomainService {
         validateStatus(app, AdoptionApplicationStatus.PENDING, AdoptionApplicationStatus.REJECTED);
 
         if (rejectReason == null || rejectReason.isBlank()) {
-            throw new IllegalArgumentException("rejectReason is required when rejecting adoption");
+            throw new BusinessException("rejectReason is required when rejecting adoption", "ADOPTION_REJECT_REASON_REQUIRED");
         }
 
         app.setStatus(AdoptionApplicationStatus.REJECTED);
@@ -133,7 +144,10 @@ public class AdoptionDomainService {
         app.setDecidedAt(LocalDateTime.now());
         app.setRejectReason(rejectReason);
         app.setUpdatedAt(LocalDateTime.now());
-        return applicationRepository.save(app);
+        AdoptionApplication saved = applicationRepository.save(app);
+        notifyApplicant(saved, NotificationType.ADOPTION_REJECTED, "Đơn nhận nuôi " + code(saved) + " không được duyệt",
+                "Lý do: " + rejectReason);
+        return saved;
     }
 
     /**
@@ -147,14 +161,22 @@ public class AdoptionDomainService {
 
         if (app.getStatus() != AdoptionApplicationStatus.PENDING
                 && app.getStatus() != AdoptionApplicationStatus.APPROVED) {
-            throw new IllegalStateException(
-                    "Only PENDING or APPROVED applications can be canceled");
+            throw new BusinessException(
+                    "Only PENDING or APPROVED applications can be canceled", "ADOPTION_INVALID_STATUS");
         }
 
         app.setStatus(AdoptionApplicationStatus.CANCELED);
         app.setUpdatedAt(LocalDateTime.now());
 
-        return applicationRepository.save(app);
+        AdoptionApplication saved = applicationRepository.save(app);
+        if (requesterId.equals(saved.getApplicantId())) {
+            notifications.notifyOrganizationHandlers(saved.getOrganizationId(), NotificationType.ADOPTION_CANCELED,
+                    "Đơn nhận nuôi " + code(saved) + " đã bị huỷ", "Người nộp đã huỷ đơn.", data(saved));
+        } else {
+            notifyApplicant(saved, NotificationType.ADOPTION_CANCELED, "Đơn nhận nuôi " + code(saved) + " đã bị huỷ",
+                    "Tổ chức đã huỷ đơn của bạn.");
+        }
+        return saved;
     }
 
     /**
@@ -181,10 +203,16 @@ public class AdoptionDomainService {
         log.info("Adoption completed: pet {} transferred to user {}", app.getPetId(), app.getApplicantId());
 
         AdoptionApplication saved = applicationRepository.save(app);
-        // Left open they could never succeed, and PENDING ones would use up the applicants' limit.
-        applicationRepository.cancelOpenForPet(app.getPetId(), app.getApplicationId(), "Thú cưng đã được người khác nhận nuôi", LocalDateTime.now());
+        // Left open they could never succeed, and PENDING ones would use up the limit of those applicants.
+        List<UUID> closedApplicants = applicationRepository.findOpenApplicantIdsForPet(app.getPetId(), app.getApplicationId());
+        applicationRepository.cancelOpenForPet(app.getPetId(), app.getApplicationId(), AUTO_CANCEL_REASON, LocalDateTime.now());
+
+        notifyApplicant(saved, NotificationType.ADOPTION_COMPLETED, "Nhận nuôi hoàn tất " + code(saved),
+                "Bé đã chính thức là thú cưng của bạn.");
+        notifications.notifyUsers(closedApplicants, NotificationType.ADOPTION_CANCELED,
+                "Đơn nhận nuôi của bạn đã đóng", AUTO_CANCEL_REASON, Map.of("petId", String.valueOf(app.getPetId())));
         return saved;
-}
+    }
 
     public ReclaimLog reclaim(UUID applicationId, String reason, UUID proofId, UUID reclaimedBy) {
         log.info("Reclaiming adopted pet from application {}", applicationId);
@@ -214,16 +242,33 @@ public class AdoptionDomainService {
                 .reclaimedAt(LocalDateTime.now())
                 .createdAt(LocalDateTime.now())
                 .build();
-        return reclaimLogRepository.save(reclaimLog);
+        ReclaimLog savedLog = reclaimLogRepository.save(reclaimLog);
+        notifyApplicant(app, NotificationType.ADOPTION_RECLAIMED, "Tổ chức đã thu hồi thú cưng (" + code(app) + ")",
+                "Lý do: " + reason);
+        return savedLog;
     }
 
     // ── Private helpers ─────────────────────────────
 
+    private static final String AUTO_CANCEL_REASON = "Thú cưng đã được người khác nhận nuôi";
+
+    private void notifyApplicant(AdoptionApplication app, NotificationType type, String title, String body) {
+        notifications.notifyUsers(List.of(app.getApplicantId()), type, title, body, data(app));
+    }
+
+    private static String code(AdoptionApplication app) {
+        return app.getAdoptionCode() == null ? "" : app.getAdoptionCode();
+    }
+
+    private static Map<String, String> data(AdoptionApplication app) {
+        return Map.of("applicationId", String.valueOf(app.getApplicationId()), "petId", String.valueOf(app.getPetId()));
+    }
+
     private void validateStatus(AdoptionApplication app, AdoptionApplicationStatus expectedCurrent, AdoptionApplicationStatus targetStatus) {
         if (app.getStatus() != expectedCurrent) {
-            throw new IllegalStateException(
+            throw new BusinessException(
                     String.format("Cannot transition adoption application status from %s to %s",
-                            app.getStatus(), targetStatus));
+                            app.getStatus(), targetStatus), "ADOPTION_INVALID_STATUS");
         }
     }
 

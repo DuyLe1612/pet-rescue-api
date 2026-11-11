@@ -17,6 +17,9 @@ public interface AdoptionApplicationRepository {
 
     long countByApplicantIdAndStatus(UUID applicantId, AdoptionApplicationStatus status);
 
+    /** Applicants whose PENDING or APPROVED application for the pet is about to be closed by {@link #cancelOpenForPet}. */
+    java.util.List<UUID> findOpenApplicantIdsForPet(UUID petId, UUID exceptApplicationId);
+
     /** Cancels every PENDING or APPROVED application for the pet except the given one. */
     int cancelOpenForPet(UUID petId, UUID exceptApplicationId, String reason, java.time.LocalDateTime now);
 }

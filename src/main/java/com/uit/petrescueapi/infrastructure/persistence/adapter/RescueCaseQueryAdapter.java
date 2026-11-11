@@ -34,8 +34,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     // ======================================================
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
-        return queryRepo.findAllSummaries(search, pageable)
+    public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, RescueCaseFilter filter, Pageable pageable) {
+        return queryRepo.findAllSummaries(search, allStatuses(filter), statusNames(filter), allPriorities(filter),
+                        priorityNames(filter), filter.species(), filter.province(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -46,17 +47,19 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findNearbySummaries(
-            double lat, double lng, double distanceMeters, Pageable pageable) {
+            double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
 
-        return queryRepo.findNearby(lng, lat, distanceMeters, pageable)
+        return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), pageable)
                 .map(this::toSummaryDto);
     }
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(
-            double minLat, double minLng, double maxLat, double maxLng, Pageable pageable) {
+            double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 
-        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, pageable)
+        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, allStatuses(filter), statusNames(filter),
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -153,6 +156,25 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .filter(Objects::nonNull)
                 .map(cloudStoragePort::buildUrl)
                 .toList();
+    }
+
+    // An empty IN () list is invalid SQL, so "no filter" travels as a flag plus a placeholder value.
+    private static final List<String> NO_VALUES = List.of("");
+
+    private static boolean allStatuses(RescueCaseFilter filter) {
+        return filter.statuses() == null || filter.statuses().isEmpty();
+    }
+
+    private static List<String> statusNames(RescueCaseFilter filter) {
+        return allStatuses(filter) ? NO_VALUES : filter.statuses().stream().map(Enum::name).toList();
+    }
+
+    private static boolean allPriorities(RescueCaseFilter filter) {
+        return filter.priorities() == null || filter.priorities().isEmpty();
+    }
+
+    private static List<String> priorityNames(RescueCaseFilter filter) {
+        return allPriorities(filter) ? NO_VALUES : filter.priorities().stream().map(Enum::name).toList();
     }
 
     private List<String> normalizeStatuses(List<RescueCaseStatus> status) {

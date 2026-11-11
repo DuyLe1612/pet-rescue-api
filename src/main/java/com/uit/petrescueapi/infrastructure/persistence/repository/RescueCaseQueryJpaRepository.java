@@ -62,10 +62,38 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
     """,
-            countQuery = "SELECT COUNT(rc.case_id) FROM rescue_cases rc LEFT JOIN users u ON rc.reported_by = u.user_id WHERE rc.is_deleted = false AND (:search IS NULL OR :search = '' OR LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%'))) ",
+            countQuery = """
+      SELECT COUNT(rc.case_id)
+      FROM rescue_cases rc
+      LEFT JOIN users u ON rc.reported_by = u.user_id
+      WHERE rc.is_deleted = false
+         AND (:search IS NULL OR :search = '' OR
+              LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+    """,
             nativeQuery = true)
-    Page<RescueCaseSummaryProjection> findAllSummaries(@Param("search") String search, Pageable pageable);
+    Page<RescueCaseSummaryProjection> findAllSummaries(
+            @Param("search") String search,
+            @Param("allStatuses") boolean allStatuses,
+            @Param("statuses") List<String> statuses,
+            @Param("allPriorities") boolean allPriorities,
+            @Param("priorities") List<String> priorities,
+            @Param("species") String species,
+            @Param("province") String province,
+            Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
 
@@ -131,6 +159,11 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
         ORDER BY distance
     """,
             countQuery = """
@@ -138,12 +171,23 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                         FROM rescue_cases rc
                         WHERE rc.is_deleted = false
                           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
                     """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findNearby(
             @Param("lng") double lng,
             @Param("lat") double lat,
             @Param("distanceMeters") double distanceMeters,
+            @Param("allStatuses") boolean allStatuses,
+            @Param("statuses") List<String> statuses,
+            @Param("allPriorities") boolean allPriorities,
+            @Param("priorities") List<String> priorities,
+            @Param("species") String species,
+            @Param("province") String province,
             Pageable pageable);
 
     // ── Within bounding box (PostGIS spatial query) ──
@@ -169,12 +213,22 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
     """,
             countQuery = """
                         SELECT COUNT(rc.case_id)
                         FROM rescue_cases rc
                         WHERE rc.is_deleted = false
                           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
                     """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findWithinBoundingBox(
@@ -182,6 +236,12 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("minLat") double minLat,
             @Param("maxLng") double maxLng,
             @Param("maxLat") double maxLat,
+            @Param("allStatuses") boolean allStatuses,
+            @Param("statuses") List<String> statuses,
+            @Param("allPriorities") boolean allPriorities,
+            @Param("priorities") List<String> priorities,
+            @Param("species") String species,
+            @Param("province") String province,
             Pageable pageable);
 
     // ══════════════════════════════════════════════════════════════════════════

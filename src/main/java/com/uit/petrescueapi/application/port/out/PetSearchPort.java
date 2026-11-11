@@ -20,6 +20,7 @@ public interface PetSearchPort {
             List<String> statuses,
             UUID ownerUserId,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     );
 }

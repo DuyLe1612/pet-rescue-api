@@ -525,7 +525,164 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data.size").value(100));
     }
 
+    @Test
+    void sizeIsAcceptedAsAnAliasOfPageSize() throws Exception {
+        mvc.perform(get("/api/v1/rescue-cases?size=3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size").value(3));
+        mvc.perform(get("/api/v1/rescue-cases?size=3&pageSize=7"))
+                .andExpect(jsonPath("$.data.size").value(7));
+    }
+
+    // ── Filters ─────────────────────────────────────
+
+    @Test
+    void caseListAppliesStatusPrioritySpeciesAndProvince() throws Exception {
+        UUID reporter = person();
+        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        UUID match = filterCase(reporter, species, "CRITICAL", "REPORTED", "79", "Hồ Chí Minh");
+        UUID otherStatus = filterCase(reporter, species, "CRITICAL", "CLOSED", "79", "Hồ Chí Minh");
+        UUID otherPriority = filterCase(reporter, species, "LOW", "REPORTED", "79", "Hồ Chí Minh");
+        UUID otherProvince = filterCase(reporter, species, "CRITICAL", "REPORTED", "01", "Hà Nội");
+
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species.toUpperCase()))
+                .containsExactlyInAnyOrder(match, otherStatus, otherPriority, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED"))
+                .containsExactlyInAnyOrder(match, otherPriority, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED&status=CLOSED&priority=CRITICAL"))
+                .containsExactlyInAnyOrder(match, otherStatus, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED&priority=CRITICAL&province=79"))
+                .containsExactly(match);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&province=hà nội"))
+                .containsExactly(otherProvince);
+    }
+
+    @Test
+    void nearbyAndBoundingBoxListsApplyTheSameFilters() throws Exception {
+        UUID reporter = person();
+        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        UUID open = filterCase(reporter, species, "HIGH", "REPORTED", "79", "Hồ Chí Minh");
+        filterCase(reporter, species, "HIGH", "CLOSED", "79", "Hồ Chí Minh");
+
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&lat=10.5&lng=106.7&distance=500&species=" + species + "&status=REPORTED"))
+                .containsExactly(open);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&minLat=10.4&minLng=106.6&maxLat=10.6&maxLng=106.8&species="
+                + species + "&status=REPORTED")).containsExactly(open);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&lat=10.5&lng=106.7&distance=500&species=" + species)).hasSize(2);
+    }
+
+    @Test
+    void petsFilterByTheProvinceOfTheirOrganization() throws Exception {
+        String code = "P" + UUID.randomUUID().toString().substring(0, 6);
+        UUID here = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET province_code = ?, province_name = 'Tỉnh Thử' WHERE organization_id = ?", code, here);
+        UUID elsewhere = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petHere = pet("ORGANIZATION", here, here);
+        pet("ORGANIZATION", elsewhere, elsewhere);
+        pet("USER", person(), null);
+
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&availableOnly=true&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&search=Mực&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&province=tỉnh thử")))).contains(petHere);
+    }
+
+    @Test
+    void anyoneCanAskForAvailablePetsButNotForOtherStatuses() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID available = pet("ORGANIZATION", shelter, shelter);
+        UUID adopted = pet("ORGANIZATION", shelter, shelter);
+        jdbc.update("UPDATE pets SET status = 'ADOPTED' WHERE pet_id = ?", adopted);
+        String scope = "/api/v1/pets?pageSize=100&organizationId=" + shelter;
+
+        assertThat(petIds(mvc.perform(get(scope + "&status=AVAILABLE")))).containsExactly(available);
+        // a restricted status is dropped for a stranger, as before, rather than honoured
+        assertThat(petIds(mvc.perform(get(scope + "&status=ADOPTED")))).containsExactlyInAnyOrder(available, adopted);
+        assertThat(petIds(call(get(scope + "&status=ADOPTED"), member(shelter, "STAFF")))).containsExactly(adopted);
+    }
+
+    @Test
+    void myPetsListsOnlyWhatICurrentlyOwn() throws Exception {
+        UUID me = person();
+        UUID mine = pet("USER", me, null);
+        pet("USER", person(), null);
+
+        assertThat(petIds(call(get("/api/v1/users/me/pets"), me))).containsExactly(mine);
+    }
+
+    @Test
+    void anotherUsersContactDetailsAreOnlyForThemAndAdmins() throws Exception {
+        UUID owner = person();
+        jdbc.update("UPDATE users SET phone = '0911111111', street_address = '1 Lê Lợi' WHERE user_id = ?", owner);
+
+        call(get("/api/v1/users/" + owner), person())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").exists())
+                .andExpect(jsonPath("$.data.email").doesNotExist())
+                .andExpect(jsonPath("$.data.phone").doesNotExist())
+                .andExpect(jsonPath("$.data.streetAddress").doesNotExist());
+        call(get("/api/v1/users/" + owner), owner).andExpect(jsonPath("$.data.phone").value("0911111111"));
+        call(get("/api/v1/users/" + owner), admin()).andExpect(jsonPath("$.data.email").exists());
+    }
+
+    // ── Adoption notifications ──────────────────────
+
+    @Test
+    void adoptionStepsReachTheApplicantAndTheOrganization() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID applicant = person();
+        UUID rival = person();
+        UUID rivalApplication = application(petId, rival, shelter, "PENDING");
+
+        // no signature: it is optional now
+        String body = call(post("/api/v1/adoptions"), applicant, """
+                {"petId":"%s","experience":"Đã nuôi chó mười năm","housingCondition":"%s","liveCondition":"Nhà có sân"}
+                """.formatted(petId, com.uit.petrescueapi.domain.valueobject.HousingCondition.values()[0].name()))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String applicationId = JsonPath.read(body, "$.data.applicationId");
+        assertThat(notificationTypes(owner)).containsExactly("ADOPTION_SUBMITTED");
+        assertThat(notificationTypes(staff)).containsExactly("ADOPTION_SUBMITTED");
+
+        call(patch("/api/v1/adoptions/" + applicationId + "/approve"), staff, "{}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTION_READY_AT_REQUIRED"));
+        call(patch("/api/v1/adoptions/" + applicationId + "/approve"), staff, "{\"readyAt\":\"2030-01-01T10:00:00\"}")
+                .andExpect(status().isOk());
+        call(patch("/api/v1/adoptions/" + applicationId + "/complete"), owner, "{}").andExpect(status().isOk());
+
+        assertThat(notificationTypes(applicant)).containsExactly("ADOPTION_APPROVED", "ADOPTION_COMPLETED");
+        assertThat(applicationStatus(rivalApplication)).isEqualTo("CANCELED");
+        assertThat(notificationTypes(rival)).containsExactly("ADOPTION_CANCELED");
+    }
+
     // ── Helpers ─────────────────────────────────────
+
+    private List<String> notificationTypes(UUID userId) {
+        return jdbc.queryForList("SELECT type FROM notifications WHERE user_id = ? ORDER BY created_at, type", String.class, userId);
+    }
+
+    private UUID filterCase(UUID reporter, String species, String priority, String caseStatus, String provinceCode, String provinceName) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, species, priority, status, reported_by, reported_at, created_at,
+                                          province_code, province_name, location)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326))
+                """, id, id.toString().substring(0, 12), species, priority, caseStatus, reporter, provinceCode, provinceName);
+        return id;
+    }
+
+    private List<UUID> caseIds(String url) throws Exception {
+        String body = mvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.<List<String>>read(body, "$.data.content[*].caseId").stream().map(UUID::fromString).toList();
+    }
+
+    private List<UUID> petIds(ResultActions result) throws Exception {
+        String body = result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.<List<String>>read(body, "$.data.content[*].petId").stream().map(UUID::fromString).toList();
+    }
 
     @FunctionalInterface
     private interface Action {

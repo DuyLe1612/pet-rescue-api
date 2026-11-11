@@ -50,6 +50,9 @@ public class ApiResponse<T> {
     @Schema(description = "Human-readable message", example = "OK")
     private String message;
 
+    @Schema(description = "Machine-readable error code, only on business errors", example = "PET_NOT_AVAILABLE")
+    private String errorCode;
+
     @Schema(description = "Response payload")
     private T data;
 
@@ -99,6 +102,12 @@ public class ApiResponse<T> {
                 .timestamp(LocalDateTime.now().toString())
                 .correlationId(MDC.get("correlationId"))
                 .build();
+    }
+
+    public static <T> ApiResponse<T> error(int status, String message, String errorCode) {
+        ApiResponse<T> response = error(status, message);
+        response.setErrorCode(errorCode);
+        return response;
     }
 
     public static <T> ApiResponse<T> error(int status, String message) {
