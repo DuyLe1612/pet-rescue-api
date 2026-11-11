@@ -67,8 +67,11 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ── 3. Deploy to Production (NeonDB, no Docker Postgres) ──
+  # Temporarily off: production runs on Render, which deploys by itself, and there is no VPS
+  # to SSH into. Remove the `if: false` line to bring the VPS deploy back.
   deploy:
     name: Deploy to Production
+    if: false
     runs-on: ubuntu-latest
     needs: docker
     environment: production
