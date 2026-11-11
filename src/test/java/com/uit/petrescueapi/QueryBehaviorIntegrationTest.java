@@ -53,6 +53,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -656,6 +657,202 @@ class QueryBehaviorIntegrationTest {
         assertThat(notificationTypes(applicant)).containsExactly("ADOPTION_APPROVED", "ADOPTION_COMPLETED");
         assertThat(applicationStatus(rivalApplication)).isEqualTo("CANCELED");
         assertThat(notificationTypes(rival)).containsExactly("ADOPTION_CANCELED");
+    }
+
+    // ── Matching ────────────────────────────────────
+
+    private static final String GOOD_HOME = """
+            {"housingType":"HOUSE","buildingRule":"ALLOWED","hoursAwayPerDay":4,"activityLevel":3,
+             "monthlyBudget":2000000,"adjustmentWeeksExpected":6,"experienceLevel":1,"consent":true%s}
+            """;
+    private static final String EASY_PET = """
+            {"friendlyPeople":5,"friendlyChildren":5,"fearStrangers":1,"fearNoise":1,"energy":3,"goodWithDogs":5,
+             "goodWithCats":5,"aloneMinutes":480,"size":"SMALL","noiseLevel":1,"monthlyCost":500000,
+             "careLevel":"LOW","sourceRole":"FOSTER"}
+            """;
+    private static final String HARD_PET = """
+            {"friendlyPeople":2,"fearStrangers":5,"energy":5,"goodWithCats":2,"aloneMinutes":30,"size":"LARGE",
+             "noiseLevel":5,"monthlyCost":9000000,"careLevel":"HIGH","sourceRole":"FOSTER"}
+            """;
+
+    @Test
+    void adopterProfileNeedsConsentAndCountsItsVersions() throws Exception {
+        UUID me = person();
+
+        call(get("/api/v1/users/me/adopter-profile"), me).andExpect(status().isNotFound());
+        call(put("/api/v1/users/me/adopter-profile"), me, "{\"housingType\":\"HOUSE\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTER_PROFILE_CONSENT_REQUIRED"));
+        call(put("/api/v1/users/me/adopter-profile"), me, "{\"consent\":true}").andExpect(status().isBadRequest());
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"hasCat\":true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.buildingRule").value("ALLOWED"));
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(""))
+                .andExpect(jsonPath("$.data.version").value(2));
+        call(get("/api/v1/users/me/adopter-profile"), me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.housingType").value("HOUSE"))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.consent").value(true));
+    }
+
+    @Test
+    void whoeverManagesAPetRecordsItsTraitsAndAnyoneReadsThem() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = dog(shelter);
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/traits"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.petId").value(petId.toString()))
+                .andExpect(jsonPath("$.data.energy").doesNotExist());
+        call(put("/api/v1/pets/" + petId + "/traits"), person(), EASY_PET).andExpect(status().isForbidden());
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, "{\"energy\":9}").andExpect(status().isBadRequest());
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, EASY_PET)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceRole").value("FOSTER"));
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/traits")).andExpect(jsonPath("$.data.energy").value(3));
+        mvc.perform(get("/api/v1/pets/" + UUID.randomUUID() + "/traits")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aMatchExplainsItselfAndKeepsTheNumberFromTheAdopter() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = dog(shelter);
+        call(put("/api/v1/pets/" + petId + "/traits"), member(shelter, "STAFF"), EASY_PET).andExpect(status().isOk());
+        UUID me = person();
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/match")).andExpect(status().isUnauthorized());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTER_PROFILE_REQUIRED"));
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted("")).andExpect(status().isOk());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.certainty").value("HIGH"))
+                .andExpect(jsonPath("$.data.score").doesNotExist())
+                .andExpect(jsonPath("$.data.reasons.length()").value(5))
+                .andExpect(jsonPath("$.data.reasons[0].code").value("LIFESTYLE"))
+                .andExpect(jsonPath("$.data.reasons[0].text").isNotEmpty())
+                .andExpect(jsonPath("$.data.warnings.length()").value(0));
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(jsonPath("$.data.level").value("NOT_SUITABLE"))
+                .andExpect(jsonPath("$.data.warnings[0].code").value("ALLERGY"))
+                .andExpect(jsonPath("$.data.warnings[0].text").isNotEmpty());
+    }
+
+    @Test
+    void sortByMatchPutsTheBestPetFirstAndWarnedPetsLast() throws Exception {
+        String province = "M" + UUID.randomUUID().toString().substring(0, 6);
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET province_code = ? WHERE organization_id = ?", province, shelter);
+        UUID staff = member(shelter, "STAFF");
+        UUID warned = dog(shelter);
+        UUID hard = dog(shelter);
+        UUID undescribed = dog(shelter);
+        UUID easy = dog(shelter);
+        UUID notAvailable = dog(shelter);
+        jdbc.update("UPDATE pets SET status = 'FOSTERING' WHERE pet_id = ?", notAvailable);
+        call(put("/api/v1/pets/" + easy + "/traits"), staff, EASY_PET).andExpect(status().isOk());
+        call(put("/api/v1/pets/" + hard + "/traits"), staff, HARD_PET).andExpect(status().isOk());
+        call(put("/api/v1/pets/" + warned + "/traits"), staff, "{\"goodWithCats\":1}").andExpect(status().isOk());
+        UUID me = person();
+        String url = "/api/v1/pets?sort=match&province=" + province;
+
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        call(get(url), me).andExpect(status().isUnprocessableEntity());
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"hasCat\":true")).andExpect(status().isOk());
+
+        String body = call(get(url), me).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(4))
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").doesNotExist())
+                .andExpect(jsonPath("$.data.content[3].match.level").value("NOT_SUITABLE"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(body, "$.data.content[*].petId"))
+                .containsExactly(easy.toString(), undescribed.toString(), hard.toString(), warned.toString());
+
+        // paging walks the same order
+        String second = call(get(url + "&page=1&pageSize=2"), me).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(second, "$.data.content[*].petId")).containsExactly(hard.toString(), warned.toString());
+    }
+
+    @Test
+    void anApplicationFreezesItsMatchAndAWarningOnlyNeedsAcknowledging() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = dog(shelter);
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, EASY_PET).andExpect(status().isOk());
+        UUID fits = person();
+        UUID allergic = person();
+        UUID noProfile = person();
+        call(put("/api/v1/users/me/adopter-profile"), fits, GOOD_HOME.formatted("")).andExpect(status().isOk());
+        call(put("/api/v1/users/me/adopter-profile"), allergic, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        String form = "{\"petId\":\"" + petId + "\",\"experience\":\"Đã nuôi chó mười năm\",\"housingCondition\":\"HOUSE\",\"liveCondition\":\"Nhà có sân\"%s}";
+
+        call(post("/api/v1/adoptions"), allergic, form.formatted(""))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("MATCH_WARNING_NOT_ACKNOWLEDGED"));
+        String warnedId = applicationId(call(post("/api/v1/adoptions"), allergic, form.formatted(",\"acknowledgedWarnings\":true")));
+        String noProfileId = applicationId(call(post("/api/v1/adoptions"), noProfile, form.formatted("")));
+        String fitsId = applicationId(call(post("/api/v1/adoptions"), fits, form.formatted("")));
+
+        // reviewers: best match first, then the one nothing is known about, the flagged one last
+        String list = call(get("/api/v1/adoptions/organization/" + shelter + "?sort=match&petId=" + petId), staff)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").value(100.0))
+                .andExpect(jsonPath("$.data.content[1].match").doesNotExist())
+                .andExpect(jsonPath("$.data.content[2].match.level").value("NOT_SUITABLE"))
+                .andExpect(jsonPath("$.data.content[2].match.warnings[0].code").value("ALLERGY"))
+                .andExpect(jsonPath("$.data.content[2].match.warningsAcknowledged").value(true))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(list, "$.data.content[*].applicationId")).containsExactly(fitsId, noProfileId, warnedId);
+        call(get("/api/v1/adoptions/organization/" + shelter + "?petId=" + UUID.randomUUID()), staff)
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+
+        // the applicant reads the level and the reasons, the reviewer also the number
+        call(get("/api/v1/adoptions/" + fitsId), fits)
+                .andExpect(jsonPath("$.data.match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.match.score").doesNotExist())
+                .andExpect(jsonPath("$.data.match.reasons.length()").value(5));
+        call(get("/api/v1/adoptions/user/" + fits), fits)
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").doesNotExist());
+
+        // what was true at submission stays on the application
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, HARD_PET).andExpect(status().isOk());
+        call(put("/api/v1/users/me/adopter-profile"), fits, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        call(get("/api/v1/adoptions/" + fitsId), staff)
+                .andExpect(jsonPath("$.data.match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.match.score").value(100.0))
+                .andExpect(jsonPath("$.data.match.weightsVersion").value(1))
+                .andExpect(jsonPath("$.data.match.warnings.length()").value(0));
+        assertThat(jdbc.queryForObject("SELECT match_snapshot FROM adoption_applications WHERE application_id = ?::uuid",
+                String.class, fitsId)).contains("\"adopterProfile\"", "\"petTraits\"", "\"result\"");
+
+        call(patch("/api/v1/adoptions/" + warnedId + "/reject"), staff,
+                "{\"rejectReason\":\"Nhà có người dị ứng\",\"reasonCode\":\"MATCH_WARNING\"}").andExpect(status().isOk());
+        call(get("/api/v1/adoptions/" + warnedId), staff)
+                .andExpect(jsonPath("$.data.decisionReasonCode").value("MATCH_WARNING"));
+    }
+
+    private UUID dog(UUID shelter) {
+        UUID id = pet("ORGANIZATION", shelter, shelter);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Dog') WHERE pet_id = ?", id);
+        return id;
+    }
+
+    private String applicationId(ResultActions created) throws Exception {
+        return JsonPath.read(created.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(),
+                "$.data.applicationId");
     }
 
     // ── Helpers ─────────────────────────────────────
