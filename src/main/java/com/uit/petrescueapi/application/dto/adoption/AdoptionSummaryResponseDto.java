@@ -43,4 +43,7 @@ public class AdoptionSummaryResponseDto {
     private LocalDateTime createdAt;
     private String applicantUsername;
     private LocalDateTime readyAt;
+
+    @Schema(description = "Match frozen when the application was submitted. Null when the applicant had no adopter profile.")
+    private com.uit.petrescueapi.application.dto.matching.MatchResultDto match;
 }

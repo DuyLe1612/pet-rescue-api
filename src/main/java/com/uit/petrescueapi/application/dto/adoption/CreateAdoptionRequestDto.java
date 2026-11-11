@@ -39,4 +39,10 @@ public class CreateAdoptionRequestDto {
     /** Optional. When sent it must be a media file the applicant uploaded. */
     @JsonAlias({"e_signature_id", "eSignatureId"})
     private UUID signatureMediaId;
+
+    /**
+     * Must be true when matching raised a warning for this pet: the applicant confirms they read it.
+     * The application is still submitted; the organization sees the flag and decides.
+     */
+    private boolean acknowledgedWarnings;
 }

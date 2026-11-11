@@ -22,4 +22,10 @@ public interface AdoptionSummaryProjection {
     String getLiveCondition();
     LocalDateTime getCreatedAt();
     LocalDateTime getReadyAt();
+
+    String getMatchLevel();
+    java.math.BigDecimal getMatchScore();
+    String getMatchCertainty();
+    String getMatchWarnings();
+    Boolean getWarningsAcknowledged();
 }

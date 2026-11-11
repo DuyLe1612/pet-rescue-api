@@ -31,6 +31,7 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
 
     private final AdoptionQueryJpaRepository queryRepo;
     private final CloudStoragePort cloudStoragePort;
+    private final AdoptionMatchMapper matchMapper;
 
     // ── List (summary) queries ──────────────────
 
@@ -45,8 +46,8 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
     }
 
     @Override
-    public Page<AdoptionSummaryResponseDto> findByOrganizationIdSummaries(UUID organizationId, List<String> statuses, String search, Pageable pageable) {
-        return queryRepo.findByOrganizationIdSummaries(organizationId, normalizeStatuses(statuses), search, pageable).map(this::toSummaryDto);
+    public Page<AdoptionSummaryResponseDto> findByOrganizationIdSummaries(UUID organizationId, UUID petId, List<String> statuses, String search, Pageable pageable) {
+        return queryRepo.findByOrganizationIdSummaries(organizationId, petId, normalizeStatuses(statuses), search, pageable).map(this::toSummaryDto);
     }
 
     // ── Detail (single adoption application) query ──
@@ -73,6 +74,8 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .createdAt(p.getCreatedAt())
                 .applicantUsername(p.getApplicantUsername())
                 .readyAt(p.getReadyAt())
+                .match(matchMapper.summary(p.getMatchLevel(), p.getMatchScore(), p.getMatchCertainty(),
+                        p.getMatchWarnings(), p.getWarningsAcknowledged()))
                 .build();
     }
 
@@ -97,6 +100,9 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .decidedByUsername(p.getDecidedByUsername())
                 .rejectReason(p.getRejectReason())
                 .readyAt(p.getReadyAt())
+                .decisionReasonCode(p.getDecisionReasonCode())
+                .match(matchMapper.detail(p.getMatchSnapshot(), p.getMatchLevel(), p.getMatchScore(), p.getMatchCertainty(),
+                        p.getMatchWarnings(), p.getWarningsAcknowledged(), p.getMatchWeightsVersion()))
                 .build();
     }
 
