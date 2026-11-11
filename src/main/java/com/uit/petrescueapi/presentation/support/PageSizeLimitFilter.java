@@ -20,6 +20,9 @@ import java.util.Set;
 /**
  * Caps page sizes for every endpoint in one place: a single {@code pageSize=100000} could otherwise
  * load a whole table into a 256 MB heap. Values above the limit are lowered, not rejected.
+ *
+ * <p>Also accepts {@code size} as an alias of {@code pageSize}: the web client sends {@code size}, and
+ * before this the value was silently ignored and every list fell back to 20 rows.</p>
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -32,7 +35,8 @@ public class PageSizeLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         boolean tooLarge = SIZE_PARAMETERS.stream().anyMatch(name -> isTooLarge(request.getParameter(name)));
-        chain.doFilter(tooLarge ? new CappedRequest(request) : request, response);
+        boolean aliased = request.getParameter("size") != null && request.getParameter("pageSize") == null;
+        chain.doFilter(tooLarge || aliased ? new CappedRequest(request) : request, response);
     }
 
     private static boolean isTooLarge(String value) {
@@ -53,8 +57,11 @@ public class PageSizeLimitFilter extends OncePerRequestFilter {
         CappedRequest(HttpServletRequest request) {
             super(request);
             parameters = new HashMap<>(request.getParameterMap());
+            if (!parameters.containsKey("pageSize") && parameters.containsKey("size")) {
+                parameters.put("pageSize", parameters.get("size"));
+            }
             for (String name : SIZE_PARAMETERS) {
-                if (isTooLarge(request.getParameter(name))) {
+                if (isTooLarge(getParameter(name))) {
                     parameters.put(name, new String[]{String.valueOf(MAX_PAGE_SIZE)});
                 }
             }

@@ -22,11 +22,11 @@ public interface RescueCaseQueryDataPort {
 
     RescueCaseResponseDto findById(UUID caseId, UUID viewerId);
 
-    Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
-    Page<RescueCaseSummaryResponseDto> findNearbySummaries(double lat, double lng, double distanceMeters, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findNearbySummaries(double lat, double lng, double distanceMeters, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
-    Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
     // ── Map marker queries (ultra-lightweight, no pagination for fast rendering) ──
 

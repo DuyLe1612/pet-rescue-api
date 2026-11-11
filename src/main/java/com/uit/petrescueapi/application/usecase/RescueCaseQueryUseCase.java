@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter;
 import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.domain.entity.RescueCaseClaim;
@@ -56,21 +57,25 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAll(String search, Pageable pageable) {
+    public Page<RescueCaseSummaryResponseDto> findAll(String search, RescueCaseFilter filter, Pageable pageable) {
         log.debug("Query: find all rescue cases (paginated, search={})", search);
-        return queryDataPort.findAllSummaries(search, pageable);
+        return queryDataPort.findAllSummaries(search, orNone(filter), pageable);
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, Pageable pageable) {
+    public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
         log.debug("Query: find rescue cases nearby ({}, {}) within {} meters", lat, lng, distanceMeters);
-        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, pageable);
+        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, orNone(filter), pageable);
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, Pageable pageable) {
+    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
         log.debug("Query: find rescue cases within bounding box ({},{}) to ({},{})", minLat, minLng, maxLat, maxLng);
-        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, pageable);
+        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, orNone(filter), pageable);
+    }
+
+    private static RescueCaseFilter orNone(RescueCaseFilter filter) {
+        return filter == null ? RescueCaseFilter.none() : filter;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

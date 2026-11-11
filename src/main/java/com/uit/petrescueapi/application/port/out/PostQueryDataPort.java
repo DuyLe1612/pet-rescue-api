@@ -20,7 +20,11 @@ public interface PostQueryDataPort {
 
     PostResponseDto findById(UUID postId);
 
-    Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable);
+    default Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
+        return findAllSummaries(search, PostFeedFilter.none(), pageable);
+    }
+
+    Page<PostSummaryResponseDto> findAllSummaries(String search, PostFeedFilter filter, Pageable pageable);
 
     /**
      * Feed page ordered by {@code (createdAt, postId)} descending. Pass the previous page's

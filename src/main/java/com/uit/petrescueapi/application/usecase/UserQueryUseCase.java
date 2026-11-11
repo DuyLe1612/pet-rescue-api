@@ -27,11 +27,23 @@ import java.util.UUID;
 public class UserQueryUseCase implements UserQueryPort {
 
     private final UserQueryDataPort queryDataPort;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
 
     @Override
     public UserResponseDto findById(UUID userId) {
         log.debug("Query: find user by id {}", userId);
         return queryDataPort.findById(userId);
+    }
+
+    @Override
+    public UserResponseDto findByIdForViewer(UUID userId, UUID viewerId) {
+        UserResponseDto dto = findById(userId);
+        if (!userId.equals(viewerId) && !accessControl.isAdmin(viewerId)) {
+            dto.setEmail(null);
+            dto.setPhone(null);
+            dto.setStreetAddress(null);
+        }
+        return dto;
     }
 
     @Override

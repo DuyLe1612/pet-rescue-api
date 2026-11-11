@@ -158,6 +158,8 @@ public class PetController {
     @GetMapping
     @Operation(summary = "List all pets (paginated, with optional filters)",
             description = "Unified endpoint for listing pets. Supports filtering by status, user, organization, and availability. " +
+                    "province (code or name) matches the province of the pet's organization. " +
+                    "Anyone may ask for status=AVAILABLE; other statuses need admin or a member of organizationId. " +
                     "Use status=AVAILABLE or availableOnly=true for available pets. " +
                     "Use organizationId=X to filter by organization. Use userId=X to filter by owner.")
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getAll(
@@ -172,6 +174,7 @@ public class PetController {
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID organizationId,
+            @RequestParam(required = false) String province,
             @RequestParam(required = false) Boolean availableOnly) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -197,8 +200,11 @@ public class PetController {
         if (!admin) {
             userId = null;
         }
-        if (!canUseStatus) {
-            status = null;
+        if (!canUseStatus && status != null) {
+            // AVAILABLE is what the public adoption page lists; every other status stays restricted.
+            status = status.stream().anyMatch(PetStatus.AVAILABLE.name()::equals)
+                    ? List.of(PetStatus.AVAILABLE.name())
+                    : null;
         }
 
         List<PetStatus> statusList = status == null ? null :
@@ -207,13 +213,13 @@ public class PetController {
         if (Boolean.TRUE.equals(availableOnly)) {
             return ResponseEntity.ok(ApiResponse.ok(
                     PageResponse.from(petQueryPort.findAvailableWithFilters(
-                            species, breed, gender, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
+                            species, breed, gender, organizationId, province, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                     ))));
         }
 
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
-                        species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
+                        species, breed, gender, search, statusList, userId, organizationId, province, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

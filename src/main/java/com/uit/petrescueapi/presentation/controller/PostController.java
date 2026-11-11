@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import com.uit.petrescueapi.domain.valueobject.PostCategory;
+
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -78,35 +80,50 @@ public class PostController {
     @GetMapping
     @Operation(
             summary = "List posts",
-            description = "Returns paginated post summaries."
+            description = "Returns paginated post summaries. Optional filters on the facets the author confirmed "
+                    + "(category, species, district, province, needsRescue) and on a tag code."
     )
     public ResponseEntity<ApiResponse<PageResponse<PostSummaryResponseDto>>> getAll(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortOrder) {
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(required = false) PostCategory category,
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) Boolean needsRescue,
+            @RequestParam(required = false) String tag) {
+        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag);
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findAll(search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/feed")
     @Operation(
             summary = "Post feed by cursor",
             description = "Returns post feed using cursor pagination by (createdAt, postId): pass nextCursor as cursor and "
-                    + "nextCursorId as cursorId. Optional filters on confirmed post facets (category, species, district) and tag code."
+                    + "nextCursorId as cursorId. Optional filters on confirmed post facets (category, species, district, province, "
+                    + "needsRescue) and tag code. category is one of RESCUE, ADOPTION, LOST, FOUND, GENERAL."
     )
     public ResponseEntity<ApiResponse<PostCursorResponseDto>> getFeed(
             @RequestParam(required = false) LocalDateTime cursor,
             @RequestParam(required = false) UUID cursorId,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) PostCategory category,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String district,
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) Boolean needsRescue,
             @RequestParam(required = false) String tag,
             Authentication authentication) {
         UUID viewerId = authentication != null ? UUID.fromString(authentication.getName()) : null;
-        PostFeedFilter filter = new PostFeedFilter(category, species, district, tag);
+        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag);
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, cursorId, pageSize, viewerId, filter)));
+    }
+
+    private static String name(PostCategory category) {
+        return category == null ? null : category.name();
     }
 }

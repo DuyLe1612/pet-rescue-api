@@ -39,11 +39,12 @@ public class PetQueryUseCase implements PetQueryPort {
             List<PetStatus> statuses,
             UUID ownerUserId,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     ) {
         log.debug("Query: find all pets with filters (species={}, breed={}, gender={}, searchName={}, statuses={}, ownerUserId={}, ownerOrganizationId={})",
                 species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId);
-        return queryDataPort.findAllWithFilters(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, pageable);
+        return queryDataPort.findAllWithFilters(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, province, pageable);
     }
 
     @Override
@@ -52,10 +53,11 @@ public class PetQueryUseCase implements PetQueryPort {
             String breed,
             String gender,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     ) {
         log.debug("Query: find available pets with filters (species={}, breed={}, gender={}, status={}, ownerOrganizationId={})",
                 species, breed, gender, PetStatus.AVAILABLE, ownerOrganizationId);
-        return queryDataPort.findAvailableWithFilters(species, breed, gender, ownerOrganizationId, pageable);
+        return queryDataPort.findAvailableWithFilters(species, breed, gender, ownerOrganizationId, province, pageable);
     }
 }
