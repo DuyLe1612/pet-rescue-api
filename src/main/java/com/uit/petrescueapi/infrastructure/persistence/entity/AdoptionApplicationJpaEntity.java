@@ -73,6 +73,34 @@ public class AdoptionApplicationJpaEntity extends BaseJpaEntity {
     @Column(name = "ready_at", columnDefinition = "TIMESTAMPTZ")
     private LocalDateTime readyAt;
 
+    @Column(name = "match_level", length = 20)
+    private String matchLevel;
+
+    @Column(name = "match_score", precision = 5, scale = 1)
+    private java.math.BigDecimal matchScore;
+
+    @Column(name = "match_certainty", length = 10)
+    private String matchCertainty;
+
+    @Column(name = "match_weights_version")
+    private Integer matchWeightsVersion;
+
+    @Column(name = "match_warnings")
+    private String matchWarnings;
+
+    @Column(name = "warnings_acknowledged", nullable = false)
+    private boolean warningsAcknowledged;
+
+    @Builder.Default
+    @Column(name = "match_rank", nullable = false, precision = 5, scale = 1)
+    private java.math.BigDecimal matchRank = java.math.BigDecimal.valueOf(-1);
+
+    @Column(name = "match_snapshot", columnDefinition = "TEXT")
+    private String matchSnapshot;
+
+    @Column(name = "decision_reason_code", length = 50)
+    private String decisionReasonCode;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pet_id", insertable = false, updatable = false)
     private PetJpaEntity pet;

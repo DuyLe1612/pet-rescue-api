@@ -86,6 +86,13 @@ public class AdoptionDomainService {
             );
         }
 
+        // After the hard business rules above: a warning never blocks, but the applicant must have read it.
+        if (application.hasMatchWarnings() && !application.isWarningsAcknowledged()) {
+            throw new UnprocessableEntityException(
+                    "This pet has compatibility warnings for you. Confirm that you have read them to apply.",
+                    "MATCH_WARNING_NOT_ACKNOWLEDGED");
+        }
+
         // Always derived from the pet: a client-supplied value would let a caller route
         // the application to their own organization and approve it themselves.
         application.setOrganizationId(resolvePetOrganizationOwner(application.getPetId()));
@@ -105,6 +112,10 @@ public class AdoptionDomainService {
      * Validates the current status is PENDING before transitioning to APPROVED.
      */
     public AdoptionApplication approve(UUID applicationId, UUID decidedBy, LocalDateTime readyAt) {
+        return approve(applicationId, decidedBy, readyAt, null);
+    }
+
+    public AdoptionApplication approve(UUID applicationId, UUID decidedBy, LocalDateTime readyAt, String reasonCode) {
         log.info("Approving adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
         accessControl.requireAdoptionDecider(app.getOrganizationId(), decidedBy);
@@ -118,6 +129,7 @@ public class AdoptionDomainService {
         app.setDecidedBy(decidedBy);
         app.setDecidedAt(LocalDateTime.now());
         app.setReadyAt(readyAt);
+        app.setDecisionReasonCode(blankToNull(reasonCode));
         app.setUpdatedAt(LocalDateTime.now());
         AdoptionApplication saved = applicationRepository.save(app);
         notifyApplicant(saved, NotificationType.ADOPTION_APPROVED, "Đơn nhận nuôi " + code(saved) + " đã được duyệt",
@@ -130,6 +142,10 @@ public class AdoptionDomainService {
      * Validates the current status is PENDING before transitioning to REJECTED.
      */
     public AdoptionApplication reject(UUID applicationId, UUID decidedBy, String rejectReason) {
+        return reject(applicationId, decidedBy, rejectReason, null);
+    }
+
+    public AdoptionApplication reject(UUID applicationId, UUID decidedBy, String rejectReason, String reasonCode) {
         log.info("Rejecting adoption application {}", applicationId);
         AdoptionApplication app = findById(applicationId);
         accessControl.requireAdoptionDecider(app.getOrganizationId(), decidedBy);
@@ -143,6 +159,7 @@ public class AdoptionDomainService {
         app.setDecidedBy(decidedBy);
         app.setDecidedAt(LocalDateTime.now());
         app.setRejectReason(rejectReason);
+        app.setDecisionReasonCode(blankToNull(reasonCode));
         app.setUpdatedAt(LocalDateTime.now());
         AdoptionApplication saved = applicationRepository.save(app);
         notifyApplicant(saved, NotificationType.ADOPTION_REJECTED, "Đơn nhận nuôi " + code(saved) + " không được duyệt",
@@ -254,6 +271,10 @@ public class AdoptionDomainService {
 
     private void notifyApplicant(AdoptionApplication app, NotificationType type, String title, String body) {
         notifications.notifyUsers(List.of(app.getApplicantId()), type, title, body, data(app));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static String code(AdoptionApplication app) {

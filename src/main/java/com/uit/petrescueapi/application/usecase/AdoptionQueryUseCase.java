@@ -37,7 +37,12 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
         log.debug("Query: find adoption application by id {}", applicationId);
         AdoptionApplication application = adoptionDomainService.findById(applicationId);
         accessControl.requireAdoptionViewer(application.getApplicantId(), application.getOrganizationId(), requesterId);
-        return queryDataPort.findById(applicationId);
+        AdoptionResponseDto dto = queryDataPort.findById(applicationId);
+        // The number is for whoever reviews the application; the applicant sees the level and the reasons.
+        if (dto.getMatch() != null && requesterId.equals(application.getApplicantId())) {
+            dto.setMatch(dto.getMatch().withoutScore());
+        }
+        return dto;
     }
 
     @Override
@@ -51,7 +56,12 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
     public Page<AdoptionSummaryResponseDto> findByApplicantId(UUID applicantId, List<String> statuses, String search, Pageable pageable, UUID requesterId) {
         accessControl.requireSelfOrAdmin(applicantId, requesterId);
         log.debug("Query: find adoption applications by applicant id {} (statuses={}, search={}, paginated)", applicantId, statuses, search);
-        return queryDataPort.findByApplicantIdSummaries(applicantId, statuses, search, pageable);
+        return queryDataPort.findByApplicantIdSummaries(applicantId, statuses, search, pageable).map(dto -> {
+            if (dto.getMatch() != null) {
+                dto.setMatch(dto.getMatch().withoutScore());
+            }
+            return dto;
+        });
     }
 
     @Override
@@ -64,9 +74,9 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
     }
 
     @Override
-    public Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, List<String> statuses, String search, Pageable pageable, UUID requesterId) {
+    public Page<AdoptionSummaryResponseDto> findByOrganizationId(UUID organizationId, UUID petId, List<String> statuses, String search, Pageable pageable, UUID requesterId) {
         accessControl.requireOrgMemberOrAdmin(organizationId, requesterId);
         log.debug("Query: find adoption applications by organization id {} (statuses={}, search={}, paginated)", organizationId, statuses, search);
-        return queryDataPort.findByOrganizationIdSummaries(organizationId, statuses, search, pageable);
+        return queryDataPort.findByOrganizationIdSummaries(organizationId, petId, statuses, search, pageable);
     }
 }

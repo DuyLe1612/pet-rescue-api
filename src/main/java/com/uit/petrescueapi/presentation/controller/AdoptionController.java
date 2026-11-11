@@ -133,19 +133,29 @@ public class AdoptionController {
     }
 
     @GetMapping("/organization/{orgId}")
-    @Operation(summary = "Get adoption applications by organization ID")
+    @Operation(summary = "Get adoption applications by organization ID",
+            description = "petId narrows to one pet. sort=match puts the best match first, applications without a match "
+                    + "after them, and applications with a warning last.")
     public ResponseEntity<ApiResponse<PageResponse<AdoptionSummaryResponseDto>>> getByOrganizationId(
             @PathVariable UUID orgId,
+            @RequestParam(required = false) UUID petId,
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(required = false) String sort,
             Authentication authentication) {
         UUID requesterId = UUID.fromString(authentication.getName());
+        boolean byMatch = "match".equalsIgnoreCase(sort) || "match".equalsIgnoreCase(sortBy);
+        org.springframework.data.domain.Pageable pageable = byMatch
+                ? org.springframework.data.domain.PageRequest.of(page, pageSize, org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Order.desc("matchRank"),
+                        org.springframework.data.domain.Sort.Order.desc("createdAt")))
+                : PageableRequestFactory.of(page, pageSize, sortBy, sortOrder);
         return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findByOrganizationId(orgId, status, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder), requesterId))));
+                PageResponse.from(queryPort.findByOrganizationId(orgId, petId, status, search, pageable, requesterId))));
     }
 
     @GetMapping("/reclaims")
