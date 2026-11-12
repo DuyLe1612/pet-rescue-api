@@ -42,9 +42,12 @@ public class PostQueryUseCase implements PostQueryPort {
     private final CloudStoragePort cloudStorage;
 
     @Override
-    public PostResponseDto findById(UUID postId) {
+    public PostResponseDto findById(UUID postId, UUID viewerId) {
         log.debug("Query: find post by id {}", postId);
         PostResponseDto post = queryDataPort.findById(postId);
+        if (viewerId != null) {
+            post.setLikedByMe(queryDataPort.isLikedBy(postId, viewerId));
+        }
         if (post.getRescueCase() != null) {
             post.setRescueCase(card(references.findRescueCaseCards(List.of(post.getRescueCase().getCaseId()))
                     .get(post.getRescueCase().getCaseId())));

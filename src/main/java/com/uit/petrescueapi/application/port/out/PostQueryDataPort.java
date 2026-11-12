@@ -20,6 +20,8 @@ public interface PostQueryDataPort {
 
     PostResponseDto findById(UUID postId);
 
+    boolean isLikedBy(UUID postId, UUID userId);
+
     default Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
         return findAllSummaries(search, PostFeedFilter.none(), pageable);
     }

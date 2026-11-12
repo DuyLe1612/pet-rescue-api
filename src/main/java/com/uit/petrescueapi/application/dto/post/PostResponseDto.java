@@ -27,6 +27,9 @@ public class PostResponseDto {
     private String authorAvatarUrl;
     private Integer likeCount;
     private Integer commentCount;
+    /** Null for guests. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Boolean likedByMe;
 
     private UUID rescueCaseId;
 

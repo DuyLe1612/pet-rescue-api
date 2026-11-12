@@ -190,6 +190,11 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         return new PostFacets(category, f.getSpecies(), f.getDistrict(), f.getProvince(), Boolean.TRUE.equals(f.getNeedsRescue()));
     }
 
+    @Override
+    public boolean isLikedBy(UUID postId, UUID userId) {
+        return mongo.exists(query(where("_id").is(new PostLikeKey(postId, userId))), PostLikeDocument.class);
+    }
+
     /** One lookup for the whole page. Anonymous viewers get no value at all. */
     private void markLikedBy(UUID viewerId, List<PostSummaryResponseDto> items) {
         if (viewerId == null || items.isEmpty()) {

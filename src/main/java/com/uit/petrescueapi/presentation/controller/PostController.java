@@ -71,10 +71,11 @@ public class PostController {
     @GetMapping("/{id}")
     @Operation(
             summary = "Get post by ID",
-            description = "Returns post detail including author, media, and tags."
+            description = "Public, so a shared link opens for anyone. Returns post detail including author, media, tags, "
+                    + "the linked rescue case, and likedByMe for a signed-in viewer."
     )
-    public ResponseEntity<ApiResponse<PostResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
+    public ResponseEntity<ApiResponse<PostResponseDto>> getById(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id, viewerId(authentication))));
     }
 
     @GetMapping
@@ -124,12 +125,16 @@ public class PostController {
             @RequestParam(required = false) Boolean hasOpenCase,
             @RequestParam(required = false) String tag,
             Authentication authentication) {
-        // Public endpoint: a guest arrives as an anonymous token, not as null.
-        UUID viewerId = authentication == null
-                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken
-                ? null : UUID.fromString(authentication.getName());
+        UUID viewerId = viewerId(authentication);
         PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag, rescueCaseId, hasOpenCase);
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, cursorId, pageSize, viewerId, filter)));
+    }
+
+    /** Public endpoints: a guest arrives as an anonymous token, not as null. */
+    private static UUID viewerId(Authentication authentication) {
+        return authentication == null
+                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken
+                ? null : UUID.fromString(authentication.getName());
     }
 
     private static String name(PostCategory category) {

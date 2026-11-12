@@ -105,6 +105,8 @@ class QueryBehaviorIntegrationTest {
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
     @MockitoBean CloudStoragePort cloud;
+    /** No broker in this test: likes and comments publish counter events that nothing here consumes. */
+    @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
 
     @BeforeEach
     void cloudBuildsUrls() {
@@ -712,6 +714,36 @@ class QueryBehaviorIntegrationTest {
         call(put("/api/v1/posts/" + postId), sharer, "{\"rescueCaseId\":\"" + caseId + "\"}")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_CLOSED"));
+    }
+
+    @Test
+    void aSharedPostLinkOpensForGuestsWithItsComments() throws Exception {
+        UUID author = person();
+        UUID reader = person();
+        String created = call(post("/api/v1/posts"), author, "{\"content\":\"Bé mèo nhà mình hôm nay\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts/" + postId + "/comments"), reader, "{\"content\":\"Dễ thương quá\"}").andExpect(status().isCreated());
+        call(post("/api/v1/posts/" + postId + "/like"), reader).andExpect(status().isOk());
+
+        // a guest reads the post and its comments, without any "liked by me"
+        mvc.perform(get("/api/v1/posts/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("Bé mèo nhà mình hôm nay"))
+                .andExpect(jsonPath("$.data.rescueCase").doesNotExist())
+                .andExpect(jsonPath("$.data.likedByMe").doesNotExist());
+        mvc.perform(get("/api/v1/posts/" + postId + "/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].content").value("Dễ thương quá"));
+        call(get("/api/v1/posts/" + postId), reader).andExpect(jsonPath("$.data.likedByMe").value(true));
+        call(get("/api/v1/posts/" + postId), author).andExpect(jsonPath("$.data.likedByMe").value(false));
+
+        // writing still needs an account, and so do the list and the analysis
+        mvc.perform(post("/api/v1/posts/" + postId + "/comments").contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/posts/" + postId + "/like")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts/" + postId + "/analysis")).andExpect(status().isUnauthorized());
     }
 
     @Test

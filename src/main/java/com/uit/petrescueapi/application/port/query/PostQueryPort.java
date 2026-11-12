@@ -11,7 +11,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 public interface PostQueryPort {
-    PostResponseDto findById(UUID postId);
+    /** @param viewerId null for a guest; then {@code likedByMe} is left out */
+    PostResponseDto findById(UUID postId, UUID viewerId);
     Page<PostSummaryResponseDto> findAll(String search, PostFeedFilter filter, Pageable pageable);
     PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter);
 }

@@ -75,6 +75,9 @@ public class SecurityConfig {
                        .requestMatchers(HttpMethod.GET, "/api/v1/banners/active").permitAll()
                        // The community feed is how most people come across a rescue case, signed in or not.
                        .requestMatchers(HttpMethod.GET, "/api/v1/posts/feed").permitAll()
+                       // A shared link must open for whoever receives it: one post and its comments.
+                       // The paged list (GET /posts) and the analysis endpoints stay behind sign-in.
+                       .requestMatchers(HttpMethod.GET, "/api/v1/posts/*", "/api/v1/posts/*/comments").permitAll()
                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                        .anyRequest().authenticated()
                )
