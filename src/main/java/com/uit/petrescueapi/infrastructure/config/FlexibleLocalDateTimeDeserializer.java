@@ -4,17 +4,17 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.uit.petrescueapi.application.support.AppTime;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
+/**
+ * Reads every {@link LocalDateTime} in a request body. Accepts {@code Z} or an offset, a time
+ * without one (taken as UTC), or a date alone (start of that day in Vietnam). See {@link AppTime}.
+ */
 public class FlexibleLocalDateTimeDeserializer extends JsonDeserializer<LocalDateTime> {
-
-    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-    private static final DateTimeFormatter DATE_ONLY = DateTimeFormatter.ISO_LOCAL_DATE;
 
     @Override
     public LocalDateTime deserialize(JsonParser parser, DeserializationContext ctxt) throws IOException {
@@ -23,17 +23,12 @@ public class FlexibleLocalDateTimeDeserializer extends JsonDeserializer<LocalDat
             return null;
         }
         try {
-            return LocalDateTime.parse(value, DATE_TIME);
+            return AppTime.fromWire(value);
         } catch (DateTimeParseException ex) {
-            try {
-                LocalDate date = LocalDate.parse(value, DATE_ONLY);
-                return date.atStartOfDay();
-            } catch (DateTimeParseException ex2) {
-                throw new InvalidFormatException(parser,
-                        "Invalid datetime format. Use ISO-8601 'yyyy-MM-dd' or 'yyyy-MM-ddTHH:mm:ss'",
-                        value,
-                        LocalDateTime.class);
-            }
+            throw new InvalidFormatException(parser,
+                    "Invalid date-time. Use ISO-8601 with an offset, e.g. '2026-11-12T10:00:00Z' or '2026-11-12T17:00:00+07:00'",
+                    value,
+                    LocalDateTime.class);
         }
     }
 }

@@ -92,4 +92,6 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    // Tests do not go through main(), which pins UTC in production. Run them the way production runs.
+    systemProperty("user.timezone", "UTC")
 }

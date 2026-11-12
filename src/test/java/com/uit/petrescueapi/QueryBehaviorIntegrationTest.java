@@ -763,6 +763,79 @@ class QueryBehaviorIntegrationTest {
         assertThat(JsonPath.<List<String>>read(stillOpen, "$.data.content[*].caseId")).containsExactly(open.toString());
     }
 
+    // ── Time on the wire ────────────────────────────
+
+    @Test
+    void everyDateTimeLeavesTheApiAsUtcWithZ() throws Exception {
+        UUID reporter = person();
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(5);
+        UUID caseId = report(reporter);
+
+        String detail = mvc.perform(get("/api/v1/rescue-cases/" + caseId)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String reportedAt = JsonPath.read(detail, "$.data.reportedAt");
+        assertThat(reportedAt).endsWith("Z");
+        // the instant is right, not shifted by the host's zone
+        assertThat(java.time.Instant.parse(reportedAt))
+                .isBetween(before.toInstant(java.time.ZoneOffset.UTC), java.time.Instant.now().plusSeconds(5));
+        assertThat(JsonPath.<String>read(detail, "$.timestamp")).endsWith("Z");
+
+        String nearby = mvc.perform(get("/api/v1/rescue-cases?lat=10.5&lng=106.7&distance=500&pageSize=100"))
+                .andReturn().getResponse().getContentAsString();
+        // the list queries convert in SQL, the detail in Java: both must give the same instant
+        assertThat(JsonPath.<List<String>>read(nearby, "$.data.content[?(@.caseId=='" + caseId + "')].reportedAt"))
+                .containsExactly(reportedAt);
+    }
+
+    @Test
+    void aCursorSentBackWithZWalksTheWholeFeed() throws Exception {
+        UUID author = person();
+        for (int i = 0; i < 3; i++) {
+            call(post("/api/v1/posts"), author, "{\"content\":\"tz cursor " + i + "\"}").andExpect(status().isCreated());
+        }
+
+        String first = mvc.perform(get("/api/v1/posts/feed?pageSize=2")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.data.nextCursor");
+        String cursorId = JsonPath.read(first, "$.data.nextCursorId");
+        assertThat(cursor).endsWith("Z");
+
+        String second = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", cursor).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> firstIds = JsonPath.read(first, "$.data.items[*].postId");
+        List<String> secondIds = JsonPath.read(second, "$.data.items[*].postId");
+        assertThat(secondIds).isNotEmpty().doesNotContainAnyElementsOf(firstIds);
+
+        // an offset other than Z is the same instant
+        String shifted = java.time.Instant.parse(cursor).atOffset(java.time.ZoneOffset.ofHours(7)).toString();
+        String sameSecond = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", shifted).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(sameSecond, "$.data.items[*].postId")).isEqualTo(secondIds);
+    }
+
+    @Test
+    void theDashboardCountsMonthsAsPeopleInVietnamDo() {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        int year = 2031;
+        // 31 Jan 18:00 UTC is already 1 Feb 01:00 in Vietnam
+        UUID earlyFebruary = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2031-01-31T18:00:00Z' WHERE application_id = ?", earlyFebruary);
+        // 31 Dec 18:00 UTC of the year before is already 1 Jan in Vietnam
+        UUID newYear = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2030-12-31T18:00:00Z' WHERE application_id = ?", newYear);
+
+        var trend = dashboard.getAdoptionTrend(year);
+        String months = String.valueOf(trend);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 1).mapToLong(m -> m.getPending()).sum()).isEqualTo(1);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 2).mapToLong(m -> m.getPending()).sum())
+                .as(months).isEqualTo(1);
+    }
+
     // ── Adoption notifications ──────────────────────
 
     @Test
