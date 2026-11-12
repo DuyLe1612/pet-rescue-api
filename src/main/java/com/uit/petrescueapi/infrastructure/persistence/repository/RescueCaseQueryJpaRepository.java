@@ -67,6 +67,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
     """,
             countQuery = """
       SELECT COUNT(rc.case_id)
@@ -83,6 +84,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
     """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findAllSummaries(
@@ -93,6 +95,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
             @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
@@ -164,6 +167,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
         ORDER BY distance
     """,
             countQuery = """
@@ -176,6 +180,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
                     """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findNearby(
@@ -188,6 +193,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
             @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
     // ── Within bounding box (PostGIS spatial query) ──
@@ -218,6 +224,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
     """,
             countQuery = """
                         SELECT COUNT(rc.case_id)
@@ -229,6 +236,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
                     """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findWithinBoundingBox(
@@ -242,6 +250,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
             @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
     // ══════════════════════════════════════════════════════════════════════════

@@ -39,15 +39,24 @@ public class RescueCaseController {
     private final RescueCaseQueryPort queryPort;
     private final RescueCaseWebMapper mapper;
     private final PetWebMapper petMapper;
+    private final com.uit.petrescueapi.application.port.command.RescueCaseSharePort sharePort;
 
     @PostMapping
-    @Operation(summary = "Report a new rescue case")
+    @Operation(summary = "Report a new rescue case",
+            description = "shareAsPost=true also publishes a community post about the case (postContent is optional). "
+                    + "The case is saved first: if the post fails the response still is 201, with postShareFailed=true.")
     public ResponseEntity<ApiResponse<RescueCaseResponseDto>> report(
             @Valid @RequestBody CreateRescueCaseRequestDto cmd,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(mapper.toDto(commandPort.report(cmd, userId))));
+        com.uit.petrescueapi.domain.entity.RescueCase reported = commandPort.report(cmd, userId);
+        RescueCaseResponseDto body = mapper.toDto(reported);
+        if (cmd.isShareAsPost()) {
+            java.util.Optional<UUID> postId = sharePort.shareAsPost(reported, cmd.getPostContent(), userId);
+            body.setSharedPostId(postId.orElse(null));
+            body.setPostShareFailed(postId.isEmpty());
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(body));
     }
 
     @PutMapping("/{id}")

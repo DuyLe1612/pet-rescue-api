@@ -20,6 +20,8 @@ public interface PostQueryDataPort {
 
     PostResponseDto findById(UUID postId);
 
+    boolean isLikedBy(UUID postId, UUID userId);
+
     default Page<PostSummaryResponseDto> findAllSummaries(String search, Pageable pageable) {
         return findAllSummaries(search, PostFeedFilter.none(), pageable);
     }
@@ -30,5 +32,8 @@ public interface PostQueryDataPort {
      * Feed page ordered by {@code (createdAt, postId)} descending. Pass the previous page's
      * {@code nextCursor} + {@code nextCursorId}; {@code cursorId} may be null for old clients.
      */
+    /** Whether this author already has a live post about the case, other than {@code exceptPostId} (may be null). */
+    boolean existsByAuthorAndRescueCase(UUID authorId, UUID caseId, UUID exceptPostId);
+
     PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter);
 }

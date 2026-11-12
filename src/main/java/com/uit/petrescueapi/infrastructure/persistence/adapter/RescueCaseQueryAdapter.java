@@ -36,7 +36,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     @Override
     public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, RescueCaseFilter filter, Pageable pageable) {
         return queryRepo.findAllSummaries(search, allStatuses(filter), statusNames(filter), allPriorities(filter),
-                        priorityNames(filter), filter.species(), filter.province(), pageable)
+                        priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -50,7 +50,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
 
         return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), pageable)
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -59,7 +59,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 
         return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), pageable)
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 

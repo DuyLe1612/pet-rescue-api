@@ -71,10 +71,11 @@ public class PostController {
     @GetMapping("/{id}")
     @Operation(
             summary = "Get post by ID",
-            description = "Returns post detail including author, media, and tags."
+            description = "Public, so a shared link opens for anyone. Returns post detail including author, media, tags, "
+                    + "the linked rescue case, and likedByMe for a signed-in viewer."
     )
-    public ResponseEntity<ApiResponse<PostResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
+    public ResponseEntity<ApiResponse<PostResponseDto>> getById(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id, viewerId(authentication))));
     }
 
     @GetMapping
@@ -94,8 +95,10 @@ public class PostController {
             @RequestParam(required = false) String district,
             @RequestParam(required = false) String province,
             @RequestParam(required = false) Boolean needsRescue,
+            @RequestParam(required = false) UUID rescueCaseId,
+            @RequestParam(required = false) Boolean hasOpenCase,
             @RequestParam(required = false) String tag) {
-        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag);
+        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag, rescueCaseId, hasOpenCase);
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
@@ -103,9 +106,11 @@ public class PostController {
     @GetMapping("/feed")
     @Operation(
             summary = "Post feed by cursor",
-            description = "Returns post feed using cursor pagination by (createdAt, postId): pass nextCursor as cursor and "
+            description = "Public. Returns post feed using cursor pagination by (createdAt, postId): pass nextCursor as cursor and "
                     + "nextCursorId as cursorId. Optional filters on confirmed post facets (category, species, district, province, "
-                    + "needsRescue) and tag code. category is one of RESCUE, ADOPTION, LOST, FOUND, GENERAL."
+                    + "needsRescue) and tag code. category is one of RESCUE, ADOPTION, LOST, FOUND, GENERAL. "
+                    + "rescueCaseId returns the posts about one case; hasOpenCase=true the posts whose case still needs help. "
+                    + "A linked post carries rescueCase with the case code, status, priority, place and first image."
     )
     public ResponseEntity<ApiResponse<PostCursorResponseDto>> getFeed(
             @RequestParam(required = false) LocalDateTime cursor,
@@ -116,11 +121,20 @@ public class PostController {
             @RequestParam(required = false) String district,
             @RequestParam(required = false) String province,
             @RequestParam(required = false) Boolean needsRescue,
+            @RequestParam(required = false) UUID rescueCaseId,
+            @RequestParam(required = false) Boolean hasOpenCase,
             @RequestParam(required = false) String tag,
             Authentication authentication) {
-        UUID viewerId = authentication != null ? UUID.fromString(authentication.getName()) : null;
-        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag);
+        UUID viewerId = viewerId(authentication);
+        PostFeedFilter filter = new PostFeedFilter(name(category), species, district, province, needsRescue, tag, rescueCaseId, hasOpenCase);
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findFeedByCursor(cursor, cursorId, pageSize, viewerId, filter)));
+    }
+
+    /** Public endpoints: a guest arrives as an anonymous token, not as null. */
+    private static UUID viewerId(Authentication authentication) {
+        return authentication == null
+                || authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken
+                ? null : UUID.fromString(authentication.getName());
     }
 
     private static String name(PostCategory category) {

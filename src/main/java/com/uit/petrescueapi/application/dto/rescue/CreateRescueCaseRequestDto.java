@@ -35,4 +35,11 @@ public class CreateRescueCaseRequestDto {
 
     @Phone
     private String contactPhone;
+
+    /** True also publishes a community post about this case, so people scrolling the feed see it. */
+    private boolean shareAsPost;
+
+    /** Text of that post. When empty one is written from the species, the place and the description. */
+    @jakarta.validation.constraints.Size(max = 2000)
+    private String postContent;
 }

@@ -105,6 +105,8 @@ class QueryBehaviorIntegrationTest {
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
     @MockitoBean CloudStoragePort cloud;
+    /** No broker in this test: likes and comments publish counter events that nothing here consumes. */
+    @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
 
     @BeforeEach
     void cloudBuildsUrls() {
@@ -624,6 +626,214 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data.streetAddress").doesNotExist());
         call(get("/api/v1/users/" + owner), owner).andExpect(jsonPath("$.data.phone").value("0911111111"));
         call(get("/api/v1/users/" + owner), admin()).andExpect(jsonPath("$.data.email").exists());
+    }
+
+    // ── Posts and rescue cases ──────────────────────
+
+    private static final String CASE_FORM = """
+            {"species":"Dog","priority":"HIGH","description":"Bị thương ở chân","latitude":10.5,"longitude":106.7,
+             "locationText":"Cầu Thị Nghè","wardName":"Phường 1","provinceName":"Hồ Chí Minh","provinceCode":"79"%s}
+            """;
+
+    @Test
+    void reportingACaseCanPublishItsPostInTheSameCall() throws Exception {
+        UUID reporter = person();
+
+        String body = call(post("/api/v1/rescue-cases"), reporter, CASE_FORM.formatted(",\"shareAsPost\":true"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").isNotEmpty())
+                .andExpect(jsonPath("$.data.postShareFailed").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String caseId = JsonPath.read(body, "$.data.caseId");
+        String postId = JsonPath.read(body, "$.data.sharedPostId");
+        linkCaseImage(UUID.fromString(caseId), reporter);
+
+        // the post is written from the report, labelled as a rescue post, and shows the case as a card
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].postId").value(postId))
+                .andExpect(jsonPath("$.data.items[0].content").value("Cần giúp đỡ: Dog tại Cầu Thị Nghè, Phường 1, Hồ Chí Minh. Bị thương ở chân"))
+                .andExpect(jsonPath("$.data.items[0].facets.category").value("RESCUE"))
+                .andExpect(jsonPath("$.data.items[0].facets.species").value("Dog"))
+                .andExpect(jsonPath("$.data.items[0].facets.needsRescue").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseId").value(caseId))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseCode").isNotEmpty())
+                .andExpect(jsonPath("$.data.items[0].rescueCase.status").value("REPORTED"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.open").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.priority").value("HIGH"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.locationText").value("Cầu Thị Nghè"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.imageUrl").value(startsWith("https://cdn.test/")));
+        mvc.perform(get("/api/v1/posts/feed?category=RESCUE&needsRescue=true&hasOpenCase=true"))
+                .andExpect(jsonPath("$.data.items[*].postId").value(hasItem(postId)));
+        // a guest reads the feed, a signed-in viewer also learns what they liked
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items[0].likedByMe").doesNotExist());
+        call(get("/api/v1/posts/feed?rescueCaseId=" + caseId), reporter).andExpect(jsonPath("$.data.items[0].likedByMe").value(false));
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+
+        // the card follows the case, not a copy made when the post was written
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?::uuid", caseId);
+        call(get("/api/v1/posts/" + postId), reporter)
+                .andExpect(jsonPath("$.data.rescueCase.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.rescueCase.open").value(false));
+    }
+
+    @Test
+    void aReportWithoutSharingPublishesNothing() throws Exception {
+        String body = call(post("/api/v1/rescue-cases"), person(), CASE_FORM.formatted(""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").doesNotExist())
+                .andExpect(jsonPath("$.data.postShareFailed").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + JsonPath.<String>read(body, "$.data.caseId")))
+                .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
+    void anyoneSharesAnOpenCaseOnceAndCanUnlinkTheirPost() throws Exception {
+        UUID reporter = person();
+        UUID sharer = person();
+        UUID caseId = report(reporter);
+        String shareBody = "{\"content\":\"Ai ở gần giúp bé với\",\"rescueCaseId\":\"" + caseId + "\"}";
+
+        String created = call(post("/api/v1/posts"), sharer, shareBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts"), sharer, shareBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_ALREADY_SHARED"));
+        call(post("/api/v1/posts"), reporter, shareBody).andExpect(status().isCreated());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(2));
+
+        call(put("/api/v1/posts/" + postId), sharer, "{\"removeRescueCase\":true}").andExpect(status().isOk());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(1));
+        call(get("/api/v1/posts/" + postId), sharer).andExpect(jsonPath("$.data.rescueCase").doesNotExist());
+
+        jdbc.update("UPDATE rescue_cases SET status = 'RESCUED' WHERE case_id = ?", caseId);
+        call(put("/api/v1/posts/" + postId), sharer, "{\"rescueCaseId\":\"" + caseId + "\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_CLOSED"));
+    }
+
+    @Test
+    void aSharedPostLinkOpensForGuestsWithItsComments() throws Exception {
+        UUID author = person();
+        UUID reader = person();
+        String created = call(post("/api/v1/posts"), author, "{\"content\":\"Bé mèo nhà mình hôm nay\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts/" + postId + "/comments"), reader, "{\"content\":\"Dễ thương quá\"}").andExpect(status().isCreated());
+        call(post("/api/v1/posts/" + postId + "/like"), reader).andExpect(status().isOk());
+
+        // a guest reads the post and its comments, without any "liked by me"
+        mvc.perform(get("/api/v1/posts/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("Bé mèo nhà mình hôm nay"))
+                .andExpect(jsonPath("$.data.rescueCase").doesNotExist())
+                .andExpect(jsonPath("$.data.likedByMe").doesNotExist());
+        mvc.perform(get("/api/v1/posts/" + postId + "/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].content").value("Dễ thương quá"));
+        call(get("/api/v1/posts/" + postId), reader).andExpect(jsonPath("$.data.likedByMe").value(true));
+        call(get("/api/v1/posts/" + postId), author).andExpect(jsonPath("$.data.likedByMe").value(false));
+
+        // writing still needs an account, and so do the list and the analysis
+        mvc.perform(post("/api/v1/posts/" + postId + "/comments").contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/posts/" + postId + "/like")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts/" + postId + "/analysis")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void myRescueCasesListsOnlyWhatIReported() throws Exception {
+        UUID me = person();
+        UUID open = report(me);
+        UUID closed = report(me);
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?", closed);
+        report(person());
+
+        String all = call(get("/api/v1/users/me/rescue-cases"), me).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[*].caseId"))
+                .containsExactlyInAnyOrder(open.toString(), closed.toString());
+        String stillOpen = call(get("/api/v1/users/me/rescue-cases?status=REPORTED&status=IN_PROGRESS"), me)
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(stillOpen, "$.data.content[*].caseId")).containsExactly(open.toString());
+    }
+
+    // ── Time on the wire ────────────────────────────
+
+    @Test
+    void everyDateTimeLeavesTheApiAsUtcWithZ() throws Exception {
+        UUID reporter = person();
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(5);
+        UUID caseId = report(reporter);
+
+        String detail = mvc.perform(get("/api/v1/rescue-cases/" + caseId)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String reportedAt = JsonPath.read(detail, "$.data.reportedAt");
+        assertThat(reportedAt).endsWith("Z");
+        // the instant is right, not shifted by the host's zone
+        assertThat(java.time.Instant.parse(reportedAt))
+                .isBetween(before.toInstant(java.time.ZoneOffset.UTC), java.time.Instant.now().plusSeconds(5));
+        assertThat(JsonPath.<String>read(detail, "$.timestamp")).endsWith("Z");
+
+        String nearby = mvc.perform(get("/api/v1/rescue-cases?lat=10.5&lng=106.7&distance=500&pageSize=100"))
+                .andReturn().getResponse().getContentAsString();
+        // the list queries convert in SQL, the detail in Java: both must give the same instant
+        assertThat(JsonPath.<List<String>>read(nearby, "$.data.content[?(@.caseId=='" + caseId + "')].reportedAt"))
+                .containsExactly(reportedAt);
+    }
+
+    @Test
+    void aCursorSentBackWithZWalksTheWholeFeed() throws Exception {
+        UUID author = person();
+        for (int i = 0; i < 3; i++) {
+            call(post("/api/v1/posts"), author, "{\"content\":\"tz cursor " + i + "\"}").andExpect(status().isCreated());
+        }
+
+        String first = mvc.perform(get("/api/v1/posts/feed?pageSize=2")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.data.nextCursor");
+        String cursorId = JsonPath.read(first, "$.data.nextCursorId");
+        assertThat(cursor).endsWith("Z");
+
+        String second = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", cursor).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> firstIds = JsonPath.read(first, "$.data.items[*].postId");
+        List<String> secondIds = JsonPath.read(second, "$.data.items[*].postId");
+        assertThat(secondIds).isNotEmpty().doesNotContainAnyElementsOf(firstIds);
+
+        // an offset other than Z is the same instant
+        String shifted = java.time.Instant.parse(cursor).atOffset(java.time.ZoneOffset.ofHours(7)).toString();
+        String sameSecond = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", shifted).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(sameSecond, "$.data.items[*].postId")).isEqualTo(secondIds);
+    }
+
+    @Test
+    void theDashboardCountsMonthsAsPeopleInVietnamDo() {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        int year = 2031;
+        // 31 Jan 18:00 UTC is already 1 Feb 01:00 in Vietnam
+        UUID earlyFebruary = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2031-01-31T18:00:00Z' WHERE application_id = ?", earlyFebruary);
+        // 31 Dec 18:00 UTC of the year before is already 1 Jan in Vietnam
+        UUID newYear = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2030-12-31T18:00:00Z' WHERE application_id = ?", newYear);
+
+        var trend = dashboard.getAdoptionTrend(year);
+        String months = String.valueOf(trend);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 1).mapToLong(m -> m.getPending()).sum()).isEqualTo(1);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 2).mapToLong(m -> m.getPending()).sum())
+                .as(months).isEqualTo(1);
     }
 
     // ── Adoption notifications ──────────────────────
