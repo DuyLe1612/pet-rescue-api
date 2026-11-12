@@ -53,6 +53,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -623,6 +624,111 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data.streetAddress").doesNotExist());
         call(get("/api/v1/users/" + owner), owner).andExpect(jsonPath("$.data.phone").value("0911111111"));
         call(get("/api/v1/users/" + owner), admin()).andExpect(jsonPath("$.data.email").exists());
+    }
+
+    // ── Posts and rescue cases ──────────────────────
+
+    private static final String CASE_FORM = """
+            {"species":"Dog","priority":"HIGH","description":"Bị thương ở chân","latitude":10.5,"longitude":106.7,
+             "locationText":"Cầu Thị Nghè","wardName":"Phường 1","provinceName":"Hồ Chí Minh","provinceCode":"79"%s}
+            """;
+
+    @Test
+    void reportingACaseCanPublishItsPostInTheSameCall() throws Exception {
+        UUID reporter = person();
+
+        String body = call(post("/api/v1/rescue-cases"), reporter, CASE_FORM.formatted(",\"shareAsPost\":true"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").isNotEmpty())
+                .andExpect(jsonPath("$.data.postShareFailed").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String caseId = JsonPath.read(body, "$.data.caseId");
+        String postId = JsonPath.read(body, "$.data.sharedPostId");
+        linkCaseImage(UUID.fromString(caseId), reporter);
+
+        // the post is written from the report, labelled as a rescue post, and shows the case as a card
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].postId").value(postId))
+                .andExpect(jsonPath("$.data.items[0].content").value("Cần giúp đỡ: Dog tại Cầu Thị Nghè, Phường 1, Hồ Chí Minh. Bị thương ở chân"))
+                .andExpect(jsonPath("$.data.items[0].facets.category").value("RESCUE"))
+                .andExpect(jsonPath("$.data.items[0].facets.species").value("Dog"))
+                .andExpect(jsonPath("$.data.items[0].facets.needsRescue").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseId").value(caseId))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseCode").isNotEmpty())
+                .andExpect(jsonPath("$.data.items[0].rescueCase.status").value("REPORTED"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.open").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.priority").value("HIGH"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.locationText").value("Cầu Thị Nghè"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.imageUrl").value(startsWith("https://cdn.test/")));
+        mvc.perform(get("/api/v1/posts/feed?category=RESCUE&needsRescue=true&hasOpenCase=true"))
+                .andExpect(jsonPath("$.data.items[*].postId").value(hasItem(postId)));
+        // a guest reads the feed, a signed-in viewer also learns what they liked
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items[0].likedByMe").doesNotExist());
+        call(get("/api/v1/posts/feed?rescueCaseId=" + caseId), reporter).andExpect(jsonPath("$.data.items[0].likedByMe").value(false));
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+
+        // the card follows the case, not a copy made when the post was written
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?::uuid", caseId);
+        call(get("/api/v1/posts/" + postId), reporter)
+                .andExpect(jsonPath("$.data.rescueCase.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.rescueCase.open").value(false));
+    }
+
+    @Test
+    void aReportWithoutSharingPublishesNothing() throws Exception {
+        String body = call(post("/api/v1/rescue-cases"), person(), CASE_FORM.formatted(""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").doesNotExist())
+                .andExpect(jsonPath("$.data.postShareFailed").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + JsonPath.<String>read(body, "$.data.caseId")))
+                .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
+    void anyoneSharesAnOpenCaseOnceAndCanUnlinkTheirPost() throws Exception {
+        UUID reporter = person();
+        UUID sharer = person();
+        UUID caseId = report(reporter);
+        String shareBody = "{\"content\":\"Ai ở gần giúp bé với\",\"rescueCaseId\":\"" + caseId + "\"}";
+
+        String created = call(post("/api/v1/posts"), sharer, shareBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts"), sharer, shareBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_ALREADY_SHARED"));
+        call(post("/api/v1/posts"), reporter, shareBody).andExpect(status().isCreated());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(2));
+
+        call(put("/api/v1/posts/" + postId), sharer, "{\"removeRescueCase\":true}").andExpect(status().isOk());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(1));
+        call(get("/api/v1/posts/" + postId), sharer).andExpect(jsonPath("$.data.rescueCase").doesNotExist());
+
+        jdbc.update("UPDATE rescue_cases SET status = 'RESCUED' WHERE case_id = ?", caseId);
+        call(put("/api/v1/posts/" + postId), sharer, "{\"rescueCaseId\":\"" + caseId + "\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_CLOSED"));
+    }
+
+    @Test
+    void myRescueCasesListsOnlyWhatIReported() throws Exception {
+        UUID me = person();
+        UUID open = report(me);
+        UUID closed = report(me);
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?", closed);
+        report(person());
+
+        String all = call(get("/api/v1/users/me/rescue-cases"), me).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[*].caseId"))
+                .containsExactlyInAnyOrder(open.toString(), closed.toString());
+        String stillOpen = call(get("/api/v1/users/me/rescue-cases?status=REPORTED&status=IN_PROGRESS"), me)
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(stillOpen, "$.data.content[*].caseId")).containsExactly(open.toString());
     }
 
     // ── Adoption notifications ──────────────────────

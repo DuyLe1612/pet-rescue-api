@@ -96,6 +96,11 @@ class MongoPostTest extends MongoIntegrationTest {
                 public Optional<String> findRescueCaseStatus(UUID caseId) {
                     return RESCUE.equals(caseId) ? Optional.of("OPEN") : Optional.empty();
                 }
+
+                @Override
+                public java.util.Map<UUID, RescueCaseCard> findRescueCaseCards(Collection<UUID> caseIds) {
+                    return java.util.Map.of();
+                }
             };
         }
 
@@ -281,6 +286,49 @@ class MongoPostTest extends MongoIntegrationTest {
         assertThat(all.get(0).getFacets().category().name()).isEqualTo("RESCUE");
         assertThat(all.get(0).getFacets().needsRescue()).isTrue();
         assertThat(all.get(2).getFacets()).isNull();
+    }
+
+    @Test
+    void postsFilterByTheirRescueCaseAndByWhetherItIsStillOpen() {
+        LocalDateTime t = LocalDateTime.now();
+        UUID caseA = UUID.randomUUID();
+        UUID caseB = UUID.randomUUID();
+        UUID aboutOpenCase = UUID.randomUUID();
+        UUID aboutClosedCase = UUID.randomUUID();
+        UUID unlinked = UUID.randomUUID();
+        insertPost(aboutOpenCase, t, List.of(), null);
+        insertPost(aboutClosedCase, t.minusSeconds(1), List.of(), null);
+        insertPost(unlinked, t.minusSeconds(2), List.of(), null);
+        linkCase(aboutOpenCase, caseA, "IN_PROGRESS");
+        linkCase(aboutClosedCase, caseB, "CLOSED");
+
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, null, null, null, caseA, null)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(aboutOpenCase);
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, null, null, null, null, true)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(aboutOpenCase);
+        assertThat(postQuery.findFeedByCursor(null, null, 10, null,
+                new PostFeedFilter(null, null, null, null, null, null, null, false)).getItems())
+                .extracting(PostSummaryResponseDto::getPostId).containsExactly(aboutClosedCase, unlinked);
+
+        PostSummaryResponseDto linked = postQuery.findFeedByCursor(null, null, 1, null, PostFeedFilter.none()).getItems().get(0);
+        assertThat(linked.getRescueCase().getCaseId()).isEqualTo(caseA);
+        assertThat(linked.getRescueCase().getStatus()).isEqualTo("IN_PROGRESS");
+
+        assertThat(postQuery.existsByAuthorAndRescueCase(ALICE, caseA, null)).isTrue();
+        assertThat(postQuery.existsByAuthorAndRescueCase(ALICE, caseA, aboutOpenCase)).isFalse();
+        assertThat(postQuery.existsByAuthorAndRescueCase(BOB, caseA, null)).isFalse();
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("_id").is(aboutOpenCase)),
+                new Update().set("deleted", true), PostDocument.class);
+        assertThat(postQuery.existsByAuthorAndRescueCase(ALICE, caseA, null)).isFalse();
+    }
+
+    private void linkCase(UUID postId, UUID caseId, String status) {
+        mongo.updateFirst(org.springframework.data.mongodb.core.query.Query.query(
+                        org.springframework.data.mongodb.core.query.Criteria.where("_id").is(postId)),
+                new Update().set("rescueCase", new PostDocument.RescueCaseRefDocument(caseId, status)), PostDocument.class);
     }
 
     @Test
