@@ -36,6 +36,9 @@ public class PostResponseDto {
     private List<String> imageUrls;
     private List<String> tags;
 
+    @Schema(description = "The rescue case this post is about. Null when the post is not linked to a case.")
+    private PostRescueCaseDto rescueCase;
+
     @Schema(description = "Labels confirmed by the author (category, species, area, needsRescue). Null until confirmed.")
     private com.uit.petrescueapi.application.dto.analysis.PostFacets facets;
 

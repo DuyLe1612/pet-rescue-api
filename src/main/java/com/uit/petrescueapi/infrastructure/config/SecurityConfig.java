@@ -73,6 +73,8 @@ public class SecurityConfig {
                        .requestMatchers(HttpMethod.GET, "/api/v1/pets/**").permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/rescue-cases/**").permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/banners/active").permitAll()
+                       // The community feed is how most people come across a rescue case, signed in or not.
+                       .requestMatchers(HttpMethod.GET, "/api/v1/posts/feed").permitAll()
                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                        .anyRequest().authenticated()
                )

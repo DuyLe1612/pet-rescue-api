@@ -5,6 +5,7 @@ import com.uit.petrescueapi.application.dto.post.PostCursorResponseDto;
 import com.uit.petrescueapi.application.dto.analysis.PostFacets;
 import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
 import com.uit.petrescueapi.domain.valueobject.PostCategory;
+import com.uit.petrescueapi.application.dto.post.PostRescueCaseDto;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
@@ -51,6 +52,8 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
             "commentCount", "stats.comments",
             "authorUsername", "author.username");
 
+    private static final List<String> OPEN_CASE_STATUSES = List.of("REPORTED", "IN_PROGRESS");
+
     private final MongoTemplate mongo;
     private final CloudStoragePort cloudStorage;
 
@@ -73,6 +76,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .imageUrls(imageUrls(d))
                 .tags(d.getTags())
                 .facets(facets(d))
+                .rescueCase(rescueCase(d))
                 .createdAt(d.getCreatedAt())
                 .updatedAt(d.getUpdatedAt())
                 .build();
@@ -143,7 +147,33 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                     : where("facets").ne(null).and("facets.needsRescue").ne(true));
         }
         if (filter.tag() != null) criteria.add(where("tags").is(filter.tag()));
+        if (filter.rescueCaseId() != null) criteria.add(where("rescueCase.caseId").is(filter.rescueCaseId()));
+        if (filter.hasOpenCase() != null) {
+            criteria.add(filter.hasOpenCase()
+                    ? where("rescueCase.status").in(OPEN_CASE_STATUSES)
+                    : where("rescueCase.status").nin(OPEN_CASE_STATUSES));
+        }
         return criteria;
+    }
+
+    /** Only the id and the status snapshot; the use case fills in the rest from PostgreSQL. */
+    private static PostRescueCaseDto rescueCase(PostDocument d) {
+        if (d.getRescueCase() == null || d.getRescueCase().getCaseId() == null) {
+            return null;
+        }
+        return PostRescueCaseDto.builder()
+                .caseId(d.getRescueCase().getCaseId())
+                .status(d.getRescueCase().getStatus())
+                .build();
+    }
+
+    @Override
+    public boolean existsByAuthorAndRescueCase(UUID authorId, UUID caseId, UUID exceptPostId) {
+        Criteria criteria = where("deleted").is(false).and("author.userId").is(authorId).and("rescueCase.caseId").is(caseId);
+        if (exceptPostId != null) {
+            criteria = criteria.and("_id").ne(exceptPostId);
+        }
+        return mongo.exists(query(criteria), PostDocument.class);
     }
 
     private static PostFacets facets(PostDocument d) {
@@ -196,6 +226,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                 .content(d.getContent())
                 .tags(d.getTags())
                 .facets(facets(d))
+                .rescueCase(rescueCase(d))
                 .likeCount(d.getStats() == null ? 0 : d.getStats().getLikes())
                 .commentCount(d.getStats() == null ? 0 : d.getStats().getComments())
                 .createdAt(d.getCreatedAt())

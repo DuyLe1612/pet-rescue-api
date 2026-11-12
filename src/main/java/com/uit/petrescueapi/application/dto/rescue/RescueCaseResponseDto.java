@@ -45,4 +45,12 @@ public class RescueCaseResponseDto {
     private boolean viewerHasActiveClaim;
     private UUID completionId;
     private String completionStatus;
+
+    /** Only in the response to a report sent with shareAsPost: the post that was published. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private UUID sharedPostId;
+
+    /** Only in that response: true when the case was saved but the post could not be published. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private Boolean postShareFailed;
 }
