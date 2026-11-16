@@ -104,6 +104,7 @@ class QueryBehaviorIntegrationTest {
     @Autowired EntityManagerFactory emf;
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
+    @Autowired com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triage;
     @MockitoBean CloudStoragePort cloud;
     /** No broker in this test: likes and comments publish counter events that nothing here consumes. */
     @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
@@ -834,6 +835,108 @@ class QueryBehaviorIntegrationTest {
         assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 1).mapToLong(m -> m.getPending()).sum()).isEqualTo(1);
         assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 2).mapToLong(m -> m.getPending()).sum())
                 .as(months).isEqualTo(1);
+    }
+
+    // ── AI triage store ─────────────────────────────
+
+    private UUID triageCase(String caseStatus, String reportedAgo) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, species, priority, status, reported_by, reported_at, created_at)
+                VALUES (?, ?, 'Dog', 'NORMAL', ?, ?, NOW() - CAST(? AS INTERVAL), NOW())
+                """, id, id.toString().substring(0, 12), caseStatus, person(), reportedAgo);
+        return id;
+    }
+
+    @Test
+    void oneWorkerTakesATriageAtATimeAndItStopsAfterTheLastAttempt() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        LocalDateTime stale = LocalDateTime.now().minusMinutes(5);
+
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        assertThat(triage.claim(caseId, 3, stale)).as("held by a live worker").isFalse();
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(com.uit.petrescueapi.domain.valueobject.TriageStatus.PENDING);
+            assertThat(t.getAttempts()).isEqualTo(1);
+        });
+
+        // a failure releases the claim, and each new claim is one more attempt
+        triage.markFailed(caseId, "api error 429", "{\"cat", 120L);
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(com.uit.petrescueapi.domain.valueobject.TriageStatus.FAILED);
+            assertThat(t.getFailure()).isEqualTo("api error 429");
+            assertThat(t.getRawOutput()).isEqualTo("{\"cat");
+        });
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        triage.markFailed(caseId, "api error 429", null, 80L);
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        triage.markFailed(caseId, "api error 429", null, 80L);
+
+        assertThat(triage.claim(caseId, 3, stale)).as("out of attempts").isFalse();
+        assertThat(triage.findByCaseId(caseId)).get().extracting(t -> t.getAttempts()).isEqualTo(3);
+    }
+
+    @Test
+    void aClaimLeftByADeadWorkerCanBeTakenOver() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isTrue();
+
+        jdbc.update("UPDATE rescue_case_triage SET claimed_at = NOW() - INTERVAL '10 minutes' WHERE case_id = ?", caseId);
+
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isTrue();
+        assertThat(triage.findByCaseId(caseId)).get().extracting(t -> t.getAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void aFinishedTriageKeepsWhatWasFoundAndIsNeverClaimedAgain() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5));
+
+        triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()
+                .caseId(caseId).model("openrouter/openai/gpt-oss-120b").promptVersion(1)
+                .aiUrgency(com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL).needsRescue(true)
+                .conditionSummary("Bleeding from the hind leg").species("Dog").district("Quận 7").province("TP. Hồ Chí Minh")
+                .missingFields(List.of("PHOTO", "DESCRIPTION")).rawOutput("{\"category\":\"RESCUE\"}")
+                .latencyMs(2100L).inputTokens(940L).outputTokens(480L).build());
+
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.isAnalyzed()).isTrue();
+            assertThat(t.getAiUrgency()).isEqualTo(com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL);
+            assertThat(t.getConditionSummary()).isEqualTo("Bleeding from the hind leg");
+            assertThat(t.getSpecies()).isEqualTo("Dog");
+            assertThat(t.getMissingFields()).containsExactly("PHOTO", "DESCRIPTION");
+            assertThat(t.getRawOutput()).isEqualTo("{\"category\":\"RESCUE\"}");
+            assertThat(t.getAnalyzedAt()).isNotNull();
+            assertThat(t.getFailure()).isNull();
+        });
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isFalse();
+    }
+
+    @Test
+    void theRetryPassFindsOnlyOpenRecentCasesThatStillNeedATriage() {
+        UUID lostEvent = triageCase("REPORTED", "10 minutes");          // no row at all
+        UUID tooNew = triageCase("REPORTED", "10 seconds");             // its own event is still on the way
+        UUID failedOnce = triageCase("IN_PROGRESS", "10 minutes");
+        UUID outOfAttempts = triageCase("REPORTED", "10 minutes");
+        UUID analysed = triageCase("REPORTED", "10 minutes");
+        UUID closed = triageCase("CLOSED", "10 minutes");
+        UUID tooOld = triageCase("REPORTED", "3 days");
+
+        triage.claim(failedOnce, 3, LocalDateTime.now().minusMinutes(5));
+        triage.markFailed(failedOnce, "api error 502", null, 50L);
+        for (int i = 0; i < 3; i++) {
+            triage.claim(outOfAttempts, 3, LocalDateTime.now().minusMinutes(5));
+            triage.markFailed(outOfAttempts, "api error 502", null, 50L);
+        }
+        triage.claim(analysed, 3, LocalDateTime.now().minusMinutes(5));
+        triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder().caseId(analysed).build());
+        jdbc.update("UPDATE rescue_case_triage SET updated_at = NOW() - INTERVAL '10 minutes' WHERE case_id IN (?, ?, ?)",
+                failedOnce, outOfAttempts, analysed);
+
+        List<UUID> found = triage.findRetryable(3, LocalDateTime.now().minusMinutes(1), LocalDateTime.now().minusDays(1), 1000);
+
+        assertThat(found).contains(lostEvent, failedOnce)
+                .doesNotContain(tooNew, outOfAttempts, analysed, closed, tooOld);
     }
 
     // ── Adoption notifications ──────────────────────
