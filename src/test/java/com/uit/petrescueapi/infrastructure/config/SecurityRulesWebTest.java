@@ -118,6 +118,11 @@ class SecurityRulesWebTest {
     }
 
     @Test
+    void anonymousCannotReadTheAiTriageOfACase() throws Exception {
+        mvc.perform(get("/api/v1/rescue-cases/" + id + "/triage")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void anonymousCanStillReadRescueCases() throws Exception {
         when(rescueQueryPort.findMapMarkers(any(), any(), any())).thenReturn(java.util.List.of());
         mvc.perform(get("/api/v1/rescue-cases/map/markers")).andExpect(status().isOk());

@@ -44,6 +44,9 @@ public interface RescueCaseQueryPort {
 
     List<RescueClaimResponseDto> findClaimsOfCase(UUID caseId, UUID requesterId);
 
+    /** For staff who can handle the case, and admins. */
+    com.uit.petrescueapi.application.dto.rescue.RescueTriageResponseDto findTriage(UUID caseId, UUID requesterId);
+
     List<RescueClaimResponseDto> findMyActiveClaims(UUID userId);
 }
 

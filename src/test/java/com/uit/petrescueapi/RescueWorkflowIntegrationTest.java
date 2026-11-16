@@ -189,6 +189,63 @@ class RescueWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.data.content[4].aiUrgency").doesNotExist());
     }
 
+    @Test
+    void onlyStaffWhoCanHandleACaseReadItsAiTriage() throws Exception {
+        String province = uniqueProvince();
+        UUID staff = member(organization(province), "STAFF");
+        UUID otherOrganizationStaff = member(organization(province), "OWNER");
+        UUID caseId = reportWith(an, province, "NORMAL");
+        String url = "/api/v1/rescue-cases/" + caseId + "/triage";
+
+        // the AI has not reached the case: the endpoint says so instead of failing
+        call(get(url), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("NOT_STARTED"))
+                .andExpect(jsonPath("$.data.reporterPriority").value("NORMAL"))
+                .andExpect(jsonPath("$.data.effectivePriority").value("NORMAL"))
+                .andExpect(jsonPath("$.data.missingFields", hasSize(0)));
+
+        analysed(caseId, com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL, "Bleeding from the hind leg");
+        call(get(url), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ANALYZED"))
+                .andExpect(jsonPath("$.data.reporterPriority").value("NORMAL"))
+                .andExpect(jsonPath("$.data.aiUrgency").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.effectivePriority").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.conditionSummary").value("Bleeding from the hind leg"))
+                .andExpect(jsonPath("$.data.model").value("test-model"))
+                .andExpect(jsonPath("$.data.missingFields[0]").value("PHOTO"));
+
+        // the label is for the people who decide: not for the reporter, not for a bystander, not for a guest
+        call(get(url), an).andExpect(status().isForbidden());
+        call(get(url), chi).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        call(get(url), admin()).andExpect(status().isOk());
+        // an unassigned case is open to the staff of any organization
+        call(get(url), otherOrganizationStaff).andExpect(status().isOk());
+
+        // once an organization holds the case, only that organization's staff may read it
+        claim(caseId, staff);
+        call(get(url), staff).andExpect(status().isOk());
+        call(get(url), otherOrganizationStaff).andExpect(status().isForbidden());
+
+        call(get("/api/v1/rescue-cases/" + UUID.randomUUID() + "/triage"), staff).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aFailedTriageShowsWhyToStaffAndChangesNothingElse() throws Exception {
+        String province = uniqueProvince();
+        UUID staff = member(organization(province), "STAFF");
+        UUID caseId = reportWith(an, province, "HIGH");
+        triage.claim(caseId, 3, java.time.LocalDateTime.now().minusMinutes(5));
+        triage.markFailed(caseId, "api error 429", null, 30L);
+
+        call(get("/api/v1/rescue-cases/" + caseId + "/triage"), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FAILED"))
+                .andExpect(jsonPath("$.data.failure").value("api error 429"))
+                .andExpect(jsonPath("$.data.attempts").value(1))
+                .andExpect(jsonPath("$.data.effectivePriority").value("HIGH"))
+                .andExpect(jsonPath("$.data.aiUrgency").doesNotExist());
+    }
+
     private void analysed(UUID caseId, com.uit.petrescueapi.domain.valueobject.RescuePriority urgency, String summary) {
         triage.claim(caseId, 3, java.time.LocalDateTime.now().minusMinutes(5));
         triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()

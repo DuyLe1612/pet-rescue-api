@@ -125,6 +125,15 @@ public class RescueCaseController {
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findClaimsOfCase(id, viewerId(authentication))));
     }
 
+    @GetMapping("/{id}/triage")
+    @Operation(summary = "What the AI made of this case",
+            description = "For staff who can handle the case, and admins. The urgency the model found, a short condition summary, "
+                    + "the species and area it normalised, and the facts the report lacks. It never replaces the report: "
+                    + "effectivePriority is the higher of the reporter's priority and the model's.")
+    public ResponseEntity<ApiResponse<RescueTriageResponseDto>> getTriage(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findTriage(id, viewerId(authentication))));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // AFTER THE RESCUE
     // ══════════════════════════════════════════════════════════════════════════
