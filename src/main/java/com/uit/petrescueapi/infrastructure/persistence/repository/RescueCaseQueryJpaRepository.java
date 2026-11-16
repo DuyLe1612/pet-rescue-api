@@ -482,7 +482,13 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             nativeQuery = true)
     Page<RescueCaseCompletionProjection> findCompletionReviewQueue(Pageable pageable);
 
-    /** Unassigned open cases, plus rescued animals waiting for an organization. Null province means everywhere. */
+    /**
+     * Unassigned open cases, plus rescued animals waiting for an organization. Null province means everywhere.
+     *
+     * <p>Sorted by the higher of the reporter's priority and the model's: the model can raise a case, never
+     * lower it. LEAST skips the NULL of a case with no finished triage, so the reporter's choice stands.
+     * (No comments inside the SQL: Spring Data's query parser trips over quotes and colons in them.)</p>
+     */
     @Query(value = """
     SELECT
         rc.case_id AS caseId,
@@ -498,8 +504,13 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rc.reported_at AS reportedAt,
         rc.needs_help AS needsHelp,
         (rc.status = 'RESCUED') AS awaitingHandover,
-        (SELECT COUNT(*) FROM rescue_case_claims c WHERE c.case_id = rc.case_id AND c.status = 'ACTIVE') AS activeClaimCount
+        (SELECT COUNT(*) FROM rescue_case_claims c WHERE c.case_id = rc.case_id AND c.status = 'ACTIVE') AS activeClaimCount,
+        CASE WHEN t.status = 'ANALYZED' THEN t.ai_urgency END AS aiUrgency,
+        CASE WHEN t.status = 'ANALYZED' THEN t.condition_summary END AS aiSummary,
+        t.status AS triageStatus,
+        CASE WHEN t.status = 'ANALYZED' THEN t.missing_fields END AS missingFields
     FROM rescue_cases rc
+    LEFT JOIN rescue_case_triage t ON t.case_id = rc.case_id
     WHERE rc.is_deleted = false
       AND rc.organization_id IS NULL
       AND (CAST(:provinceCode AS VARCHAR) IS NULL OR rc.province_code = :provinceCode OR rc.province_code IS NULL)
@@ -509,7 +520,11 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             WHERE rcc.case_id = rc.case_id AND rcc.status = 'APPROVED'
               AND rcc.outcome IN ('HANDED_TO_ORG', 'TEMP_HOLDING'))))
     ORDER BY rc.needs_help DESC,
-        CASE rc.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'NORMAL' THEN 2 ELSE 3 END,
+        LEAST(
+            CASE rc.priority WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 WHEN 'NORMAL' THEN 2 ELSE 3 END,
+            CASE WHEN t.status = 'ANALYZED'
+                 THEN CASE t.ai_urgency WHEN 'CRITICAL' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 3 END
+            END),
         rc.reported_at
     """,
             countQuery = """

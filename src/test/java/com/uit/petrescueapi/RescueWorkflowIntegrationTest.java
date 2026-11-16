@@ -74,6 +74,7 @@ class RescueWorkflowIntegrationTest {
     JdbcTemplate jdbc;
     @Autowired MongoTemplate mongo;
     @Autowired RescueMaintenancePort maintenance;
+    @Autowired com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triage;
 
     /** The people below are field initializers, which run before Spring injects {@code jdbc}. */
     private final java.util.List<String[]> pendingUsers = new java.util.ArrayList<>();
@@ -138,6 +139,61 @@ class RescueWorkflowIntegrationTest {
         call(post("/api/v1/rescue-cases/" + caseId + "/intake"), staff, petBody()).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("FOSTERING"));
         call(post("/api/v1/rescue-cases/" + caseId + "/intake"), staff, petBody()).andExpect(status().isConflict());
+    }
+
+    @Test
+    void theQueueSortsByTheHigherOfTheReportersAndTheModelsPriorityAndShowsWhatTheModelFound() throws Exception {
+        String province = uniqueProvince();
+        UUID staff = member(organization(province), "STAFF");
+        UUID raisedByTheModel = reportWith(an, province, "LOW");
+        UUID reporterOnly = reportWith(an, province, "HIGH");
+        UUID notLoweredByTheModel = reportWith(an, province, "CRITICAL");
+        UUID triageFailed = reportWith(an, province, "NORMAL");
+        UUID noEmergencySeen = reportWith(an, province, "LOW");
+
+        analysed(raisedByTheModel, com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL, "Bleeding from the hind leg");
+        analysed(notLoweredByTheModel, com.uit.petrescueapi.domain.valueobject.RescuePriority.LOW, "Looks calm");
+        analysed(noEmergencySeen, null, null);
+        triage.claim(triageFailed, 3, java.time.LocalDateTime.now().minusMinutes(5));
+        triage.markFailed(triageFailed, "api error 502", null, 40L);
+
+        // CRITICAL twice (the older first), then HIGH, NORMAL, LOW
+        call(get("/api/v1/organizations/me/rescue-queue"), staff)
+                .andExpect(jsonPath("$.data.content", hasSize(5)))
+                .andExpect(jsonPath("$.data.content[*].caseId").value(org.hamcrest.Matchers.contains(
+                        raisedByTheModel.toString(), notLoweredByTheModel.toString(), reporterOnly.toString(),
+                        triageFailed.toString(), noEmergencySeen.toString())))
+                // what the reporter chose stays what the reporter chose
+                .andExpect(jsonPath("$.data.content[0].priority").value("LOW"))
+                .andExpect(jsonPath("$.data.content[0].effectivePriority").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.content[0].aiUrgency").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.content[0].aiSummary").value("Bleeding from the hind leg"))
+                .andExpect(jsonPath("$.data.content[0].triageStatus").value("ANALYZED"))
+                .andExpect(jsonPath("$.data.content[0].missingFields[0]").value("PHOTO"))
+                // the model cannot lower a case
+                .andExpect(jsonPath("$.data.content[1].priority").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.content[1].aiUrgency").value("LOW"))
+                .andExpect(jsonPath("$.data.content[1].effectivePriority").value("CRITICAL"))
+                // no triage at all: the reporter's choice, nothing from the model
+                .andExpect(jsonPath("$.data.content[2].effectivePriority").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[2].aiUrgency").doesNotExist())
+                .andExpect(jsonPath("$.data.content[2].triageStatus").doesNotExist())
+                .andExpect(jsonPath("$.data.content[2].missingFields", hasSize(0)))
+                // a failed triage changes nothing and says so
+                .andExpect(jsonPath("$.data.content[3].effectivePriority").value("NORMAL"))
+                .andExpect(jsonPath("$.data.content[3].triageStatus").value("FAILED"))
+                .andExpect(jsonPath("$.data.content[3].aiUrgency").doesNotExist())
+                // the model saw no emergency: the reporter's low priority stands
+                .andExpect(jsonPath("$.data.content[4].effectivePriority").value("LOW"))
+                .andExpect(jsonPath("$.data.content[4].triageStatus").value("ANALYZED"))
+                .andExpect(jsonPath("$.data.content[4].aiUrgency").doesNotExist());
+    }
+
+    private void analysed(UUID caseId, com.uit.petrescueapi.domain.valueobject.RescuePriority urgency, String summary) {
+        triage.claim(caseId, 3, java.time.LocalDateTime.now().minusMinutes(5));
+        triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()
+                .caseId(caseId).model("test-model").promptVersion(1).aiUrgency(urgency).needsRescue(urgency != null)
+                .conditionSummary(summary).missingFields(java.util.List.of("PHOTO")).build());
     }
 
     @Test
@@ -425,7 +481,11 @@ class RescueWorkflowIntegrationTest {
     }
 
     private UUID reportIn(UUID reporter, String province) throws Exception {
-        String body = call(post("/api/v1/rescue-cases"), reporter, caseBody(province))
+        return reportWith(reporter, province, "HIGH");
+    }
+
+    private UUID reportWith(UUID reporter, String province, String priority) throws Exception {
+        String body = call(post("/api/v1/rescue-cases"), reporter, caseBody(province).replace("\"HIGH\"", "\"" + priority + "\""))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return UUID.fromString(JsonPath.read(body, "$.data.caseId"));
     }
