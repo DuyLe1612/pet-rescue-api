@@ -38,6 +38,21 @@ public class PetQueryAdapter implements PetQueryDataPort {
     // ── List (summary) queries with filters ──────────────────
 
     @Override
+    public Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable) {
+        return queryRepo.findOwnedBy(ownerId, type == null ? null : type.name(), pageable).map(p -> {
+            PetSummaryResponseDto dto = toSummaryDto(p);
+            dto.setAcquisitionType(p.getAcquisitionType() == null ? null
+                    : com.uit.petrescueapi.domain.valueobject.AcquisitionType.valueOf(p.getAcquisitionType()));
+            dto.setAdoptionApplicationId(p.getAdoptionApplicationId());
+            if (p.getSourceOrganizationId() != null) {
+                dto.setSourceOrganization(OrganizationMinimalDto.builder()
+                        .organizationId(p.getSourceOrganizationId()).name(p.getSourceOrganizationName()).build());
+            }
+            return dto;
+        });
+    }
+
+    @Override
     public Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,

@@ -657,6 +657,30 @@ class QueryBehaviorIntegrationTest {
     }
 
     @Test
+    void myPetsShowHowIGotEachOneAndWhereAnAdoptedOneCameFrom() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID me = person();
+        UUID mine = pet("USER", me, null);
+        jdbc.update("UPDATE pets_current_owner SET acquisition_type = 'SELF_REGISTERED' WHERE pet_id = ?", mine);
+        UUID adopted = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(adopted, me, shelter, "APPROVED");
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        String all = call(get("/api/v1/users/me/pets"), me).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + mine + "')].acquisitionType")).containsExactly("SELF_REGISTERED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].acquisitionType")).containsExactly("ADOPTED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].adoptionApplicationId")).containsExactly(application.toString());
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].sourceOrganization.organizationId")).containsExactly(shelter.toString());
+        assertThat(JsonPath.<List<Object>>read(all, "$.data.content[?(@.petId=='" + mine + "')].sourceOrganization")).isEmpty();
+
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=ADOPTED"), me))).containsExactly(adopted);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=SELF_REGISTERED"), me))).containsExactly(mine);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?sortBy=name&sortOrder=asc"), me))).containsExactlyInAnyOrder(mine, adopted);
+        call(get("/api/v1/users/me/pets?type=NOPE"), me).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void anotherUsersContactDetailsAreOnlyForThemAndAdmins() throws Exception {
         UUID owner = person();
         jdbc.update("UPDATE users SET phone = '0911111111', street_address = '1 Lê Lợi' WHERE user_id = ?", owner);

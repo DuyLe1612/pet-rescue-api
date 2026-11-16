@@ -16,6 +16,8 @@ public interface PetQueryPort {
 
     PetResponseDto findById(UUID id);
 
+    Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable);
+
     Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,

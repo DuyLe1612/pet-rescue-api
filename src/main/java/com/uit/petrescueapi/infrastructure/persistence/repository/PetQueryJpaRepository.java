@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 
 import com.uit.petrescueapi.infrastructure.persistence.entity.PetJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.PetDetailProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.MyPetProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.PetSummaryProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +20,53 @@ import java.util.UUID;
  */
 @Repository
 public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID> {
+
+    // ── The pets a person owns ───────────────────────────────
+
+    /**
+     * Joins are kept to the pet and its current owner, with everything else as sub-selects, so a sort
+     * column such as created_at is never ambiguous.
+     */
+    @Query(value = """
+        SELECT p.pet_id AS id,
+               p.pet_code AS petCode,
+               p.name AS name,
+               p.species_id AS speciesId,
+               (SELECT s.name FROM pet_species s WHERE s.species_id = p.species_id) AS species,
+               (SELECT s.name_vi FROM pet_species s WHERE s.species_id = p.species_id) AS speciesVi,
+               p.breed_id AS breedId,
+               (SELECT b.name FROM pet_breeds b WHERE b.breed_id = p.breed_id) AS breed,
+               (SELECT b.name_vi FROM pet_breeds b WHERE b.breed_id = p.breed_id) AS breedVi,
+               p.age AS age,
+               p.is_vaccinated AS vaccinated,
+               p.gender AS gender,
+               p.status AS status,
+               p.health_status AS healthStatus,
+               (SELECT mf.public_id FROM pet_media pm JOIN media_files mf ON pm.media_file_id = mf.media_id
+                WHERE pm.pet_id = p.pet_id ORDER BY pm.is_primary DESC, pm.created_at ASC LIMIT 1) AS imagePublicId,
+               pco.owner_type AS ownerType,
+               pco.owner_id AS ownerId,
+               pco.acquisition_type AS acquisitionType,
+               pco.adoption_application_id AS adoptionApplicationId,
+               (SELECT x.organization_id FROM adoption_applications x WHERE x.application_id = pco.adoption_application_id) AS sourceOrganizationId,
+               (SELECT g.name FROM adoption_applications x JOIN organizations g ON g.organization_id = x.organization_id
+                WHERE x.application_id = pco.adoption_application_id) AS sourceOrganizationName
+        FROM pets p
+        JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        WHERE p.is_deleted = false
+          AND pco.owner_type = 'USER' AND pco.owner_id = :ownerId
+          AND (CAST(:acquisitionType AS VARCHAR) IS NULL OR pco.acquisition_type = CAST(:acquisitionType AS VARCHAR))
+    """, countQuery = """
+        SELECT COUNT(p.pet_id)
+        FROM pets p
+        JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
+        WHERE p.is_deleted = false
+          AND pco.owner_type = 'USER' AND pco.owner_id = :ownerId
+          AND (CAST(:acquisitionType AS VARCHAR) IS NULL OR pco.acquisition_type = CAST(:acquisitionType AS VARCHAR))
+    """, nativeQuery = true)
+    Page<MyPetProjection> findOwnedBy(@Param("ownerId") UUID ownerId,
+                                      @Param("acquisitionType") String acquisitionType,
+                                      Pageable pageable);
 
     // ── Summary (list views) with filters ────────────────────
 

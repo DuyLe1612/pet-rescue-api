@@ -31,6 +31,11 @@ public class PetQueryUseCase implements PetQueryPort {
     }
 
     @Override
+    public Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable) {
+        return queryDataPort.findOwnedBy(ownerId, type, pageable);
+    }
+
+    @Override
     public Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,
