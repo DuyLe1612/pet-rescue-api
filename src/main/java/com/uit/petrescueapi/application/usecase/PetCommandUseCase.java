@@ -170,6 +170,7 @@ public class PetCommandUseCase implements PetCommandPort {
                             .ownerType("ORGANIZATION")
                             .ownerId(organizationId)
                             .caretakerUserId(userId)
+                            .acquisitionType(com.uit.petrescueapi.domain.valueobject.AcquisitionType.ORG_INTAKE)
                             .build()
             );
         }

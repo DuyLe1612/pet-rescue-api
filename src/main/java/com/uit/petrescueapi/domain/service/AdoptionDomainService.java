@@ -208,7 +208,8 @@ public class AdoptionDomainService {
         validateStatus(app, AdoptionApplicationStatus.APPROVED, AdoptionApplicationStatus.COMPLETED);
 
         // Transfer ownership to the adopter
-        petDomainService.transferOwnership(app.getPetId(), "USER", app.getApplicantId());
+        petDomainService.transferOwnership(app.getPetId(), "USER", app.getApplicantId(),
+                com.uit.petrescueapi.domain.valueobject.AcquisitionType.ADOPTED, app.getApplicationId());
         
         // Update pet status to ADOPTED
         petDomainService.changeStatus(app.getPetId(), PetStatus.ADOPTED);
@@ -242,7 +243,8 @@ public class AdoptionDomainService {
             throw new ConflictException("Pet must be ADOPTED before reclaim", "PET_NOT_ADOPTED");
         }
 
-        petDomainService.transferOwnership(app.getPetId(), "ORGANIZATION", app.getOrganizationId());
+        petDomainService.transferOwnership(app.getPetId(), "ORGANIZATION", app.getOrganizationId(),
+                com.uit.petrescueapi.domain.valueobject.AcquisitionType.ORG_INTAKE, null);
         petDomainService.changeStatus(app.getPetId(), PetStatus.FOSTERING);
         adjustReputation(app.getApplicantId(), -300, "PET_RECLAIMED", app.getApplicationId(), reclaimedBy);
 

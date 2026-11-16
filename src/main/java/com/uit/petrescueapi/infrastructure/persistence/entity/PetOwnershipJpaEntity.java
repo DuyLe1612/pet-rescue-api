@@ -36,4 +36,11 @@ public class PetOwnershipJpaEntity {
 
     @Column(name = "to_time")
     private LocalDateTime toTime;
+
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "acquisition_type", length = 20)
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
+
+    @Column(name = "adoption_application_id")
+    private UUID adoptionApplicationId;
 }

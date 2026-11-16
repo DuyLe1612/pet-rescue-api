@@ -432,6 +432,48 @@ class QueryBehaviorIntegrationTest {
         assertThat(applicationStatus(alreadyRejected)).isEqualTo("REJECTED");
     }
 
+    @Test
+    void adoptingRecordsHowTheNewOwnerGotThePetAndWhichApplicationDidIt() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        var current = jdbc.queryForMap("SELECT owner_type, owner_id, acquisition_type, adoption_application_id FROM pets_current_owner WHERE pet_id = ?", petId);
+        assertThat(current.get("owner_type")).isEqualTo("USER");
+        assertThat(current.get("owner_id")).isEqualTo(adopter);
+        assertThat(current.get("acquisition_type")).isEqualTo("ADOPTED");
+        assertThat(current.get("adoption_application_id")).isEqualTo(application);
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ? AND to_time IS NULL", String.class, petId))
+                .isEqualTo("ADOPTED");
+    }
+
+    @Test
+    void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID person = person();
+        String body = "{\"name\":\"Bơ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}";
+
+        String created = call(post("/api/v1/pets"), person, body).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID mine = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT adoption_application_id FROM pets_current_owner WHERE pet_id = ?", UUID.class, mine)).isNull();
+
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "OWNER");
+        String orgBody = "{\"name\":\"Mướp\",\"speciesId\":\"" + species + "\",\"gender\":\"FEMALE\",\"shelterId\":\"" + shelter + "\"}";
+        String org = call(post("/api/v1/pets"), staff, orgBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID theirs = UUID.fromString(JsonPath.read(org, "$.data.petId"));
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, theirs)).isEqualTo("ORG_INTAKE");
+    }
+
     // ── External calls ──────────────────────────────
 
     @Test
