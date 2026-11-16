@@ -5,7 +5,9 @@ import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.AdoptionApplicationRepository;
 import com.uit.petrescueapi.domain.repository.FollowupRepository;
+import com.uit.petrescueapi.domain.repository.FollowupRepository.AlertRow;
 import com.uit.petrescueapi.domain.repository.FollowupRepository.Row;
+import com.uit.petrescueapi.domain.valueobject.FollowupSeverity;
 import com.uit.petrescueapi.domain.valueobject.FollowupAnswers;
 import com.uit.petrescueapi.domain.valueobject.NotificationType;
 import lombok.RequiredArgsConstructor;
@@ -104,7 +106,24 @@ public class FollowupDomainService {
 
     /** Closes milestones nobody answered. Not answering is counted as such, never as "fine". */
     public int expire() {
-        return repository.expireOverdue(LocalDateTime.now()).size();
+        List<Row> expired = repository.expireOverdue(LocalDateTime.now());
+        for (Row row : expired) {
+            // No answer to the first question may mean the pet is not doing well: the organization should call.
+            if ("DAY_2".equals(row.milestone())) {
+                raise(row, FollowupSeverity.YELLOW, List.of("NO_RESPONSE"));
+            }
+        }
+        return expired.size();
+    }
+
+    /** Opens work for the organization; a red one also tells every owner and staff member now. */
+    private void raise(Row row, FollowupSeverity severity, List<String> reasons) {
+        repository.createAlert(row.followupId(), row.applicationId(), row.organizationId(), severity.name(), reasons);
+        if (severity == FollowupSeverity.RED) {
+            notifications.notifyOrganizationHandlers(row.organizationId(), NotificationType.FOLLOWUP_ALERT,
+                    "Cần liên hệ người nhận nuôi bé " + row.petName(), "Câu trả lời sau nhận nuôi có điều đáng lo: " + String.join(", ", reasons),
+                    Map.of("applicationId", String.valueOf(row.applicationId()), "petId", String.valueOf(row.petId())));
+        }
     }
 
     // ── Answering ───────────────────────────────────
@@ -145,6 +164,9 @@ public class FollowupDomainService {
         if (!repository.recordAnswers(row.followupId(), stored, answers.stillHasPet(), assessment.severity().name(), LocalDateTime.now())) {
             throw invalidLink();
         }
+        if (assessment.severity() != FollowupSeverity.GREEN) {
+            raise(row, assessment.severity(), assessment.reasons());
+        }
         return repository.findById(row.followupId()).orElseThrow();
     }
 
@@ -170,6 +192,32 @@ public class FollowupDomainService {
             throw new ForbiddenException("You cannot read the follow-up of this adoption");
         }
         return repository.findByApplication(applicationId);
+    }
+
+    // ── The organization's work ─────────────────────
+
+    /** Owners and staff see their own organization's alerts, admins every organization's. */
+    @Transactional(readOnly = true)
+    public List<AlertRow> alerts(UUID userId, String status) {
+        if (accessControl.isAdmin(userId)) {
+            return repository.findAlerts(null, status, 100);
+        }
+        UUID organizationId = repository.findHandlerOrganizationId(userId)
+                .orElseThrow(() -> new ForbiddenException("Only an organization's owners and staff have follow-up work"));
+        return repository.findAlerts(organizationId, status, 100);
+    }
+
+    /** Take it, note it, close it. The first time it leaves OPEN is what the response time is counted from. */
+    public AlertRow updateAlert(UUID alertId, UUID userId, String status, String note, String resolution) {
+        AlertRow alert = repository.findAlert(alertId).orElseThrow(() -> new ResourceNotFoundException("Follow-up alert", "id", alertId));
+        if (!accessControl.isAdmin(userId) && !repository.isOrganizationHandler(alert.organizationId(), userId)) {
+            throw new ForbiddenException("This alert belongs to another organization");
+        }
+        if ("RESOLVED".equals(status) && (resolution == null || resolution.isBlank())) {
+            throw new BusinessException("Say how it was resolved", "FOLLOWUP_ALERT_RESOLUTION_REQUIRED");
+        }
+        repository.updateAlert(alertId, status, userId, note == null || note.isBlank() ? null : note.trim(), resolution, LocalDateTime.now());
+        return repository.findAlert(alertId).orElseThrow();
     }
 
     private static String hash(String token) {

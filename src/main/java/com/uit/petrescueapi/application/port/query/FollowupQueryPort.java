@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.port.query;
 
+import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto;
 
@@ -11,4 +12,6 @@ public interface FollowupQueryPort {
     FollowupFormDto formFor(String token);
 
     List<FollowupDto> timeline(UUID applicationId, UUID viewerId);
+
+    List<FollowupAlertDto> alerts(UUID userId, String status);
 }

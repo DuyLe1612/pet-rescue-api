@@ -178,6 +178,72 @@ public class FollowupRepositoryAdapter implements FollowupRepository {
         return n != null && n > 0;
     }
 
+    private static final String ALERT_SELECT = """
+            SELECT a.alert_id, a.followup_id, a.application_id, ap.pet_id, p.name AS pet_name, a.organization_id, a.severity,
+                   a.reason_codes, a.status, a.assigned_to, a.first_action_at, a.resolved_at, a.resolution, a.note, a.created_at
+            FROM followup_alerts a
+            JOIN adoption_applications ap ON ap.application_id = a.application_id
+            JOIN pets p ON p.pet_id = ap.pet_id
+            """;
+
+    private final RowMapper<AlertRow> alertRows = (rs, i) -> new AlertRow(
+            rs.getObject("alert_id", UUID.class), rs.getObject("followup_id", UUID.class),
+            rs.getObject("application_id", UUID.class), rs.getObject("pet_id", UUID.class), rs.getString("pet_name"),
+            rs.getObject("organization_id", UUID.class), rs.getString("severity"),
+            List.of(rs.getString("reason_codes").split(",")), rs.getString("status"),
+            rs.getObject("assigned_to", UUID.class), time(rs, "first_action_at"), time(rs, "resolved_at"),
+            rs.getString("resolution"), rs.getString("note"), time(rs, "created_at"));
+
+    @Override
+    public UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO followup_alerts (alert_id, followup_id, application_id, organization_id, severity, reason_codes)
+                VALUES (:id, :followup, :app, :org, :severity, :reasons)
+                """, new MapSqlParameterSource("id", id).addValue("followup", followupId).addValue("app", applicationId)
+                .addValue("org", organizationId).addValue("severity", severity).addValue("reasons", String.join(",", reasons)));
+        return id;
+    }
+
+    @Override
+    public List<AlertRow> findAlerts(UUID organizationId, String status, int limit) {
+        return jdbc.query(ALERT_SELECT + """
+                WHERE (CAST(:org AS UUID) IS NULL OR a.organization_id = :org)
+                  AND (CAST(:status AS VARCHAR) IS NULL OR a.status = :status)
+                ORDER BY CASE a.severity WHEN 'RED' THEN 0 ELSE 1 END, a.created_at
+                LIMIT :limit
+                """, new MapSqlParameterSource("org", organizationId).addValue("status", status).addValue("limit", limit), alertRows);
+    }
+
+    @Override
+    public Optional<AlertRow> findAlert(UUID alertId) {
+        return jdbc.query(ALERT_SELECT + " WHERE a.alert_id = :id", new MapSqlParameterSource("id", alertId), alertRows)
+                .stream().findFirst();
+    }
+
+    @Override
+    public void updateAlert(UUID alertId, String status, UUID assignedTo, String note, String resolution, LocalDateTime now) {
+        jdbc.update("""
+                UPDATE followup_alerts
+                SET status = :status,
+                    assigned_to = COALESCE(assigned_to, :user),
+                    first_action_at = COALESCE(first_action_at, CASE WHEN :status <> 'OPEN' THEN CAST(:now AS TIMESTAMPTZ) END),
+                    resolved_at = CASE WHEN :status = 'RESOLVED' THEN CAST(:now AS TIMESTAMPTZ) ELSE NULL END,
+                    resolution = CASE WHEN :status = 'RESOLVED' THEN :resolution ELSE NULL END,
+                    note = COALESCE(:note, note)
+                WHERE alert_id = :id
+                """, new MapSqlParameterSource("id", alertId).addValue("status", status).addValue("user", assignedTo)
+                .addValue("note", note).addValue("resolution", resolution).addValue("now", Timestamp.valueOf(now)));
+    }
+
+    @Override
+    public Optional<UUID> findHandlerOrganizationId(UUID userId) {
+        return jdbc.queryForList("""
+                SELECT organization_id FROM organization_members
+                WHERE user_id = :user AND status = 'ACTIVE' AND role IN ('OWNER', 'STAFF') LIMIT 1
+                """, new MapSqlParameterSource("user", userId), UUID.class).stream().findFirst();
+    }
+
     @Override
     public Optional<Contact> findContact(UUID userId) {
         return jdbc.query("SELECT email, COALESCE(NULLIF(full_name, ''), username) AS name FROM users WHERE user_id = :id",

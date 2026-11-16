@@ -1,7 +1,9 @@
 package com.uit.petrescueapi.application.port.command;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupRespondRequestDto;
+import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.domain.service.FollowupDomainService;
 
 import java.util.List;
@@ -20,4 +22,6 @@ public interface FollowupCommandPort {
     void respondWithToken(FollowupRespondRequestDto request);
 
     void respond(UUID followupId, UUID userId, FollowupAnswersRequestDto answers);
+
+    FollowupAlertDto updateAlert(UUID alertId, UUID userId, UpdateFollowupAlertRequestDto request);
 }

@@ -19,6 +19,12 @@ public interface FollowupRepository {
     record Contact(String email, String name) {
     }
 
+    /** Work for the organization: one row per worrying answer, support request or return request. */
+    record AlertRow(UUID alertId, UUID followupId, UUID applicationId, UUID petId, String petName, UUID organizationId,
+                    String severity, List<String> reasons, String status, UUID assignedTo, LocalDateTime firstActionAt,
+                    LocalDateTime resolvedAt, String resolution, String note, LocalDateTime createdAt) {
+    }
+
     /** Records the completion time and creates one row per milestone; repeating it adds nothing. */
     void schedule(UUID applicationId, LocalDateTime completedAt, List<Duration> offsets);
 
@@ -50,6 +56,18 @@ public interface FollowupRepository {
     List<Row> expireOverdue(LocalDateTime now);
 
     Optional<Contact> findContact(UUID userId);
+
+    UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons);
+
+    /** Most urgent first, then oldest. {@code status} null means every status. */
+    List<AlertRow> findAlerts(UUID organizationId, String status, int limit);
+
+    Optional<AlertRow> findAlert(UUID alertId);
+
+    void updateAlert(UUID alertId, String status, UUID assignedTo, String note, String resolution, LocalDateTime now);
+
+    /** The organization an owner or staff member works for; empty if none. */
+    Optional<UUID> findHandlerOrganizationId(UUID userId);
 
     /** An active owner or staff member of the organization. */
     boolean isOrganizationHandler(UUID organizationId, UUID userId);

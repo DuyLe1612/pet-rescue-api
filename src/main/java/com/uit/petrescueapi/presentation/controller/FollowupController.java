@@ -1,7 +1,9 @@
 package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupDto;
+import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupRespondRequestDto;
 import com.uit.petrescueapi.application.port.command.FollowupCommandPort;
@@ -14,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,6 +57,22 @@ public class FollowupController {
                                                     Authentication authentication) {
         commandPort.respond(id, UUID.fromString(authentication.getName()), answers);
         return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @GetMapping("/organizations/me/followup-alerts")
+    @Operation(summary = "Follow-up work for my organization",
+            description = "Red first, then oldest. status=OPEN|IN_PROGRESS|RESOLVED filters. Owners and staff only; admins see every organization.")
+    public ResponseEntity<ApiResponse<List<FollowupAlertDto>>> alerts(@RequestParam(required = false) String status,
+                                                                      Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.alerts(UUID.fromString(authentication.getName()), status)));
+    }
+
+    @PatchMapping("/followup-alerts/{id}")
+    @Operation(summary = "Take, note or close a follow-up alert")
+    public ResponseEntity<ApiResponse<FollowupAlertDto>> updateAlert(@PathVariable UUID id,
+                                                                     @Valid @RequestBody UpdateFollowupAlertRequestDto request,
+                                                                     Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(commandPort.updateAlert(id, UUID.fromString(authentication.getName()), request)));
     }
 
     @GetMapping("/adoptions/{id}/followups")

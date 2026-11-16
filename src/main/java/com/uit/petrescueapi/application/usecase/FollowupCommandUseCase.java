@@ -1,7 +1,9 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupRespondRequestDto;
+import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.application.port.command.FollowupCommandPort;
 import com.uit.petrescueapi.domain.service.FollowupDomainService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,11 @@ public class FollowupCommandUseCase implements FollowupCommandPort {
     @Override
     public void respondWithToken(FollowupRespondRequestDto request) {
         followups.respondWithToken(request.token(), request.answers().toDomain());
+    }
+
+    @Override
+    public FollowupAlertDto updateAlert(UUID alertId, UUID userId, UpdateFollowupAlertRequestDto request) {
+        return FollowupQueryUseCase.toDto(followups.updateAlert(alertId, userId, request.status(), request.note(), request.resolution()));
     }
 
     @Override

@@ -595,6 +595,92 @@ class QueryBehaviorIntegrationTest {
         mvc.perform(get(url)).andExpect(status().isUnauthorized());
     }
 
+    /** Sends the milestone and answers it through the signed-in endpoint; returns the follow-up id. */
+    private UUID answered(UUID application, UUID adopter, String milestone, String answers) throws Exception {
+        makeDue(application, milestone);
+        followupCommands.dispatchDue(20);
+        UUID followup = jdbc.queryForObject("SELECT followup_id FROM adoption_followups WHERE application_id = ? AND milestone = ?", UUID.class, application, milestone);
+        call(post("/api/v1/followups/" + followup + "/answers"), adopter, answers).andExpect(status().isOk());
+        return followup;
+    }
+
+    @Test
+    void worryingAnswersBecomeWorkForTheOrganizationAndOnlyRedOnesNotifyStaffAtOnce() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+
+        answered(application, adopter, "DAY_2", ANSWERS_FINE);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM followup_alerts WHERE application_id = ?", Integer.class, application)).as("green makes no work").isZero();
+
+        answered(application, adopter, "WEEK_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"WORRIED\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).as("yellow waits in the queue").isZero();
+
+        answered(application, adopter, "MONTH_3",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"CONSIDERING_RETURN\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).isEqualTo(1);
+
+        // red on top, with every reason; the queue is the organization's own
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].severity").value("RED"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("CONSIDERING_RETURN"))
+                .andExpect(jsonPath("$.data[0].petName").value("Mực"))
+                .andExpect(jsonPath("$.data[1].severity").value("YELLOW"));
+        call(get("/api/v1/organizations/me/followup-alerts?status=RESOLVED"), staff).andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "STAFF"))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), adopter).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/organizations/me/followup-alerts")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anUnansweredFirstQuestionAsksTheOrganizationToCallButALaterOneDoesNot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        for (String milestone : List.of("DAY_2", "WEEK_2")) {
+            makeDue(application, milestone);
+            followupCommands.dispatchDue(20);
+            jdbc.update("UPDATE adoption_followups SET status = 'SENT', expires_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = ?", application, milestone);
+        }
+
+        assertThat(followupCommands.expire()).isEqualTo(2);
+
+        assertThat(jdbc.queryForList("SELECT severity || ':' || reason_codes FROM followup_alerts WHERE application_id = ?", String.class, application))
+                .containsExactly("YELLOW:NO_RESPONSE");
+    }
+
+    @Test
+    void staffTakeAndCloseAnAlertAndAnotherOrganizationCannot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        answered(application, adopter, "DAY_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"MUCH\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        UUID alert = jdbc.queryForObject("SELECT alert_id FROM followup_alerts WHERE application_id = ?", UUID.class, application);
+        String url = "/api/v1/followup-alerts/" + alert;
+
+        call(patch(url), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER"), "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), adopter, "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), staff, "{\"status\":\"DONE\"}").andExpect(status().isBadRequest());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\"}").andExpect(status().isBadRequest());
+
+        call(patch(url), staff, "{\"status\":\"IN_PROGRESS\",\"note\":\"Đã gọi, hẹn chiều nay\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.data.assignedTo").value(staff.toString()))
+                .andExpect(jsonPath("$.data.firstActionAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.resolvedAt").doesNotExist());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\",\"resolution\":\"ADVISED\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.resolution").value("ADVISED"))
+                .andExpect(jsonPath("$.data.note").value("Đã gọi, hẹn chiều nay"))
+                .andExpect(jsonPath("$.data.resolvedAt").isNotEmpty());
+    }
+
     @Test
     void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
         UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);

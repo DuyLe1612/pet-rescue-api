@@ -1,10 +1,12 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto.Option;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto.Question;
 import com.uit.petrescueapi.application.port.query.FollowupQueryPort;
+import com.uit.petrescueapi.domain.repository.FollowupRepository.AlertRow;
 import com.uit.petrescueapi.domain.repository.FollowupRepository.Row;
 import com.uit.petrescueapi.domain.service.FollowupDomainService;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,16 @@ public class FollowupQueryUseCase implements FollowupQueryPort {
     public FollowupFormDto formFor(String token) {
         Row row = followups.formFor(token);
         return new FollowupFormDto(row.petName(), row.milestone(), INTRO.get(row.milestone()), QUESTIONS);
+    }
+
+    @Override
+    public List<FollowupAlertDto> alerts(UUID userId, String status) {
+        return followups.alerts(userId, status).stream().map(FollowupQueryUseCase::toDto).toList();
+    }
+
+    static FollowupAlertDto toDto(AlertRow a) {
+        return new FollowupAlertDto(a.alertId(), a.applicationId(), a.petId(), a.petName(), a.severity(), a.reasons(),
+                a.status(), a.assignedTo(), a.createdAt(), a.firstActionAt(), a.resolvedAt(), a.resolution(), a.note());
     }
 
     @Override
