@@ -327,6 +327,11 @@ public class FollowupDomainService {
         return repository.findAlert(alertId).orElseThrow();
     }
 
+    @Transactional(readOnly = true)
+    public FollowupRepository.Metrics metrics() {
+        return repository.metrics(LocalDateTime.now());
+    }
+
     private static String hash(String token) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));

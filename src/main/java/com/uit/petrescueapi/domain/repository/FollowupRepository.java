@@ -57,6 +57,29 @@ public interface FollowupRepository {
 
     Optional<Contact> findContact(UUID userId);
 
+    /**
+     * Numbers for the admin page. A rate is null when its denominator is zero: with a handful of
+     * adoptions no percentage means anything, and an empty one must not read as 0%.
+     */
+    record Metrics(List<MilestoneStat> milestones, AlertStats alerts, List<OutcomeStat> outcomes, Double medianDaysToOutcome) {
+    }
+
+    /**
+     * {@code asked} milestones were sent. Of those, {@code responded} answered and {@code unanswered} did not
+     * (expired or still waiting): not answering is counted on its own and never as "doing fine".
+     */
+    record MilestoneStat(String milestone, long asked, long responded, long unanswered, Double responseRate,
+                         long stillHasPet, Double stillHasPetRate) {
+    }
+
+    record AlertStats(long red, long yellow, long unresolved, Double medianMinutesToFirstAction, Double onTimeRate) {
+    }
+
+    record OutcomeStat(String outcomeType, String reasonCode, long count) {
+    }
+
+    Metrics metrics(LocalDateTime now);
+
     UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons, String note);
 
     /** Most urgent first, then oldest. {@code status} null means every status. */

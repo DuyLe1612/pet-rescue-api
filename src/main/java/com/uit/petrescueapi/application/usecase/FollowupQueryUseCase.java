@@ -49,6 +49,11 @@ public class FollowupQueryUseCase implements FollowupQueryPort {
     }
 
     @Override
+    public com.uit.petrescueapi.domain.repository.FollowupRepository.Metrics metrics() {
+        return followups.metrics();
+    }
+
+    @Override
     public List<FollowupAlertDto> alerts(UUID userId, String status) {
         return followups.alerts(userId, status).stream().map(FollowupQueryUseCase::toDto).toList();
     }

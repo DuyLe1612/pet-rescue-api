@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -116,6 +117,16 @@ public class FollowupController {
                                                                    @Valid @RequestBody RecordOutcomeRequestDto request,
                                                                    Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.ok(commandPort.recordOutcome(id, UUID.fromString(authentication.getName()), request)));
+    }
+
+    @GetMapping("/admin/followups/metrics")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Follow-up numbers for the admin page",
+            description = "Per milestone: how many were asked, answered, and not answered (never counted as fine), and how many still have "
+                    + "the pet among those who answered. A rate is null while its denominator is zero. Also alert response times, "
+                    + "and outcomes by type and reason. Nothing here says follow-up lowers returns: there is no control group.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.domain.repository.FollowupRepository.Metrics>> metrics() {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.metrics()));
     }
 
     @GetMapping("/adoptions/{id}/followups")

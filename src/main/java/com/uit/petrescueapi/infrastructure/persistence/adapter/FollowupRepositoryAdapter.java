@@ -304,6 +304,53 @@ public class FollowupRepositoryAdapter implements FollowupRepository {
                 """, new MapSqlParameterSource("user", userId), UUID.class).stream().findFirst();
     }
 
+    private static Double rate(long part, long whole) {
+        return whole == 0 ? null : (double) part / whole;
+    }
+
+    @Override
+    public Metrics metrics(LocalDateTime now) {
+        List<MilestoneStat> milestones = jdbc.query("""
+                SELECT milestone,
+                       COUNT(*) FILTER (WHERE sent_at IS NOT NULL) AS asked,
+                       COUNT(*) FILTER (WHERE status = 'RESPONDED') AS responded,
+                       COUNT(*) FILTER (WHERE sent_at IS NOT NULL AND status <> 'RESPONDED' AND status <> 'CANCELLED') AS unanswered,
+                       COUNT(*) FILTER (WHERE status = 'RESPONDED' AND still_has_pet) AS still_has_pet
+                FROM adoption_followups GROUP BY milestone
+                ORDER BY CASE milestone WHEN 'DAY_2' THEN 1 WHEN 'WEEK_2' THEN 2 WHEN 'MONTH_3' THEN 3 ELSE 4 END
+                """, new MapSqlParameterSource(), (rs, i) -> {
+            long asked = rs.getLong("asked");
+            long responded = rs.getLong("responded");
+            long still = rs.getLong("still_has_pet");
+            return new MilestoneStat(rs.getString("milestone"), asked, responded, rs.getLong("unanswered"),
+                    rate(responded, asked), still, rate(still, responded));
+        });
+
+        AlertStats alerts = jdbc.queryForObject("""
+                SELECT COUNT(*) FILTER (WHERE severity = 'RED') AS red,
+                       COUNT(*) FILTER (WHERE severity = 'YELLOW') AS yellow,
+                       COUNT(*) FILTER (WHERE status <> 'RESOLVED') AS unresolved,
+                       percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (first_action_at - created_at)) / 60)
+                           FILTER (WHERE first_action_at IS NOT NULL) AS median_minutes,
+                       COUNT(*) FILTER (WHERE first_action_at IS NOT NULL
+                                          AND first_action_at - created_at <= CASE severity WHEN 'RED' THEN INTERVAL '24 hours' ELSE INTERVAL '72 hours' END) AS on_time,
+                       COUNT(*) FILTER (WHERE first_action_at IS NOT NULL) AS acted
+                FROM followup_alerts
+                """, new MapSqlParameterSource(), (rs, i) -> new AlertStats(rs.getLong("red"), rs.getLong("yellow"),
+                rs.getLong("unresolved"), (Double) rs.getObject("median_minutes"), rate(rs.getLong("on_time"), rs.getLong("acted"))));
+
+        List<OutcomeStat> outcomes = jdbc.query("""
+                SELECT outcome_type, reason_code, COUNT(*) AS n FROM adoption_outcomes
+                GROUP BY outcome_type, reason_code ORDER BY n DESC, outcome_type, reason_code
+                """, new MapSqlParameterSource(), (rs, i) -> new OutcomeStat(rs.getString("outcome_type"), rs.getString("reason_code"), rs.getLong("n")));
+
+        Double medianDays = jdbc.queryForObject("""
+                SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY days_since_completed) FROM adoption_outcomes
+                WHERE days_since_completed IS NOT NULL
+                """, new MapSqlParameterSource(), Double.class);
+        return new Metrics(milestones, alerts, outcomes, medianDays);
+    }
+
     @Override
     public Optional<Contact> findContact(UUID userId) {
         return jdbc.query("SELECT email, COALESCE(NULLIF(full_name, ''), username) AS name FROM users WHERE user_id = :id",

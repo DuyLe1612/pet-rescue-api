@@ -14,4 +14,6 @@ public interface FollowupQueryPort {
     List<FollowupDto> timeline(UUID applicationId, UUID viewerId);
 
     List<FollowupAlertDto> alerts(UUID userId, String status);
+
+    com.uit.petrescueapi.domain.repository.FollowupRepository.Metrics metrics();
 }

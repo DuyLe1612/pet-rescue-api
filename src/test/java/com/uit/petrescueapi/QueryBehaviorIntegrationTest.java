@@ -800,6 +800,39 @@ class QueryBehaviorIntegrationTest {
         mvc.perform(get(url)).andExpect(status().isUnauthorized());
     }
 
+    private long metric(String json, String path) {
+        List<Number> found = JsonPath.read(json, path);
+        return found.isEmpty() ? 0 : found.get(0).longValue();
+    }
+
+    @Test
+    void followUpNumbersCountNotAnsweringOnItsOwnAndAreForAdminsOnly() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        String url = "/api/v1/admin/followups/metrics";
+        call(get(url), staff).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        String before = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        UUID answeringAdopter = person();
+        UUID answering = adoptedApplication(shelter, answeringAdopter);
+        answered(answering, answeringAdopter, "DAY_2", ANSWERS_FINE);
+        UUID silent = adoptedApplication(shelter, person());
+        makeDue(silent, "DAY_2");
+        followupCommands.dispatchDue(20);
+        UUID leaving = adoptedApplication(shelter, person());
+        call(post("/api/v1/adoptions/" + leaving + "/outcome"), staff, "{\"outcomeType\":\"RETURNED_BY_ADOPTER\",\"reasonCode\":\"TIME\"}").andExpect(status().isOk());
+
+        String after = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String day2 = "$.data.milestones[?(@.milestone=='DAY_2')].";
+        assertThat(metric(after, day2 + "asked") - metric(before, day2 + "asked")).isEqualTo(2);
+        assertThat(metric(after, day2 + "responded") - metric(before, day2 + "responded")).isEqualTo(1);
+        assertThat(metric(after, day2 + "unanswered") - metric(before, day2 + "unanswered")).as("silence is its own number").isEqualTo(1);
+        assertThat(metric(after, day2 + "stillHasPet") - metric(before, day2 + "stillHasPet")).isEqualTo(1);
+        String returned = "$.data.outcomes[?(@.outcomeType=='RETURNED_BY_ADOPTER' && @.reasonCode=='TIME')].count";
+        assertThat(metric(after, returned) - metric(before, returned)).isEqualTo(1);
+    }
+
     @Test
     void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
         UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
