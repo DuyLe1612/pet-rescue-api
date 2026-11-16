@@ -778,6 +778,29 @@ class QueryBehaviorIntegrationTest {
     }
 
     @Test
+    void theAdopterProfileFormIsPrefilledFromThePetsThePersonKeepsAlive() throws Exception {
+        UUID me = person();
+        String url = "/api/v1/users/me/adopter-profile/suggestion";
+        call(get(url), me).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasDog").value(false))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(0)));
+
+        UUID dog = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Dog'), status = 'ADOPTED' WHERE pet_id = ?", dog);
+        UUID deadCat = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat'), status = 'DECEASED' WHERE pet_id = ?", deadCat);
+        UUID someoneElsesCat = pet("USER", person(), null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat') WHERE pet_id = ?", someoneElsesCat);
+
+        call(get(url), me).andExpect(jsonPath("$.data.hasDog").value(true))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(1)))
+                .andExpect(jsonPath("$.data.basedOnPetIds[0]").value(dog.toString()));
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
         UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
         UUID person = person();
