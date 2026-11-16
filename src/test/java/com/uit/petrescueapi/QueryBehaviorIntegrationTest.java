@@ -101,6 +101,7 @@ class QueryBehaviorIntegrationTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.uit.petrescueapi.domain.service.FollowupDomainService followups;
     @Autowired EntityManagerFactory emf;
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
@@ -449,6 +450,33 @@ class QueryBehaviorIntegrationTest {
         assertThat(current.get("adoption_application_id")).isEqualTo(application);
         assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ? AND to_time IS NULL", String.class, petId))
                 .isEqualTo("ADOPTED");
+    }
+
+    @Test
+    void completingAnAdoptionSchedulesFourMilestonesOnceAndCancelsOnlyTheOpenOnes() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, person(), shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList("SELECT milestone FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("DAY_2", "WEEK_2", "MONTH_3", "MONTH_6");
+        assertThat(jdbc.queryForObject("SELECT completed_at IS NOT NULL FROM adoption_applications WHERE application_id = ?", Boolean.class, application)).isTrue();
+        // due two days after completion, as configured
+        assertThat(jdbc.queryForObject("""
+                SELECT f.due_at = a.completed_at + INTERVAL '2 days'
+                FROM adoption_followups f JOIN adoption_applications a ON a.application_id = f.application_id
+                WHERE f.application_id = ? AND f.milestone = 'DAY_2'""", Boolean.class, application)).isTrue();
+
+        followups.scheduleFor(application, LocalDateTime.now());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM adoption_followups WHERE application_id = ?", Integer.class, application)).isEqualTo(4);
+
+        jdbc.update("UPDATE adoption_followups SET status = 'RESPONDED' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        followups.cancelOpen(application);
+        assertThat(jdbc.queryForList("SELECT status FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("RESPONDED", "CANCELLED", "CANCELLED", "CANCELLED");
     }
 
     @Test

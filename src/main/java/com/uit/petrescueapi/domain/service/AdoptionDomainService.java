@@ -53,6 +53,7 @@ public class AdoptionDomainService {
     private final ReputationDomainService reputationDomainService;
     private final ReclaimLogRepository reclaimLogRepository;
     private final NotificationDomainService notifications;
+    private final FollowupDomainService followups;
 
     // ── Queries ─────────────────────────────────────
 
@@ -221,6 +222,7 @@ public class AdoptionDomainService {
         log.info("Adoption completed: pet {} transferred to user {}", app.getPetId(), app.getApplicantId());
 
         AdoptionApplication saved = applicationRepository.save(app);
+        followups.scheduleFor(saved.getApplicationId(), app.getUpdatedAt());
         // Left open they could never succeed, and PENDING ones would use up the limit of those applicants.
         List<UUID> closedApplicants = applicationRepository.findOpenApplicantIdsForPet(app.getPetId(), app.getApplicationId());
         applicationRepository.cancelOpenForPet(app.getPetId(), app.getApplicationId(), AUTO_CANCEL_REASON, LocalDateTime.now());
@@ -246,6 +248,7 @@ public class AdoptionDomainService {
         petDomainService.transferOwnership(app.getPetId(), "ORGANIZATION", app.getOrganizationId(),
                 com.uit.petrescueapi.domain.valueobject.AcquisitionType.ORG_INTAKE, null);
         petDomainService.changeStatus(app.getPetId(), PetStatus.FOSTERING);
+        followups.cancelOpen(app.getApplicationId());
         adjustReputation(app.getApplicantId(), -300, "PET_RECLAIMED", app.getApplicationId(), reclaimedBy);
 
         ReclaimLog reclaimLog = ReclaimLog.builder()
