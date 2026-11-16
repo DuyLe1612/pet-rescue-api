@@ -16,6 +16,12 @@ public interface PetQueryPort {
 
     PetResponseDto findById(UUID id);
 
+    /**
+     * The pet as {@code viewerId} (null for a guest) may see it: a private pet is only found by the
+     * people who manage it and by admins, and is reported as not found to everyone else.
+     */
+    PetResponseDto findByIdForViewer(UUID id, UUID viewerId);
+
     Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable);
 
     Page<PetSummaryResponseDto> findAllWithFilters(

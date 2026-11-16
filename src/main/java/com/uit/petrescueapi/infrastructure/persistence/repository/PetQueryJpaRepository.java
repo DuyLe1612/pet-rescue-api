@@ -104,7 +104,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND (p.visibility = 'PUBLIC' OR :ownerUserId IS NOT NULL)
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -122,7 +122,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND (p.visibility = 'PUBLIC' OR :ownerUserId IS NOT NULL)
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -179,7 +179,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND (p.visibility = 'PUBLIC' OR :ownerUserId IS NOT NULL)
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -198,7 +198,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND (p.visibility = 'PUBLIC' OR :ownerUserId IS NOT NULL)
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -257,7 +257,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN organizations o ON p.shelter_id = o.organization_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND p.visibility = 'PUBLIC'
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -274,7 +274,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
         LEFT JOIN pets_current_owner pco ON pco.pet_id = p.pet_id
         JOIN pet_species ps ON p.species_id = ps.species_id
         LEFT JOIN pet_breeds pb ON p.breed_id = pb.breed_id
-        WHERE p.is_deleted = false
+        WHERE p.is_deleted = false AND p.visibility = 'PUBLIC'
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
@@ -322,6 +322,8 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
                 p.shelter_id AS shelterId,
                  (p.created_at AT TIME ZONE 'UTC') AS createdAt,
                  (p.updated_at AT TIME ZONE 'UTC') AS updatedAt,
+               p.visibility AS visibility,
+               pco.acquisition_type AS acquisitionType,
                pco.owner_type AS ownerType,
                pco.owner_id AS ownerId,
                COALESCE(NULLIF(u.full_name, ''), u.username, own_org.name) AS ownerName,

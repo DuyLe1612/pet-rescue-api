@@ -35,6 +35,9 @@ public class Pet extends BaseEntity {
     private String description;
     private PetStatus status;
     private HealthStatus healthStatus;
+
+    @Builder.Default
+    private com.uit.petrescueapi.domain.valueobject.PetVisibility visibility = com.uit.petrescueapi.domain.valueobject.PetVisibility.PUBLIC;
     private boolean vaccinated;
     private boolean neutered;
     private UUID shelterId;

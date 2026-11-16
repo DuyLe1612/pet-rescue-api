@@ -174,6 +174,8 @@ public class PetQueryAdapter implements PetQueryDataPort {
         private PetResponseDto toResponseDto(PetDetailProjection p, String primaryImageUrl, List<String> imageUrls) {
         return PetResponseDto.builder()
                 .petId(p.getId())
+                .visibility(p.getVisibility() == null ? null : com.uit.petrescueapi.domain.valueobject.PetVisibility.valueOf(p.getVisibility()))
+                .acquisitionType(p.getAcquisitionType() == null ? null : com.uit.petrescueapi.domain.valueobject.AcquisitionType.valueOf(p.getAcquisitionType()))
                 .name(p.getName())
                 .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())

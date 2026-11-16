@@ -23,11 +23,22 @@ import java.util.UUID;
 public class PetQueryUseCase implements PetQueryPort {
 
     private final PetQueryDataPort queryDataPort;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
 
     @Override
     public PetResponseDto findById(UUID id) {
         log.debug("Query: find pet by id {}", id);
         return queryDataPort.findById(id);
+    }
+
+    @Override
+    public PetResponseDto findByIdForViewer(UUID id, UUID viewerId) {
+        PetResponseDto pet = queryDataPort.findById(id);
+        if (pet.getVisibility() == com.uit.petrescueapi.domain.valueobject.PetVisibility.PRIVATE
+                && !accessControl.canManagePet(id, viewerId)) {
+            throw new com.uit.petrescueapi.domain.exception.ResourceNotFoundException("Pet", "id", id);
+        }
+        return pet;
     }
 
     @Override

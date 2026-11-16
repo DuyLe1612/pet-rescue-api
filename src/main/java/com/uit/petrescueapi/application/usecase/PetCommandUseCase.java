@@ -301,6 +301,12 @@ public class PetCommandUseCase implements PetCommandPort {
     }
 
     @Override
+    public Pet changeVisibility(UUID id, com.uit.petrescueapi.domain.valueobject.PetVisibility visibility, UUID requesterId) {
+        accessControl.requirePetManager(id, requesterId);
+        return petDomainService.changeVisibility(id, visibility);
+    }
+
+    @Override
     public void transferOwnership(
             UUID petId,
             TransferOwnershipRequestDto cmd,

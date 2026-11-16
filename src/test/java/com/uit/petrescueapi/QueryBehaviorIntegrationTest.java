@@ -681,6 +681,41 @@ class QueryBehaviorIntegrationTest {
     }
 
     @Test
+    void aPetAPersonRegistersIsPrivateUntilTheyShowIt() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID owner = person();
+        UUID stranger = person();
+        String created = call(post("/api/v1/pets"), owner, "{\"name\":\"Cỏ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+        String url = "/api/v1/pets/" + id;
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID orgPet = pet("ORGANIZATION", shelter, shelter);
+
+        call(get(url), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.data.acquisitionType").value("SELF_REGISTERED"));
+        call(get(url), admin()).andExpect(status().isOk());
+        call(get(url), stranger).andExpect(status().isNotFound());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(orgPet).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/pets?pageSize=100"), stranger))).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/users/me/pets"), owner))).containsExactly(id);
+
+        // only whoever manages the pet decides who can see it
+        call(patch(url + "/visibility?visibility=PUBLIC"), stranger).andExpect(status().isForbidden());
+        mvc.perform(patch(url + "/visibility?visibility=PUBLIC")).andExpect(status().isUnauthorized());
+        call(patch(url + "/visibility?visibility=PUBLIC"), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(id);
+
+        call(patch(url + "/visibility?visibility=PRIVATE"), owner).andExpect(status().isOk());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+    }
+
+    @Test
     void anotherUsersContactDetailsAreOnlyForThemAndAdmins() throws Exception {
         UUID owner = person();
         jdbc.update("UPDATE users SET phone = '0911111111', street_address = '1 Lê Lợi' WHERE user_id = ?", owner);

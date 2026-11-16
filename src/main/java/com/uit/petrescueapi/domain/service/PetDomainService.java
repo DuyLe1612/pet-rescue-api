@@ -76,6 +76,7 @@ public class PetDomainService {
         }
         pet.setPetCode(visualCodeRepository.nextPetCode());
         pet.setStatus(PetStatus.ADOPTED);
+        pet.setVisibility(com.uit.petrescueapi.domain.valueobject.PetVisibility.PRIVATE);
         pet.setCreatedAt(LocalDateTime.now());
         Pet saved = petRepository.save(pet);
 
@@ -190,6 +191,13 @@ public class PetDomainService {
         currentOwnerRepository.upsert(currentOwner);
         
         log.info("Ownership transferred: pet {} → {} {}", petId, newOwnerType, newOwnerId);
+    }
+
+    public Pet changeVisibility(UUID id, com.uit.petrescueapi.domain.valueobject.PetVisibility visibility) {
+        Pet existing = findById(id);
+        existing.setVisibility(visibility);
+        existing.setUpdatedAt(LocalDateTime.now());
+        return petRepository.save(existing);
     }
 
     public Pet update(UUID id, Pet updated) {
