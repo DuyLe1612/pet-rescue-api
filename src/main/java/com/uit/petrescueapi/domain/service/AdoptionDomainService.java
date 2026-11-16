@@ -248,7 +248,7 @@ public class AdoptionDomainService {
         petDomainService.transferOwnership(app.getPetId(), "ORGANIZATION", app.getOrganizationId(),
                 com.uit.petrescueapi.domain.valueobject.AcquisitionType.ORG_INTAKE, null);
         petDomainService.changeStatus(app.getPetId(), PetStatus.FOSTERING);
-        followups.cancelOpen(app.getApplicationId());
+        followups.recordReclaim(app, reclaimedBy);
         adjustReputation(app.getApplicantId(), -300, "PET_RECLAIMED", app.getApplicationId(), reclaimedBy);
 
         ReclaimLog reclaimLog = ReclaimLog.builder()

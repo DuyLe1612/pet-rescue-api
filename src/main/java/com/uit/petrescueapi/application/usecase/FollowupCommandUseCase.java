@@ -1,7 +1,11 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.AdoptionOutcomeDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
+import com.uit.petrescueapi.application.dto.followup.RecordOutcomeRequestDto;
+import com.uit.petrescueapi.application.dto.followup.ReturnRequestDto;
+import com.uit.petrescueapi.application.dto.followup.SupportRequestDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupRespondRequestDto;
 import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.application.port.command.FollowupCommandPort;
@@ -38,6 +42,27 @@ public class FollowupCommandUseCase implements FollowupCommandPort {
     @Override
     public void respondWithToken(FollowupRespondRequestDto request) {
         followups.respondWithToken(request.token(), request.answers().toDomain());
+    }
+
+    @Override
+    public void requestSupport(UUID applicationId, UUID userId, SupportRequestDto request) {
+        followups.requestSupport(applicationId, userId, request == null ? null : request.note());
+    }
+
+    @Override
+    public void requestReturn(UUID applicationId, UUID userId, ReturnRequestDto request) {
+        followups.requestReturn(applicationId, userId, request.reasonCode(), request.note());
+    }
+
+    @Override
+    public void setPreference(UUID applicationId, UUID userId, boolean enabled) {
+        followups.setPreference(applicationId, userId, enabled);
+    }
+
+    @Override
+    public AdoptionOutcomeDto recordOutcome(UUID applicationId, UUID userId, RecordOutcomeRequestDto request) {
+        var o = followups.recordOutcome(applicationId, userId, request.outcomeType(), request.reasonCode(), request.note());
+        return new AdoptionOutcomeDto(o.applicationId(), o.petId(), o.outcomeType(), o.reasonCode(), o.occurredAt(), o.daysSinceCompleted(), o.note());
     }
 
     @Override

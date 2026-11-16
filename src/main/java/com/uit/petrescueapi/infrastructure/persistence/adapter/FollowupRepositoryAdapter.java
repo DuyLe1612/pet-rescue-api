@@ -195,14 +195,74 @@ public class FollowupRepositoryAdapter implements FollowupRepository {
             rs.getString("resolution"), rs.getString("note"), time(rs, "created_at"));
 
     @Override
-    public UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons) {
+    public UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons, String note) {
         UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO followup_alerts (alert_id, followup_id, application_id, organization_id, severity, reason_codes)
-                VALUES (:id, :followup, :app, :org, :severity, :reasons)
+                INSERT INTO followup_alerts (alert_id, followup_id, application_id, organization_id, severity, reason_codes, note)
+                VALUES (:id, :followup, :app, :org, :severity, :reasons, :note)
                 """, new MapSqlParameterSource("id", id).addValue("followup", followupId).addValue("app", applicationId)
-                .addValue("org", organizationId).addValue("severity", severity).addValue("reasons", String.join(",", reasons)));
+                .addValue("org", organizationId).addValue("severity", severity).addValue("reasons", String.join(",", reasons))
+                .addValue("note", note));
         return id;
+    }
+
+    @Override
+    public boolean hasUnresolvedAlert(UUID applicationId, String reason) {
+        Integer n = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM followup_alerts
+                WHERE application_id = :app AND status <> 'RESOLVED' AND (',' || reason_codes || ',') LIKE :reason
+                """, new MapSqlParameterSource("app", applicationId).addValue("reason", "%," + reason + ",%"), Integer.class);
+        return n != null && n > 0;
+    }
+
+    @Override
+    public void resolveOpenAlerts(UUID applicationId, String resolution, LocalDateTime now) {
+        jdbc.update("""
+                UPDATE followup_alerts SET status = 'RESOLVED', resolved_at = :now, resolution = :resolution,
+                    first_action_at = COALESCE(first_action_at, :now)
+                WHERE application_id = :app AND status <> 'RESOLVED'
+                """, new MapSqlParameterSource("app", applicationId).addValue("resolution", resolution)
+                .addValue("now", Timestamp.valueOf(now)));
+    }
+
+    @Override
+    public boolean insertOutcome(UUID applicationId, UUID petId, String outcomeType, String reasonCode, UUID initiatedBy,
+                                 LocalDateTime occurredAt, String note) {
+        return jdbc.update("""
+                INSERT INTO adoption_outcomes (outcome_id, application_id, pet_id, outcome_type, reason_code, initiated_by,
+                                               occurred_at, days_since_completed, note)
+                SELECT :id, a.application_id, :pet, :type, :reason, :by, :at,
+                       CASE WHEN a.completed_at IS NULL THEN NULL
+                            ELSE CAST(EXTRACT(EPOCH FROM (CAST(:at AS TIMESTAMPTZ) - a.completed_at)) / 86400 AS INT) END,
+                       :note
+                FROM adoption_applications a WHERE a.application_id = :app
+                ON CONFLICT (application_id) DO NOTHING
+                """, new MapSqlParameterSource("id", UUID.randomUUID()).addValue("app", applicationId).addValue("pet", petId)
+                .addValue("type", outcomeType).addValue("reason", reasonCode).addValue("by", initiatedBy)
+                .addValue("at", Timestamp.valueOf(occurredAt)).addValue("note", note)) > 0;
+    }
+
+    @Override
+    public Optional<Outcome> findOutcome(UUID applicationId) {
+        return jdbc.query("SELECT * FROM adoption_outcomes WHERE application_id = :app", new MapSqlParameterSource("app", applicationId),
+                (rs, i) -> new Outcome(rs.getObject("outcome_id", UUID.class), rs.getObject("application_id", UUID.class),
+                        rs.getObject("pet_id", UUID.class), rs.getString("outcome_type"), rs.getString("reason_code"),
+                        rs.getObject("initiated_by", UUID.class), time(rs, "occurred_at"), (Integer) rs.getObject("days_since_completed"),
+                        rs.getString("note"))).stream().findFirst();
+    }
+
+    @Override
+    public void setOptOut(UUID applicationId, boolean optOut) {
+        jdbc.update("UPDATE adoption_applications SET followup_opt_out = :out WHERE application_id = :app",
+                new MapSqlParameterSource("out", optOut).addValue("app", applicationId));
+    }
+
+    @Override
+    public int reviveFuture(UUID applicationId, LocalDateTime now) {
+        return jdbc.update("""
+                UPDATE adoption_followups SET status = 'SCHEDULED'
+                WHERE application_id = :app AND status = 'CANCELLED' AND due_at > :now
+                """, new MapSqlParameterSource("app", applicationId).addValue("now", Timestamp.valueOf(now)));
     }
 
     @Override

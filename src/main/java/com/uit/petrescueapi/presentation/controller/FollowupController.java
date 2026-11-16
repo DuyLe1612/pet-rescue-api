@@ -1,7 +1,12 @@
 package com.uit.petrescueapi.presentation.controller;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.AdoptionOutcomeDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
+import com.uit.petrescueapi.application.dto.followup.FollowupPreferenceDto;
+import com.uit.petrescueapi.application.dto.followup.RecordOutcomeRequestDto;
+import com.uit.petrescueapi.application.dto.followup.ReturnRequestDto;
+import com.uit.petrescueapi.application.dto.followup.SupportRequestDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupDto;
 import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupFormDto;
@@ -73,6 +78,44 @@ public class FollowupController {
                                                                      @Valid @RequestBody UpdateFollowupAlertRequestDto request,
                                                                      Authentication authentication) {
         return ResponseEntity.ok(ApiResponse.ok(commandPort.updateAlert(id, UUID.fromString(authentication.getName()), request)));
+    }
+
+    @PostMapping("/adoptions/{id}/support-request")
+    @Operation(summary = "I need support", description = "The adopter, any time after the adoption completed. Opens yellow work for the organization.")
+    public ResponseEntity<ApiResponse<Void>> supportRequest(@PathVariable UUID id,
+                                                            @Valid @RequestBody(required = false) SupportRequestDto request,
+                                                            Authentication authentication) {
+        commandPort.requestSupport(id, UUID.fromString(authentication.getName()), request);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PostMapping("/adoptions/{id}/return-request")
+    @Operation(summary = "I cannot keep the pet any more",
+            description = "The adopter. Opens red work and tells the organization now. Costs no reputation.")
+    public ResponseEntity<ApiResponse<Void>> returnRequest(@PathVariable UUID id,
+                                                           @Valid @RequestBody ReturnRequestDto request,
+                                                           Authentication authentication) {
+        commandPort.requestReturn(id, UUID.fromString(authentication.getName()), request);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PatchMapping("/adoptions/{id}/followup-preference")
+    @Operation(summary = "Turn the follow-up questions off or on", description = "The adopter.")
+    public ResponseEntity<ApiResponse<Void>> preference(@PathVariable UUID id,
+                                                        @Valid @RequestBody FollowupPreferenceDto request,
+                                                        Authentication authentication) {
+        commandPort.setPreference(id, UUID.fromString(authentication.getName()), request.enabled());
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    @PostMapping("/adoptions/{id}/outcome")
+    @Operation(summary = "Record how an adoption ended",
+            description = "Owners and staff of the organization that handed the pet over, and admins. RETURNED_BY_ADOPTER "
+                    + "brings the pet back to the organization (FOSTERING) without touching the adopter's reputation.")
+    public ResponseEntity<ApiResponse<AdoptionOutcomeDto>> outcome(@PathVariable UUID id,
+                                                                   @Valid @RequestBody RecordOutcomeRequestDto request,
+                                                                   Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(commandPort.recordOutcome(id, UUID.fromString(authentication.getName()), request)));
     }
 
     @GetMapping("/adoptions/{id}/followups")

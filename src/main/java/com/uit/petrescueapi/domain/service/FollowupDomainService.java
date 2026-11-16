@@ -1,6 +1,8 @@
 package com.uit.petrescueapi.domain.service;
 
+import com.uit.petrescueapi.domain.entity.AdoptionApplication;
 import com.uit.petrescueapi.domain.exception.BusinessException;
+import com.uit.petrescueapi.domain.exception.ConflictException;
 import com.uit.petrescueapi.domain.exception.ForbiddenException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.AdoptionApplicationRepository;
@@ -8,7 +10,11 @@ import com.uit.petrescueapi.domain.repository.FollowupRepository;
 import com.uit.petrescueapi.domain.repository.FollowupRepository.AlertRow;
 import com.uit.petrescueapi.domain.repository.FollowupRepository.Row;
 import com.uit.petrescueapi.domain.valueobject.FollowupSeverity;
+import com.uit.petrescueapi.domain.repository.FollowupRepository.Outcome;
+import com.uit.petrescueapi.domain.valueobject.AcquisitionType;
+import com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus;
 import com.uit.petrescueapi.domain.valueobject.FollowupAnswers;
+import com.uit.petrescueapi.domain.valueobject.PetStatus;
 import com.uit.petrescueapi.domain.valueobject.NotificationType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +52,7 @@ public class FollowupDomainService {
     private final AdoptionApplicationRepository applications;
     private final AccessControlDomainService accessControl;
     private final NotificationDomainService notifications;
+    private final PetDomainService pets;
 
     private final SecureRandom random = new SecureRandom();
 
@@ -118,7 +125,7 @@ public class FollowupDomainService {
 
     /** Opens work for the organization; a red one also tells every owner and staff member now. */
     private void raise(Row row, FollowupSeverity severity, List<String> reasons) {
-        repository.createAlert(row.followupId(), row.applicationId(), row.organizationId(), severity.name(), reasons);
+        repository.createAlert(row.followupId(), row.applicationId(), row.organizationId(), severity.name(), reasons, null);
         if (severity == FollowupSeverity.RED) {
             notifications.notifyOrganizationHandlers(row.organizationId(), NotificationType.FOLLOWUP_ALERT,
                     "Cần liên hệ người nhận nuôi bé " + row.petName(), "Câu trả lời sau nhận nuôi có điều đáng lo: " + String.join(", ", reasons),
@@ -192,6 +199,106 @@ public class FollowupDomainService {
             throw new ForbiddenException("You cannot read the follow-up of this adoption");
         }
         return repository.findByApplication(applicationId);
+    }
+
+    // ── The adopter asks for help, or can no longer keep the pet ──
+
+    /** "I need support": work for the organization, any time, without waiting for a milestone. */
+    public void requestSupport(UUID applicationId, UUID userId, String note) {
+        AdoptionApplication app = adopterApplication(applicationId, userId);
+        if (!repository.hasUnresolvedAlert(applicationId, "SUPPORT_REQUESTED")) {
+            repository.createAlert(null, applicationId, app.getOrganizationId(), FollowupSeverity.YELLOW.name(),
+                    List.of("SUPPORT_REQUESTED"), blankToNull(note));
+        }
+    }
+
+    /**
+     * "I cannot keep the pet any more": red work, and the organization is told now. No reputation is
+     * lost: a person who is punished for saying so would stay silent and the animal would be abandoned.
+     */
+    public void requestReturn(UUID applicationId, UUID userId, String reasonCode, String note) {
+        AdoptionApplication app = adopterApplication(applicationId, userId);
+        if (repository.hasUnresolvedAlert(applicationId, "RETURN_REQUESTED")) {
+            return;
+        }
+        repository.createAlert(null, applicationId, app.getOrganizationId(), FollowupSeverity.RED.name(),
+                List.of("RETURN_REQUESTED", reasonCode), blankToNull(note));
+        notifications.notifyOrganizationHandlers(app.getOrganizationId(), NotificationType.FOLLOWUP_ALERT,
+                "Người nhận nuôi muốn trả bé lại", "Cần liên hệ sớm để hỗ trợ hoặc sắp xếp đón bé về.",
+                Map.of("applicationId", String.valueOf(applicationId), "petId", String.valueOf(app.getPetId())));
+    }
+
+    /** Turning it off stops every question still to come; turning it on again restores those not yet due. */
+    public void setPreference(UUID applicationId, UUID userId, boolean enabled) {
+        adopterApplication(applicationId, userId);
+        repository.setOptOut(applicationId, !enabled);
+        if (!enabled) {
+            repository.cancelOpen(applicationId);
+        } else if (repository.findOutcome(applicationId).isEmpty()) {
+            repository.reviveFuture(applicationId, LocalDateTime.now());
+        }
+    }
+
+    private AdoptionApplication adopterApplication(UUID applicationId, UUID userId) {
+        AdoptionApplication app = applications.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Adoption application", "id", applicationId));
+        if (!app.getApplicantId().equals(userId)) {
+            throw new ResourceNotFoundException("Adoption application", "id", applicationId);
+        }
+        if (app.getStatus() != AdoptionApplicationStatus.COMPLETED || repository.findOutcome(applicationId).isPresent()) {
+            throw new ConflictException("This adoption is not active", "ADOPTION_NOT_ACTIVE");
+        }
+        return app;
+    }
+
+    // ── How an adoption ended ───────────────────────
+
+    /**
+     * The organization confirms the result. A pet that goes back becomes the organization's again
+     * (FOSTERING) without costing the adopter reputation; a lost or dead pet only changes the pet's
+     * status. Whatever the outcome, no more questions are sent.
+     */
+    public Outcome recordOutcome(UUID applicationId, UUID userId, String type, String reasonCode, String note) {
+        AdoptionApplication app = applications.findById(applicationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Adoption application", "id", applicationId));
+        if (!accessControl.isAdmin(userId) && !repository.isOrganizationHandler(app.getOrganizationId(), userId)) {
+            throw new ForbiddenException("Only the organization that handed the pet over can record the outcome");
+        }
+        if (app.getStatus() != AdoptionApplicationStatus.COMPLETED || repository.findOutcome(applicationId).isPresent()) {
+            throw new ConflictException("This adoption already ended or never completed", "ADOPTION_NOT_ACTIVE");
+        }
+        switch (type) {
+            case "RETURNED_BY_ADOPTER" -> {
+                pets.transferOwnership(app.getPetId(), "ORGANIZATION", app.getOrganizationId(), AcquisitionType.ORG_INTAKE, null);
+                pets.changeStatus(app.getPetId(), PetStatus.FOSTERING);
+            }
+            case "LOST" -> pets.changeStatus(app.getPetId(), PetStatus.LOST);
+            case "DECEASED" -> pets.changeStatus(app.getPetId(), PetStatus.DECEASED);
+            case "REHOMED" -> { }
+            default -> throw new BusinessException("Unknown outcome " + type, "FOLLOWUP_OUTCOME_INVALID");
+        }
+        UUID initiatedBy = "RETURNED_BY_ADOPTER".equals(type) ? app.getApplicantId() : userId;
+        finish(app, type, reasonCode, initiatedBy, note, "RETURNED_BY_ADOPTER".equals(type) ? "RETURNED" : "OTHER");
+        notifications.notifyUsers(List.of(app.getApplicantId()), NotificationType.ADOPTION_RECLAIMED,
+                "Đã ghi nhận kết quả nhận nuôi", "Cảm ơn bạn đã cho bé một mái nhà.",
+                Map.of("applicationId", String.valueOf(applicationId), "petId", String.valueOf(app.getPetId())));
+        return repository.findOutcome(applicationId).orElseThrow();
+    }
+
+    /** A reclaim for a violation is also an outcome, so the numbers cover every way an adoption can end. */
+    public void recordReclaim(AdoptionApplication app, UUID reclaimedBy) {
+        finish(app, "RECLAIMED", "OTHER", reclaimedBy, null, "RETURNED");
+    }
+
+    private void finish(AdoptionApplication app, String type, String reasonCode, UUID initiatedBy, String note, String alertResolution) {
+        LocalDateTime now = LocalDateTime.now();
+        repository.insertOutcome(app.getApplicationId(), app.getPetId(), type, reasonCode, initiatedBy, now, blankToNull(note));
+        repository.cancelOpen(app.getApplicationId());
+        repository.resolveOpenAlerts(app.getApplicationId(), alertResolution, now);
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
     }
 
     // ── The organization's work ─────────────────────

@@ -1,7 +1,11 @@
 package com.uit.petrescueapi.application.port.command;
 
 import com.uit.petrescueapi.application.dto.followup.FollowupAnswersRequestDto;
+import com.uit.petrescueapi.application.dto.followup.AdoptionOutcomeDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupAlertDto;
+import com.uit.petrescueapi.application.dto.followup.RecordOutcomeRequestDto;
+import com.uit.petrescueapi.application.dto.followup.ReturnRequestDto;
+import com.uit.petrescueapi.application.dto.followup.SupportRequestDto;
 import com.uit.petrescueapi.application.dto.followup.FollowupRespondRequestDto;
 import com.uit.petrescueapi.application.dto.followup.UpdateFollowupAlertRequestDto;
 import com.uit.petrescueapi.domain.service.FollowupDomainService;
@@ -22,6 +26,14 @@ public interface FollowupCommandPort {
     void respondWithToken(FollowupRespondRequestDto request);
 
     void respond(UUID followupId, UUID userId, FollowupAnswersRequestDto answers);
+
+    void requestSupport(UUID applicationId, UUID userId, SupportRequestDto request);
+
+    void requestReturn(UUID applicationId, UUID userId, ReturnRequestDto request);
+
+    void setPreference(UUID applicationId, UUID userId, boolean enabled);
+
+    AdoptionOutcomeDto recordOutcome(UUID applicationId, UUID userId, RecordOutcomeRequestDto request);
 
     FollowupAlertDto updateAlert(UUID alertId, UUID userId, UpdateFollowupAlertRequestDto request);
 }

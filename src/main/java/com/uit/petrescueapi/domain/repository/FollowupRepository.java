@@ -57,7 +57,7 @@ public interface FollowupRepository {
 
     Optional<Contact> findContact(UUID userId);
 
-    UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons);
+    UUID createAlert(UUID followupId, UUID applicationId, UUID organizationId, String severity, List<String> reasons, String note);
 
     /** Most urgent first, then oldest. {@code status} null means every status. */
     List<AlertRow> findAlerts(UUID organizationId, String status, int limit);
@@ -65,6 +65,28 @@ public interface FollowupRepository {
     Optional<AlertRow> findAlert(UUID alertId);
 
     void updateAlert(UUID alertId, String status, UUID assignedTo, String note, String resolution, LocalDateTime now);
+
+    /** True while the application has an alert with this reason that nobody has closed. */
+    boolean hasUnresolvedAlert(UUID applicationId, String reason);
+
+    /** Closes every unresolved alert of the application, for example because the pet went back. */
+    void resolveOpenAlerts(UUID applicationId, String resolution, LocalDateTime now);
+
+    /** How an adoption ended. */
+    record Outcome(UUID outcomeId, UUID applicationId, UUID petId, String outcomeType, String reasonCode, UUID initiatedBy,
+                   LocalDateTime occurredAt, Integer daysSinceCompleted, String note) {
+    }
+
+    /** At most one per application: false if it already has one. */
+    boolean insertOutcome(UUID applicationId, UUID petId, String outcomeType, String reasonCode, UUID initiatedBy,
+                          LocalDateTime occurredAt, String note);
+
+    Optional<Outcome> findOutcome(UUID applicationId);
+
+    void setOptOut(UUID applicationId, boolean optOut);
+
+    /** Milestones cancelled earlier that are still in the future go back on the schedule. */
+    int reviveFuture(UUID applicationId, LocalDateTime now);
 
     /** The organization an owner or staff member works for; empty if none. */
     Optional<UUID> findHandlerOrganizationId(UUID userId);
