@@ -31,6 +31,13 @@ public class RescueCaseTriageRepositoryAdapter implements RescueCaseTriageReposi
     }
 
     @Override
+    public int countPhotos(UUID caseId) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM rescue_media WHERE case_id = :id",
+                new MapSqlParameterSource("id", caseId), Integer.class);
+        return count == null ? 0 : count;
+    }
+
+    @Override
     public boolean claim(UUID caseId, int maxAttempts, LocalDateTime staleBefore) {
         // The WHERE of the conflict branch is the whole guard: no row is touched, so nothing is
         // counted as updated, when the case is done, out of attempts or held by a live worker.

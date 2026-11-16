@@ -11,6 +11,9 @@ public interface RescueCaseTriageRepository {
 
     Optional<RescueCaseTriage> findByCaseId(UUID caseId);
 
+    /** Photos attached to the case; the triage rules look for a report without one. */
+    int countPhotos(UUID caseId);
+
     /**
      * Takes the case for one worker: creates the row if there is none, then moves it to PENDING with
      * one more attempt. False when the case is already analysed, out of attempts, or another worker
