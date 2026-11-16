@@ -151,6 +151,21 @@ public class RescueCaseController {
                 petMapper.toDto(commandPort.keepPet(id, request, UUID.fromString(authentication.getName())))));
     }
 
+    @GetMapping("/possible-duplicates")
+    @Operation(summary = "Open cases near a point that may be the same animal",
+            description = "Call before filing a report. Returns at most 5 cases still REPORTED or IN_PROGRESS, " +
+                    "reported within the last hours (default 48, max 168) and within radius metres (default 300, max 2000), " +
+                    "nearest first. species is optional; cases with no species recorded always match. " +
+                    "Advisory only: the caller may still file a new report.")
+    public ResponseEntity<ApiResponse<List<RescueCaseSummaryResponseDto>>> possibleDuplicates(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) Double radius,
+            @RequestParam(required = false) Integer hours) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findPossibleDuplicates(lat, lng, species, radius, hours)));
+    }
+
     @GetMapping
     @Operation(summary = "List all rescue cases (paginated, with optional filters)",
             description = "Unified endpoint for listing rescue cases. status, priority, species and province (code or name) " +

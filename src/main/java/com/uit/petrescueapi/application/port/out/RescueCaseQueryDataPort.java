@@ -26,6 +26,8 @@ public interface RescueCaseQueryDataPort {
 
     Page<RescueCaseSummaryResponseDto> findNearbySummaries(double lat, double lng, double distanceMeters, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
+    java.util.List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, double distanceMeters, String species, int hours, int maxResults);
+
     Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
     // ── Map marker queries (ultra-lightweight, no pagination for fast rendering) ──

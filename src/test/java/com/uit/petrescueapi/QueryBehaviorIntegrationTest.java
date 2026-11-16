@@ -190,6 +190,33 @@ class QueryBehaviorIntegrationTest {
     }
 
     @Test
+    void someoneAboutToReportSeesOpenRecentCasesOfTheSameAnimalNearby() throws Exception {
+        UUID reporter = person();
+        double lat = 11.25, lng = 107.35;
+        UUID sameDog = reportAt(reporter, "Dog", lat, lng);
+        UUID unknownSpecies = reportAt(reporter, null, lat + 0.0005, lng);
+        UUID cat = reportAt(reporter, "Cat", lat, lng);
+        UUID farAway = reportAt(reporter, "Dog", lat + 0.05, lng);
+        UUID lastWeek = reportAt(reporter, "Dog", lat, lng);
+        jdbc.update("UPDATE rescue_cases SET reported_at = now() - interval '5 days' WHERE case_id = ?", lastWeek);
+        UUID closed = reportAt(reporter, "Dog", lat, lng);
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?", closed);
+
+        String body = mvc.perform(get("/api/v1/rescue-cases/possible-duplicates?lat=" + lat + "&lng=" + lng + "&species=dog"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        List<String> ids = JsonPath.read(body, "$.data[*].caseId");
+        assertThat(ids).containsExactly(sameDog.toString(), unknownSpecies.toString());
+        assertThat(ids).doesNotContain(cat.toString(), farAway.toString(), lastWeek.toString(), closed.toString());
+
+        String wider = mvc.perform(get("/api/v1/rescue-cases/possible-duplicates?lat=" + lat + "&lng=" + lng + "&hours=168"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(wider, "$.data[*].caseId"))
+                .contains(sameDog.toString(), cat.toString(), lastWeek.toString())
+                .doesNotContain(farAway.toString(), closed.toString());
+    }
+
+    @Test
     void completionListCostDoesNotGrowWithItsRowsAndNamesTheCase() throws Exception {
         UUID admin = admin();
         for (int i = 0; i < 5; i++) {
@@ -1126,6 +1153,15 @@ class QueryBehaviorIntegrationTest {
                  "locationText":"Cầu Thị Nghè","wardName":"Phường 1","provinceName":"Hồ Chí Minh",
                  "provinceCode":"79","contactPhone":"0900000000"}
                 """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return UUID.fromString(JsonPath.read(body, "$.data.caseId"));
+    }
+
+    private UUID reportAt(UUID reporter, String species, double lat, double lng) throws Exception {
+        String speciesJson = species == null ? "null" : "\"" + species + "\"";
+        String body = call(post("/api/v1/rescue-cases"), reporter, """
+                {"species":%s,"priority":"HIGH","description":"Bị thương","latitude":%s,"longitude":%s,
+                 "locationText":"Ngã tư","provinceName":"Đồng Nai","provinceCode":"75","contactPhone":"0900000000"}
+                """.formatted(speciesJson, lat, lng)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return UUID.fromString(JsonPath.read(body, "$.data.caseId"));
     }
 

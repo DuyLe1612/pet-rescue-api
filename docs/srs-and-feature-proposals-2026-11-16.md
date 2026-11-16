@@ -3,6 +3,7 @@
 - **Ngày:** 16/11/2026
 - **Căn cứ:** `README.md`, `agent/01-scope-da2.md`, `agent/02-plan.md`, `docs/ux-walkthrough-2026-11-11.md`, `docs/fe-api-audit-2026-11-03.md`, danh sách controller và migration V1–V27.
 - **Trạng thái tài liệu:** bản nháp để tinh chỉnh. Mục 5 là đề xuất, chưa phải quyết định.
+- **Đính chính 16/11:** bản đầu dựa trên plan ngày 03/11 và nhánh `fix/query-performance`. Đối chiếu lại với `master` (`fdb7b22`) thì thông báo đơn nhận nuôi, lọc thú theo tỉnh, banner công khai và ghép đôi (V28) **đã có**; trạng thái bên dưới đã sửa theo `master`. `agent/02-plan.md` chưa phản ánh điều này.
 
 ---
 
@@ -68,6 +69,7 @@ Trạng thái: ✅ đã có ở backend · 🔶 một phần · ⬜ chưa có (t
 | FR-RES-06 | Intake: tạo hồ sơ thú từ ca đã cứu, hoặc người cứu giữ thú (`keep-pet`) | M | ✅ |
 | FR-RES-07 | Ẩn SĐT liên hệ, chỉ người nhận/người báo/tổ chức/admin thấy | M | ✅ |
 | FR-RES-08 | AI phân loại ca (khẩn cấp, tình trạng), gắn cờ ca trùng | S | ⬜ |
+| FR-RES-10 | Cảnh báo ca có thể trùng trước khi báo (`GET /rescue-cases/possible-duplicates`: ca còn mở, trong 48 giờ, bán kính 300 m) | S | ✅ (16/11) |
 | FR-RES-09 | Ba loại ca: cứu hộ / lạc / tìm thấy, khớp văn bản | C | ⬜ |
 
 ### 2.3 Thú và nhận nuôi
@@ -75,11 +77,11 @@ Trạng thái: ✅ đã có ở backend · 🔶 một phần · ⬜ chưa có (t
 | ID | Yêu cầu | Ưu tiên | TT |
 | --- | --- | --- | --- |
 | FR-PET-01 | CRUD hồ sơ thú, ảnh, hồ sơ y tế, lịch sử chủ, phân loại loài/giống song ngữ | M | ✅ |
-| FR-PET-02 | Tìm thú nhận nuôi theo loài, tuổi, giới tính, **tỉnh** | M | 🔶 (chưa lọc tỉnh) |
+| FR-PET-02 | Tìm thú nhận nuôi theo loài, tuổi, giới tính, **tỉnh** | M | ✅ |
 | FR-ADO-01 | Nộp đơn nhận nuôi; tổ chức duyệt/từ chối/huỷ; hoàn tất; thu hồi có nhật ký | M | ✅ |
-| FR-ADO-02 | **Thông báo** cho người nộp đơn khi duyệt/từ chối/hoàn tất, và cho tổ chức khi có đơn mới | M | ⬜ (hụt chính) |
-| FR-ADO-03 | Hồ sơ người nhận nuôi (nhà ở, thời gian, trẻ em, thú đang nuôi) | S | ⬜ |
-| FR-ADO-04 | Ghép đôi giải thích được: cảnh báo + 5 tiêu chí + lý do tiếng Việt; vi phạm chỉ cảnh báo, tổ chức quyết định | S | ⬜ |
+| FR-ADO-02 | **Thông báo** cho người nộp đơn khi duyệt/từ chối/hoàn tất, và cho tổ chức khi có đơn mới | M | ✅ |
+| FR-ADO-03 | Hồ sơ người nhận nuôi (nhà ở, thời gian, trẻ em, thú đang nuôi) | S | ✅ |
+| FR-ADO-04 | Ghép đôi giải thích được: cảnh báo + 5 tiêu chí + lý do tiếng Việt; vi phạm chỉ cảnh báo, tổ chức quyết định | S | ✅ |
 | FR-ADO-05 | Theo dõi sau nhận nuôi (ngày 2, tuần 2), tự trả thú không trừ điểm, ghi kết cục | S | ⬜ |
 | FR-ADO-06 | "Thú của tôi": phân biệt thú nhận nuôi và thú tự đăng | S | ⬜ |
 
@@ -130,6 +132,8 @@ Trạng thái: ✅ đã có ở backend · 🔶 một phần · ⬜ chưa có (t
 **Tiêu chí chấm:** (1) có giải quyết một nỗi đau thật của người dùng không; (2) có giúp cứu/nhận nuôi được nhiều thú hơn hoặc ít thất bại hơn không; (3) công sức nhỏ so với tác dụng; (4) dùng được ngay cả khi chưa có tổ chức thật. Độ khó kỹ thuật **không** là tiêu chí.
 
 ### 5.1 Nhóm A — Nên làm ngay (giá trị cao, công sức thấp)
+
+> A1, A2, A3 đã có trên `master`; còn lại A4–A6, chủ yếu là việc frontend.
 
 | # | Tính năng | Vì sao có giá trị thực tế | Công sức |
 | --- | --- | --- | --- |
