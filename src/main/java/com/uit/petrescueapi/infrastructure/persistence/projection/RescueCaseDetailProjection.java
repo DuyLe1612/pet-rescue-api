@@ -25,6 +25,8 @@ public interface RescueCaseDetailProjection {
     UUID getReportedBy();
     UUID getOrganizationId();
     UUID getPetId();
+    String getOrganizationName();
+    String getPetName();
     String getColor();
     String getDescription();
     Double getLocationLat();

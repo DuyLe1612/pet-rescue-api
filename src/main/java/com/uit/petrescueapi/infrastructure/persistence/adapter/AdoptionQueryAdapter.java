@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.adoption.AdoptionResponseDto;
 import com.uit.petrescueapi.application.dto.adoption.AdoptionSummaryResponseDto;
+import com.uit.petrescueapi.application.dto.adoption.ReclaimLogResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.AdoptionQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -49,6 +50,26 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
         return queryRepo.findByOrganizationIdSummaries(organizationId, normalizeStatuses(statuses), search, pageable).map(this::toSummaryDto);
     }
 
+    @Override
+    public Page<ReclaimLogResponseDto> findReclaimLogs(UUID organizationId, Pageable pageable) {
+        return queryRepo.findReclaimLogs(organizationId, pageable).map(p -> ReclaimLogResponseDto.builder()
+                .reclaimId(p.getReclaimId())
+                .applicationId(p.getApplicationId())
+                .petId(p.getPetId())
+                .petName(p.getPetName())
+                .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
+                .userId(p.getUserId())
+                .username(p.getUsername())
+                .reclaimedBy(p.getReclaimedBy())
+                .reclaimedByUsername(p.getReclaimedByUsername())
+                .reason(p.getReason())
+                .proofId(p.getProofId())
+                .reputationDelta(p.getReputationDelta())
+                .reclaimedAt(p.getReclaimedAt())
+                .build());
+    }
+
     // ── Detail (single adoption application) query ──
 
     @Override
@@ -71,7 +92,10 @@ public class AdoptionQueryAdapter implements AdoptionQueryDataPort {
                 .experience(p.getExperience())
                 .liveCondition(p.getLiveCondition())
                 .createdAt(p.getCreatedAt())
+                .applicantId(p.getApplicantId())
                 .applicantUsername(p.getApplicantUsername())
+                .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
                 .readyAt(p.getReadyAt())
                 .build();
     }

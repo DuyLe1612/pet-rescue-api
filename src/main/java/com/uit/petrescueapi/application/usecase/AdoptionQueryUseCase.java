@@ -55,6 +55,12 @@ public class AdoptionQueryUseCase implements AdoptionQueryPort {
     }
 
     @Override
+    public Page<com.uit.petrescueapi.application.dto.adoption.ReclaimLogResponseDto> findReclaimLogs(UUID organizationId, Pageable pageable, UUID requesterId) {
+        requireReclaimLogAccess(organizationId, requesterId);
+        return queryDataPort.findReclaimLogs(organizationId, pageable);
+    }
+
+    @Override
     public void requireReclaimLogAccess(UUID organizationId, UUID requesterId) {
         if (organizationId == null) {
             accessControl.requireAdmin(requesterId);

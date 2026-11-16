@@ -10,6 +10,8 @@ public interface RescueQueueItemProjection {
     String getPriority();
     String getStatus();
     String getDescription();
+    String getLocationText();
+    String getFirstImageUrl();
     String getProvinceName();
     String getWardName();
     Double getLatitude();

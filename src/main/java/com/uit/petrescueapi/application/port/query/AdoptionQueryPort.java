@@ -16,4 +16,7 @@ public interface AdoptionQueryPort {
 
     /** Reclaim logs of one organization for its members; across all organizations for admins only. */
     void requireReclaimLogAccess(UUID organizationId, UUID requesterId);
+
+    /** Checks access like {@link #requireReclaimLogAccess}, then lists the logs with the names they refer to. */
+    Page<com.uit.petrescueapi.application.dto.adoption.ReclaimLogResponseDto> findReclaimLogs(UUID organizationId, Pageable pageable, UUID requesterId);
 }

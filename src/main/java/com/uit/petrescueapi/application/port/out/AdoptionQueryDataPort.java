@@ -23,4 +23,7 @@ public interface AdoptionQueryDataPort {
     Page<AdoptionSummaryResponseDto> findByApplicantIdSummaries(UUID applicantId, List<String> statuses, String search, Pageable pageable);
 
     Page<AdoptionSummaryResponseDto> findByOrganizationIdSummaries(UUID organizationId, List<String> statuses, String search, Pageable pageable);
+
+    /** A null organization means every organization. */
+    Page<com.uit.petrescueapi.application.dto.adoption.ReclaimLogResponseDto> findReclaimLogs(UUID organizationId, Pageable pageable);
 }

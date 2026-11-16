@@ -31,7 +31,7 @@ public class AdoptionSummaryResponseDto {
     @Schema(example = "https://cdn.example.com/pets/buddy-primary.jpg")
     private String petPrimaryImageUrl;
 
-    @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELLED"})
+    @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "CANCELED", "COMPLETED"})
     private String status;
 
     @Schema(example = "i used to have a cat 2 years ago")
@@ -41,6 +41,9 @@ public class AdoptionSummaryResponseDto {
     private String liveCondition;
 
     private LocalDateTime createdAt;
+    private UUID applicantId;
     private String applicantUsername;
+    private UUID organizationId;
+    private String organizationName;
     private LocalDateTime readyAt;
 }

@@ -29,4 +29,9 @@ public class RescueCaseSummaryResponseDto {
     private String locationText;
     @Schema(description = "Only in nearby results")
     private Double distanceMeters;
+    private Double latitude;
+    private Double longitude;
+    private String wardName;
+    private String provinceName;
+    private boolean needsHelp;
 }

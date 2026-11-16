@@ -1,5 +1,6 @@
 package com.uit.petrescueapi.application.usecase;
 
+import com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter;
 import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.domain.entity.RescueCaseClaim;
@@ -56,21 +57,21 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAll(String search, Pageable pageable) {
-        log.debug("Query: find all rescue cases (paginated, search={})", search);
-        return queryDataPort.findAllSummaries(search, pageable);
+    public Page<RescueCaseSummaryResponseDto> findAll(RescueCaseFilter filter, Pageable pageable) {
+        log.debug("Query: find all rescue cases (paginated, filter={})", filter);
+        return queryDataPort.findAllSummaries(filter, pageable);
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, Pageable pageable) {
-        log.debug("Query: find rescue cases nearby ({}, {}) within {} meters", lat, lng, distanceMeters);
-        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, pageable);
+    public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
+        log.debug("Query: find rescue cases nearby ({}, {}) within {} meters, filter={}", lat, lng, distanceMeters, filter);
+        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, filter, pageable);
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, Pageable pageable) {
-        log.debug("Query: find rescue cases within bounding box ({},{}) to ({},{})", minLat, minLng, maxLat, maxLng);
-        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, pageable);
+    public Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
+        log.debug("Query: find rescue cases within bounding box ({},{}) to ({},{}), filter={}", minLat, minLng, maxLat, maxLng, filter);
+        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, filter, pageable);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
