@@ -139,6 +139,9 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  WHERE c.case_id = rc.case_id AND c.status = 'ACTIVE') AS activeClaimCount,
                EXISTS (SELECT 1 FROM rescue_case_claims c
                  WHERE c.case_id = rc.case_id AND c.status = 'ACTIVE' AND c.user_id = CAST(:viewerId AS uuid)) AS viewerHasActiveClaim,
+               (SELECT COUNT(*) FROM rescue_case_flags f WHERE f.case_id = rc.case_id) AS flagCount,
+               EXISTS (SELECT 1 FROM rescue_case_flags f
+                 WHERE f.case_id = rc.case_id AND f.user_id = CAST(:viewerId AS uuid)) AS viewerHasFlagged,
                comp.completion_id AS completionId,
                comp.status      AS completionStatus
         FROM rescue_cases rc

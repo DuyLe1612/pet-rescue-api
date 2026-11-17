@@ -51,6 +51,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -1876,6 +1877,147 @@ class QueryBehaviorIntegrationTest {
     private String applicationId(ResultActions created) throws Exception {
         return JsonPath.read(created.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(),
                 "$.data.applicationId");
+    }
+
+    // ── Case progress updates, community flags, first aid ──
+
+    @Test
+    void theClaimerPostsProgressAndTheReporterHearsAboutIt() throws Exception {
+        UUID reporter = person();
+        UUID claimer = person();
+        UUID caseId = report(reporter);
+        call(post("/api/v1/rescue-cases/" + caseId + "/claim"), claimer, "{\"safetyAcknowledged\":true}").andExpect(status().isOk());
+        UUID photo = permanentMedia(claimer);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), claimer,
+                "{\"note\":\"Đã tới nơi, bé đang ở gầm cầu\",\"mediaIds\":[\"" + photo + "\"]}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.note").value("Đã tới nơi, bé đang ở gầm cầu"))
+                .andExpect(jsonPath("$.data.imageUrls[0]", startsWith("https://cdn.test/")));
+
+        assertThat(notificationTypes(reporter)).contains("RESCUE_CASE_UPDATED");
+        assertThat(notificationTypes(claimer)).doesNotContain("RESCUE_CASE_UPDATED");
+
+        // anyone can follow the case
+        mvc.perform(get("/api/v1/rescue-cases/" + caseId + "/updates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].note").value("Đã tới nơi, bé đang ở gầm cầu"))
+                .andExpect(jsonPath("$.data.content[0].authorId").value(claimer.toString()))
+                .andExpect(jsonPath("$.data.content[0].authorUsername", startsWith("u-")))
+                .andExpect(jsonPath("$.data.content[0].imageUrls[0]", startsWith("https://cdn.test/")));
+    }
+
+    @Test
+    void onlyPeopleWorkingOnTheCasePostProgress() throws Exception {
+        UUID reporter = person();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), person(), "{\"note\":\"Tôi đi ngang qua\"}")
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/rescue-cases/" + caseId + "/updates")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\" \"}")
+                .andExpect(status().isBadRequest());
+        // someone else's photo
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter,
+                "{\"note\":\"Ảnh mới\",\"mediaIds\":[\"" + permanentMedia(person()) + "\"]}")
+                .andExpect(status().isForbidden());
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\"Bé vẫn còn ở đây\"}")
+                .andExpect(status().isCreated());
+        call(patch("/api/v1/rescue-cases/" + caseId + "/status"), reporter, "{\"status\":\"CLOSED\",\"reason\":\"Đã xong\"}")
+                .andExpect(status().isOk());
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\"Thêm nữa\"}")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void threeFlagsAlertTheReporterAndAdminsOnceButNeverCloseTheCase() throws Exception {
+        UUID reporter = person();
+        UUID admin = admin();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), reporter, "{\"reason\":\"FALSE_REPORT\"}")
+                .andExpect(status().isForbidden());
+
+        UUID first = person();
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), first, "{\"reason\":\"ALREADY_HANDLED\",\"note\":\"Sáng nay có người đón\"}")
+                .andExpect(status().isOk());
+        // flagging again changes the reason instead of counting twice
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), first, "{\"reason\":\"FALSE_REPORT\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(1));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"ALREADY_HANDLED\"}").andExpect(status().isOk());
+        assertThat(notificationTypes(reporter)).doesNotContain("RESCUE_CASE_FLAGGED");
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"DUPLICATE\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(3));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"DUPLICATE\"}").andExpect(status().isOk());
+
+        assertThat(notificationTypes(reporter)).containsOnlyOnce("RESCUE_CASE_FLAGGED");
+        assertThat(notificationTypes(admin)).containsOnlyOnce("RESCUE_CASE_FLAGGED");
+        assertThat(jdbc.queryForObject("SELECT status FROM rescue_cases WHERE case_id = ?", String.class, caseId)).isEqualTo("REPORTED");
+
+        call(get("/api/v1/rescue-cases/" + caseId), first)
+                .andExpect(jsonPath("$.data.flagCount").value(4))
+                .andExpect(jsonPath("$.data.viewerHasFlagged").value(true));
+
+        String flagged = mvc.perform(get("/api/v1/admin/rescue-cases/flagged?pageSize=100").with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String row = "$.data.content[?(@.caseId=='" + caseId + "')]";
+        assertThat(JsonPath.<List<Number>>read(flagged, row + ".flagCount")).singleElement().satisfies(n -> assertThat(n.intValue()).isEqualTo(4));
+        assertThat(JsonPath.<List<Number>>read(flagged, row + ".duplicateCount")).singleElement().satisfies(n -> assertThat(n.intValue()).isEqualTo(2));
+        call(get("/api/v1/admin/rescue-cases/flagged"), reporter).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aFlagCanBeWithdrawnAndOnlyOpenCasesTakeFlags() throws Exception {
+        UUID reporter = person();
+        UUID flagger = person();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"FALSE_REPORT\"}").andExpect(status().isOk());
+        call(delete("/api/v1/rescue-cases/" + caseId + "/flags/me"), flagger)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(0));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"NOT_A_REASON\"}").andExpect(status().isBadRequest());
+
+        call(patch("/api/v1/rescue-cases/" + caseId + "/status"), reporter, "{\"status\":\"CLOSED\",\"reason\":\"Đã xong\"}").andExpect(status().isOk());
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"FALSE_REPORT\"}").andExpect(status().isConflict());
+    }
+
+    @Test
+    void firstAidGuidesArePublicAndWarnWhatNotToDo() throws Exception {
+        String body = mvc.perform(get("/api/v1/rescue-cases/first-aid"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        List<String> codes = JsonPath.read(body, "$.data.guides[*].code");
+        assertThat(codes).contains("BLEEDING", "POISONING", "HEATSTROKE", "NEWBORN_ALONE");
+        assertThat(JsonPath.<List<List<String>>>read(body, "$.data.guides[*].steps")).allSatisfy(steps -> assertThat(steps).isNotEmpty());
+        assertThat(JsonPath.<List<List<String>>>read(body, "$.data.guides[*].doNot")).allSatisfy(steps -> assertThat(steps).isNotEmpty());
+        assertThat(JsonPath.<String>read(body, "$.data.disclaimer")).contains("bác sĩ thú y");
+    }
+
+    @Test
+    void theOrganizationMapFindsVetsInOneProvince() throws Exception {
+        UUID hcmVet = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID hanoiVet = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID hcmShelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET type = 'VET_CENTER', province_code = '79', province_name = 'Hồ Chí Minh', location = ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326) WHERE organization_id = ?", hcmVet);
+        jdbc.update("UPDATE organizations SET type = 'VET_CENTER', province_code = '01', province_name = 'Hà Nội', location = ST_SetSRID(ST_MakePoint(105.8, 21.0), 4326) WHERE organization_id = ?", hanoiVet);
+        jdbc.update("UPDATE organizations SET province_code = '79', province_name = 'Hồ Chí Minh', location = ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326) WHERE organization_id = ?", hcmShelter);
+
+        for (String province : List.of("79", "hồ chí minh")) {
+            mvc.perform(get("/api/v1/organizations/map/markers?type=VET_CENTER&province=" + province))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[*].organizationId", hasItem(hcmVet.toString())))
+                    .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hanoiVet.toString()))))
+                    .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hcmShelter.toString()))));
+        }
+        mvc.perform(get("/api/v1/organizations/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107&province=01"))
+                .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hcmVet.toString()))));
     }
 
     // ── Helpers ─────────────────────────────────────

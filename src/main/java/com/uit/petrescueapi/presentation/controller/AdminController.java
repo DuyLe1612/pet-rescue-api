@@ -49,6 +49,17 @@ public class AdminController {
     private final PetQueryDataPort petQueryDataPort;
     private final PasswordEncoder passwordEncoder;
     private final UserReputationJpaRepository userReputationJpaRepo;
+    private final com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCommunityQueryPort;
+
+    @GetMapping("/rescue-cases/flagged")
+    @Operation(summary = "Open rescue cases the community flagged",
+            description = "Most flagged first, with counts by reason (false report, already handled, duplicate).")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.presentation.dto.PageResponse<com.uit.petrescueapi.application.dto.rescue.FlaggedRescueCaseDto>>> getFlaggedRescueCases(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return ResponseEntity.ok(ApiResponse.ok(com.uit.petrescueapi.presentation.dto.PageResponse.from(
+                rescueCommunityQueryPort.findFlaggedCases(org.springframework.data.domain.PageRequest.of(page, pageSize)))));
+    }
 
 
     @PostMapping("/accounts")

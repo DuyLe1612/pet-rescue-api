@@ -87,6 +87,9 @@ class SecurityRulesWebTest {
     @MockitoBean UserCommandPort userCommandPort;
     @MockitoBean UserQueryPort userQueryPort;
     @MockitoBean UserWebMapper userMapper;
+    @MockitoBean com.uit.petrescueapi.application.port.command.RescueCaseCommunityPort rescueCaseCommunityPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCaseCommunityQueryPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.FirstAidQueryPort firstAidQueryPort;
 
     private final UUID id = UUID.randomUUID();
 

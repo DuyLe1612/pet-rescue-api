@@ -37,6 +37,8 @@ public interface RescueCaseDetailProjection {
     Boolean getNeedsHelp();
     Long getActiveClaimCount();
     Boolean getViewerHasActiveClaim();
+    Long getFlagCount();
+    Boolean getViewerHasFlagged();
     UUID getCompletionId();
     String getCompletionStatus();
 }

@@ -263,6 +263,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .activeClaimCount(p.getActiveClaimCount() == null ? 0 : p.getActiveClaimCount().intValue())
                 .viewerIsReporter(viewerId != null && viewerId.equals(p.getReportedBy()))
                 .viewerHasActiveClaim(Boolean.TRUE.equals(p.getViewerHasActiveClaim()))
+                .flagCount(p.getFlagCount() == null ? 0 : p.getFlagCount().intValue())
+                .viewerHasFlagged(Boolean.TRUE.equals(p.getViewerHasFlagged()))
                 .completionId(p.getCompletionId())
                 .completionStatus(p.getCompletionStatus())
                 .build();

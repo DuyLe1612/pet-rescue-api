@@ -45,6 +45,9 @@ public class RescueCaseResponseDto {
     private int activeClaimCount;
     private boolean viewerIsReporter;
     private boolean viewerHasActiveClaim;
+    @Schema(description = "People who flagged the case as false, handled or a duplicate")
+    private int flagCount;
+    private boolean viewerHasFlagged;
     private UUID completionId;
     private String completionStatus;
 
