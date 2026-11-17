@@ -72,6 +72,36 @@ public class EmailService {
         }
     }
 
+    /** The follow-up question after an adoption, with the link that opens the form without signing in. */
+    @Async
+    public void sendFollowupEmail(String to, String name, String petName, String milestone, String link) {
+        String subject = "Bé " + petName + " thế nào rồi?";
+        String body = """
+                <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6;">
+                  <h2>Chào %s,</h2>
+                  <p>Chúng mình muốn biết bé <b>%s</b> đang ra sao. Chỉ mất chưa đến một phút.</p>
+                  <p><a href="%s" style="display:inline-block;padding:12px 24px;background:#4CAF50;color:#fff;text-decoration:none;border-radius:4px;">Trả lời nhanh</a></p>
+                  <p>Nếu cần hỗ trợ, bạn có thể nói ngay trong câu trả lời: tổ chức sẽ liên hệ với bạn.</p>
+                  <br/>
+                  <p style="color:#888;">— Pet Rescue</p>
+                </body>
+                </html>
+                """.formatted(name, petName, link);
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress);
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(body, true);
+            mailSender.send(message);
+            log.info("Follow-up email ({}) sent", milestone);
+        } catch (MessagingException e) {
+            log.error("Failed to send the follow-up email: {}", e.getMessage());
+        }
+    }
+
     /**
      * Send password reset email asynchronously.
      */

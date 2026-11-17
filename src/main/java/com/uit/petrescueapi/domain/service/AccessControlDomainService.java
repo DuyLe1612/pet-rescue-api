@@ -76,6 +76,16 @@ public class AccessControlDomainService {
     }
 
     /**
+     * Reading what the AI made of a case: admin, or staff who can handle it. Not the reporter: the
+     * label is a hint for the people who decide, and a wrong one should not reach the reporter as a verdict.
+     */
+    public void requireCaseHandler(RescueCase rescueCase, UUID requesterId) {
+        if (!canHandleCase(rescueCase, requesterId)) {
+            throw new ForbiddenException("Only the staff handling this rescue case can read its triage");
+        }
+    }
+
+    /**
      * Changing status directly: only admins move a case freely. Everyone else may only close it,
      * because IN_PROGRESS comes from claiming and RESCUED from an approved completion report.
      */
@@ -197,7 +207,7 @@ public class AccessControlDomainService {
         }
     }
 
-    private boolean canManagePet(UUID petId, UUID requesterId) {
+    public boolean canManagePet(UUID petId, UUID requesterId) {
         if (requesterId == null) {
             return false;
         }

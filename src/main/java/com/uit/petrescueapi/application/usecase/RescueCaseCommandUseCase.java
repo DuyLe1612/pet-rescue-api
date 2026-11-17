@@ -53,6 +53,7 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     private final PetDomainService petDomainService;
     private final MediaQueryPort mediaQueryPort;
     private final ApplicationEventPublisher events;
+    private final com.uit.petrescueapi.domain.service.LostAndFoundDomainService lostAndFound;
     private final RescueCaseMediaRepository rescueCaseMediaRepository;
     private final RescueCompletionMediaRepository rescueCompletionMediaRepository;
 
@@ -66,10 +67,14 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
         RescueCase rescueCase = buildFromDto(cmd);
         rescueCase.setCaseId(caseId);
         rescueCase.setReportedBy(reporterId);
+        applyType(rescueCase, cmd.getCaseType());
 
         RescueCase created = domainService.report(rescueCase);
 
         attachCaseMedia(caseId, cmd.getMediaIds());
+
+        // After the photos are attached, so the triage sees them. Nothing here waits for the AI.
+        events.publishEvent(new com.uit.petrescueapi.domain.event.RescueCaseReportedEvent(caseId));
 
         return created;
     }
@@ -95,7 +100,11 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
         if (newStatus == RescueCaseStatus.CLOSED && reason == null && !accessControl.isAdmin(requesterId)) {
             throw new BusinessException("A reason is required to close a case", "RESCUE_CLOSE_REASON_REQUIRED");
         }
-        return domainService.changeStatus(caseId, newStatus, reason, requesterId);
+        RescueCase changed = domainService.changeStatus(caseId, newStatus, reason, requesterId);
+        if (newStatus == RescueCaseStatus.CLOSED) {
+            lostAndFound.onLostCaseClosed(caseId);    // the owner found the pet another way
+        }
+        return changed;
     }
 
     @Override
@@ -265,8 +274,37 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
         }
     }
 
+    /** RESCUE unless said otherwise; a FOUND report must say where the animal is now. */
+    static void applyType(RescueCase rescueCase, com.uit.petrescueapi.domain.valueobject.RescueCaseType requested) {
+        var type = requested == null ? com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE : requested;
+        rescueCase.setCaseType(type);
+        switch (type) {
+            case RESCUE -> {
+                rescueCase.setHoldingStatus(null);
+                rescueCase.setLastSeenAt(null);
+            }
+            case LOST -> rescueCase.setHoldingStatus(null);
+            case FOUND -> {
+                if (rescueCase.getHoldingStatus() == null) {
+                    throw new BusinessException("Say where the found animal is now: ON_STREET, AT_HOME or AT_ORGANIZATION",
+                            "FOUND_HOLDING_STATUS_REQUIRED");
+                }
+                rescueCase.setLastSeenAt(null);
+            }
+        }
+        if (type != com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE && rescueCase.getPriority() == null) {
+            rescueCase.setPriority(com.uit.petrescueapi.domain.valueobject.RescuePriority.NORMAL);
+        }
+        if (rescueCase.getLastSeenAt() != null && rescueCase.getLastSeenAt().isAfter(java.time.LocalDateTime.now().plusMinutes(5))) {
+            throw new BusinessException("lastSeenAt cannot be in the future", "LAST_SEEN_IN_FUTURE");
+        }
+    }
+
     private RescueCase buildFromDto(CreateRescueCaseRequestDto cmd) {
         return RescueCase.builder()
+                .holdingStatus(cmd.getHoldingStatus())
+                .lastSeenAt(cmd.getLastSeenAt())
+                .distinctiveMarks(cmd.getDistinctiveMarks())
                 .species(cmd.getSpecies())
                 .color(cmd.getColor())
                 .size(cmd.getSize())

@@ -22,11 +22,11 @@ public interface OrganizationQueryDataPort {
     Optional<OrganizationResponseDto> findById(UUID id);
 
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);
-    List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types);
+    List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types, String province);
     
     Page<OrganizationSummaryResponseDto> findWithinBoundingBoxSummaries(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, String search, Pageable pageable);
 
-    List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types);
+    List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types, String province);
 
     OrganizationWithRoleResponseDto findMyOrganization(UUID userId);
 }

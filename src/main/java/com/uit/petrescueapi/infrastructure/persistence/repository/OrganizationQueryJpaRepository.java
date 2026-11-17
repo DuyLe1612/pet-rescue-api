@@ -89,11 +89,14 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                         AND o.location IS NOT NULL
                                                         AND o.status IN (:statuses)
                                                         AND o.type IN (:types)
+                                                        AND (CAST(:province AS VARCHAR) IS NULL OR o.province_code = CAST(:province AS VARCHAR)
+                                                             OR LOWER(o.province_name) = LOWER(CAST(:province AS VARCHAR)))
                                                 ORDER BY o.created_at DESC
                                                 LIMIT 500
                                                 """, nativeQuery = true)
                 List<OrganizationMapMarkerProjection> findMapMarkers(@Param("statuses") List<String> statuses,
-                                                                                                                                                                                                                                 @Param("types") List<String> types);
+                                                                                                                                                                                                                                 @Param("types") List<String> types,
+                        @Param("province") String province);
 
                 @Query(value = """
                                                 SELECT o.organization_id AS organizationId,
@@ -150,6 +153,8 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                         AND ST_Within(o.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
                                                         AND o.status IN (:statuses)
                                                         AND o.type IN (:types)
+                                                        AND (CAST(:province AS VARCHAR) IS NULL OR o.province_code = CAST(:province AS VARCHAR)
+                                                             OR LOWER(o.province_name) = LOWER(CAST(:province AS VARCHAR)))
                                                 ORDER BY o.created_at DESC
                                                 LIMIT 500
                                                 """,
@@ -159,5 +164,6 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                                                                                                                                                                                                                          @Param("maxLat") double maxLat,
                                                                                                                                                                                                                                                          @Param("maxLng") double maxLng,
                                                                                                                                                                                                                                                          @Param("statuses") List<String> statuses,
-                                                                                                                                                                                                                                                         @Param("types") List<String> types);
+                                                                                                                                                                                                                                                         @Param("types") List<String> types,
+                        @Param("province") String province);
 }

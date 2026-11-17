@@ -33,4 +33,17 @@ public class RescueQueueItemDto {
     /** Already rescued by someone who wants to hand the animal to an organization. */
     private boolean awaitingHandover;
     private long activeClaimCount;
+
+    // ── What the AI triage found, for staff. Never replaces what the reporter wrote. ──
+
+    @io.swagger.v3.oas.annotations.media.Schema(description = "The higher of the reporter's priority and the model's: the queue is sorted by it. The model can only raise a case.")
+    private RescuePriority effectivePriority;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "What the model made of the report; null when the AI is off, pending or failed")
+    private RescuePriority aiUrgency;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Short condition summary from the model, in English")
+    private String aiSummary;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "PENDING, ANALYZED, FAILED, or null when no triage was ever started", allowableValues = {"PENDING", "ANALYZED", "FAILED"})
+    private String triageStatus;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Facts the report lacks: PHOTO, DESCRIPTION, SPECIES, LOCATION. Empty when the AI is off.")
+    private java.util.List<String> missingFields;
 }

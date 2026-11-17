@@ -170,6 +170,7 @@ public class PetCommandUseCase implements PetCommandPort {
                             .ownerType("ORGANIZATION")
                             .ownerId(organizationId)
                             .caretakerUserId(userId)
+                            .acquisitionType(com.uit.petrescueapi.domain.valueobject.AcquisitionType.ORG_INTAKE)
                             .build()
             );
         }
@@ -297,6 +298,12 @@ public class PetCommandUseCase implements PetCommandPort {
                 id,
                 newStatus
         );
+    }
+
+    @Override
+    public Pet changeVisibility(UUID id, com.uit.petrescueapi.domain.valueobject.PetVisibility visibility, UUID requesterId) {
+        accessControl.requirePetManager(id, requesterId);
+        return petDomainService.changeVisibility(id, visibility);
     }
 
     @Override

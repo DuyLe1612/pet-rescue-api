@@ -20,4 +20,11 @@ public interface RescueQueueItemProjection {
     boolean getNeedsHelp();
     boolean getAwaitingHandover();
     long getActiveClaimCount();
+    /** Only from a finished triage. */
+    String getAiUrgency();
+    String getAiSummary();
+    /** PENDING, ANALYZED or FAILED; null when the case was never triaged. */
+    String getTriageStatus();
+    /** Comma separated, only from a finished triage. */
+    String getMissingFields();
 }

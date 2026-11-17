@@ -241,23 +241,25 @@ public class OrganizationController {
     }
 
     @GetMapping("/map/markers")
-    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed.")
+    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed. "
+                    + "province is a province code or name. Use type=VET_CENTER&province=79 to list vets of one province.")
     public ResponseEntity<ApiResponse<List<OrganizationMapMarkerDto>>> getMapMarkers(
             @RequestParam(required = false) Double minLat,
             @RequestParam(required = false) Double minLng,
             @RequestParam(required = false) Double maxLat,
             @RequestParam(required = false) Double maxLng,
             @RequestParam(required = false) List<String> status,
-            @RequestParam(required = false) List<String> type) {
+            @RequestParam(required = false) List<String> type,
+            @RequestParam(required = false) String province) {
 
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
         boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
 
         if (hasBbox) {
-            return ResponseEntity.ok(ApiResponse.ok(queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, type)));
+            return ResponseEntity.ok(ApiResponse.ok(queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, type, province)));
         }
 
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type)));
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type, province)));
     }
 
     @GetMapping("/map/bounding-box")
