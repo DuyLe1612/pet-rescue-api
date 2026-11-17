@@ -55,6 +55,15 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     }
 
     @Override
+    public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(
+            double lat, double lng, double distanceMeters, String species, int hours, int maxResults) {
+
+        return queryRepo.findPossibleDuplicates(lng, lat, distanceMeters, species, hours, maxResults).stream()
+                .map(this::toSummaryDto)
+                .toList();
+    }
+
+    @Override
     public Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(
             double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 

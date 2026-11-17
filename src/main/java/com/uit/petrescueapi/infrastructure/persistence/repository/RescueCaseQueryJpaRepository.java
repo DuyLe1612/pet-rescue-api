@@ -196,6 +196,49 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
+    // ── Possible duplicates of a report about to be filed ──
+
+    /**
+     * Open cases reported recently near a point. A case with no species still matches, because
+     * the earlier reporter may not have known what the animal was.
+     */
+    @Query(value = """
+        SELECT rc.case_id AS caseId,
+               rc.case_code AS caseCode,
+               rc.species AS species,
+               rc.priority AS priority,
+               rc.status AS status,
+               (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
+               rc.location_text AS locationText,
+               u.username AS reporterUsername,
+               (
+                 SELECT mf.public_id
+                 FROM rescue_media rm
+                 JOIN media_files mf ON mf.media_id = rm.media_id
+                 WHERE rm.case_id = rc.case_id
+                 ORDER BY mf.created_at ASC
+                 LIMIT 1
+               ) AS firstImageUrl,
+               ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+        FROM rescue_cases rc
+        LEFT JOIN users u ON rc.reported_by = u.user_id
+        WHERE rc.is_deleted = false
+          AND rc.status IN ('REPORTED', 'IN_PROGRESS')
+          AND rc.reported_at >= now() - make_interval(hours => :hours)
+          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (CAST(:species AS VARCHAR) IS NULL OR rc.species IS NULL
+               OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+        ORDER BY distance, rc.reported_at DESC
+        LIMIT :maxResults
+    """, nativeQuery = true)
+    List<RescueCaseSummaryProjection> findPossibleDuplicates(
+            @Param("lng") double lng,
+            @Param("lat") double lat,
+            @Param("distanceMeters") double distanceMeters,
+            @Param("species") String species,
+            @Param("hours") int hours,
+            @Param("maxResults") int maxResults);
+
     // ── Within bounding box (PostGIS spatial query) ──
 
     @Query(value = """
