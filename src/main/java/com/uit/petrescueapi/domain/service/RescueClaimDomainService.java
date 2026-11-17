@@ -88,6 +88,7 @@ public class RescueClaimDomainService {
 
     public RescueCaseClaim claim(UUID caseId, UUID userId, boolean safetyAcknowledged) {
         RescueCase rescueCase = lockCase(caseId);
+        RescueCaseDomainService.requireRescueType(rescueCase);
         Optional<UUID> organizationId = handlerOrganization(userId);
 
         if (organizationId.isPresent() && rescueCase.getStatus() == RescueCaseStatus.RESCUED) {

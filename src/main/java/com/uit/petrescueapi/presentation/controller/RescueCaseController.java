@@ -4,6 +4,9 @@ import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
 import com.uit.petrescueapi.application.dto.pet.PetResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.*;
 import com.uit.petrescueapi.application.port.command.RescueCaseCommandPort;
+import com.uit.petrescueapi.application.port.command.RescueCaseCommunityPort;
+import com.uit.petrescueapi.application.port.query.FirstAidQueryPort;
+import com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort;
 import com.uit.petrescueapi.application.port.query.RescueCaseQueryPort;
 import com.uit.petrescueapi.domain.entity.RescueCaseCompletion;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
@@ -51,6 +54,60 @@ public class RescueCaseController {
     private final RescueCaseWebMapper mapper;
     private final PetWebMapper petMapper;
     private final com.uit.petrescueapi.application.port.command.RescueCaseSharePort sharePort;
+    private final RescueCaseCommunityPort communityPort;
+    private final com.uit.petrescueapi.application.port.command.LostAndFoundPort lostAndFoundPort;
+    private final RescueCaseCommunityQueryPort communityQueryPort;
+    private final FirstAidQueryPort firstAidQueryPort;
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // FIRST AID, PROGRESS NOTES, COMMUNITY FLAGS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @GetMapping("/first-aid")
+    @Operation(summary = "First aid guides to show while reporting a case",
+            description = "Static Vietnamese guidance by situation: urgent signs, steps, and what not to do. Not AI generated. "
+                    + "For vets nearby use GET /organizations/map/markers?type=VET_CENTER&province=...")
+    public ResponseEntity<ApiResponse<FirstAidGuidesDto>> firstAid() {
+        return ResponseEntity.ok(ApiResponse.ok(firstAidQueryPort.findGuides()));
+    }
+
+    @PostMapping("/{id}/updates")
+    @Operation(summary = "Post a progress note on a case",
+            description = "For the reporter, anyone with an active claim, the handling organization's staff and admins. "
+                    + "Up to 5 of your own photos. Not on a CLOSED case (409). The reporter and active claimers are notified.")
+    public ResponseEntity<ApiResponse<RescueCaseUpdateResponseDto>> postUpdate(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateRescueCaseUpdateRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                communityPort.postUpdate(id, request, UUID.fromString(authentication.getName()))));
+    }
+
+    @GetMapping("/{id}/updates")
+    @Operation(summary = "Progress notes of a case, newest first")
+    public ResponseEntity<ApiResponse<PageResponse<RescueCaseUpdateResponseDto>>> getUpdates(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize) {
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(communityQueryPort.findUpdates(id, PageRequest.of(page, pageSize)))));
+    }
+
+    @PostMapping("/{id}/flags")
+    @Operation(summary = "Say an open case is false, already handled, or a duplicate",
+            description = "Anyone signed in except the reporter; one flag per person, flagging again replaces the reason. "
+                    + "From 3 people the reporter and admins are told once. A flag never closes the case.")
+    public ResponseEntity<ApiResponse<RescueCaseFlagSummaryDto>> flag(
+            @PathVariable UUID id,
+            @Valid @RequestBody FlagRescueCaseRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(communityPort.flag(id, request, UUID.fromString(authentication.getName()))));
+    }
+
+    @DeleteMapping("/{id}/flags/me")
+    @Operation(summary = "Withdraw my flag")
+    public ResponseEntity<ApiResponse<RescueCaseFlagSummaryDto>> unflag(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(communityPort.unflag(id, UUID.fromString(authentication.getName()))));
+    }
 
     @PostMapping
     @Operation(summary = "Report a new rescue case",
@@ -136,6 +193,15 @@ public class RescueCaseController {
         return ResponseEntity.ok(ApiResponse.ok(queryPort.findClaimsOfCase(id, viewerId(authentication))));
     }
 
+    @GetMapping("/{id}/triage")
+    @Operation(summary = "What the AI made of this case",
+            description = "For staff who can handle the case, and admins. The urgency the model found, a short condition summary, "
+                    + "the species and area it normalised, and the facts the report lacks. It never replaces the report: "
+                    + "effectivePriority is the higher of the reporter's priority and the model's.")
+    public ResponseEntity<ApiResponse<RescueTriageResponseDto>> getTriage(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findTriage(id, viewerId(authentication))));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // AFTER THE RESCUE
     // ══════════════════════════════════════════════════════════════════════════
@@ -149,6 +215,47 @@ public class RescueCaseController {
             Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
                 petMapper.toDto(commandPort.intake(id, request, UUID.fromString(authentication.getName())))));
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // LOST AND FOUND
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @GetMapping("/{id}/matches")
+    @Operation(summary = "Cases that may be the same animal",
+            description = "For a LOST case: found animals and rescues nearby. For a FOUND or RESCUE case: lost pets nearby. "
+                    + "Scored by distance, species, colour and marks, without photos or AI. For the reporter, handlers and admins.")
+    public ResponseEntity<ApiResponse<List<CaseMatchResponseDto>>> getMatches(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(lostAndFoundPort.findMatches(id, viewerId(authentication))));
+    }
+
+    @PostMapping("/{id}/matches/{suggestionId}/confirm")
+    @Operation(summary = "The owner says this is their pet",
+            description = "Only on the LOST case, by its reporter. The lost case and a found case close as REUNITED and point at "
+                    + "each other; a rescue case only records the link. A pet reported lost from its profile gets its status back.")
+    public ResponseEntity<ApiResponse<RescueCaseResponseDto>> confirmMatch(
+            @PathVariable UUID id, @PathVariable UUID suggestionId, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(
+                lostAndFoundPort.confirmMatch(id, suggestionId, UUID.fromString(authentication.getName())))));
+    }
+
+    @PostMapping("/{id}/matches/{suggestionId}/reject")
+    @Operation(summary = "The owner says this is not their pet")
+    public ResponseEntity<ApiResponse<Void>> rejectMatch(
+            @PathVariable UUID id, @PathVariable UUID suggestionId, Authentication authentication) {
+        lostAndFoundPort.rejectMatch(id, suggestionId, UUID.fromString(authentication.getName()));
+        return ResponseEntity.ok(ApiResponse.ok(null, "Suggestion rejected"));
+    }
+
+    @PostMapping("/{id}/convert-to-rescue")
+    @Operation(summary = "Turn a found animal into a rescue case",
+            description = "When it is hurt or the finder cannot keep it. Only FOUND cases; for the reporter, handlers and admins.")
+    public ResponseEntity<ApiResponse<RescueCaseResponseDto>> convertToRescue(
+            @PathVariable UUID id,
+            @RequestBody(required = false) ConvertToRescueRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(
+                lostAndFoundPort.convertToRescue(id, request, UUID.fromString(authentication.getName())))));
     }
 
     @PostMapping("/{id}/keep-pet")
@@ -196,6 +303,7 @@ public class RescueCaseController {
             @RequestParam(required = false) List<RescuePriority> priority,
             @RequestParam(required = false) String species,
             @RequestParam(required = false) String province,
+            @RequestParam(required = false) List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> type,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) Double distance,
@@ -204,7 +312,7 @@ public class RescueCaseController {
             @RequestParam(required = false) Double maxLat,
             @RequestParam(required = false) Double maxLng) {
 
-        RescueCaseFilter filter = new RescueCaseFilter(status, priority, species, province);
+        RescueCaseFilter filter = new RescueCaseFilter(status, priority, species, province).withTypes(type);
         boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
         boolean hasPoint = GeoParams.hasPoint(lat, lng, distance);
 
@@ -234,7 +342,9 @@ public class RescueCaseController {
 
     @GetMapping("/map/markers")
     @Operation(summary = "Get map markers in bounding box",
-            description = "Ultra-lightweight endpoint for map rendering. Returns up to 500 markers with minimal data (~100 bytes each).")
+            description = "Ultra-lightweight endpoint for map rendering. Returns up to 500 markers with minimal data (~100 bytes each). "
+                    + "type: RESCUE, LOST, FOUND (default all). A LOST case, or a FOUND animal kept at home, is placed on a "
+                    + "fixed ~300 m grid; locationBlurMeters says so and the client should draw a circle.")
     public ResponseEntity<ApiResponse<List<RescueMapMarkerDto>>> getMapMarkers(
             @RequestParam(required = false) Double minLat,
             @RequestParam(required = false) Double minLng,
@@ -242,20 +352,22 @@ public class RescueCaseController {
             @RequestParam(required = false) Double maxLng,
             @RequestParam(required = false) List<RescueCaseStatus> status,
             @RequestParam(required = false) List<RescuePriority> priority,
-            @RequestParam(required = false) String species) {
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> type) {
 
         List<RescueMapMarkerDto> markers;
         boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
 
         if (hasBbox) {
-            if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null) {
+            if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null
+                    && (type == null || type.isEmpty())) {
                 markers = queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng);
             } else {
-                markers = queryPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);
+                markers = queryPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species, type);
             }
         } else {
             // no bbox provided — fall back to global map feed limited to 500
-            markers = queryPort.findMapMarkers(status, priority, species);
+            markers = queryPort.findMapMarkers(status, priority, species, type);
         }
 
         return ResponseEntity.ok(ApiResponse.ok(markers));

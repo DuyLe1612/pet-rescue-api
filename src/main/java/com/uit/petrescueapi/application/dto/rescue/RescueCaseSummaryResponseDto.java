@@ -18,6 +18,10 @@ import java.util.UUID;
 public class RescueCaseSummaryResponseDto {
     private UUID caseId;
     private String caseCode;
+    @Schema(example = "RESCUE", allowableValues = {"RESCUE", "LOST", "FOUND"})
+    private String caseType;
+    @Schema(description = "Set when latitude and longitude are moved by up to this many metres")
+    private Integer locationBlurMeters;
     private String species;
     @Schema(description = "Priority level", example = "HIGH")
     private RescuePriority priority;

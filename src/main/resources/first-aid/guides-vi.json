@@ -1,0 +1,116 @@
+{
+  "disclaimer": "Đây là hướng dẫn chung khi chờ trợ giúp, không thay thế bác sĩ thú y. Hãy gọi hoặc đưa thú tới bác sĩ thú y gần nhất càng sớm càng tốt. Luôn giữ an toàn cho bản thân trước.",
+  "guides": [
+    {
+      "code": "HIT_BY_VEHICLE",
+      "title": "Bị xe tông, nghi gãy xương",
+      "urgentSigns": ["Khó thở", "Không đứng dậy được", "Lợi nhợt nhạt hoặc tím", "Chảy máu không ngừng"],
+      "steps": [
+        "Kiểm tra xe cộ xung quanh, chỉ tiếp cận khi bạn an toàn.",
+        "Tiến lại chậm, nói nhỏ; thú đau có thể cắn dù vốn hiền.",
+        "Phủ khăn hoặc áo lên người thú để giữ ấm và giúp thú bớt hoảng.",
+        "Chuyển thú lên một tấm phẳng, cứng (bìa các-tông, tấm ván), giữ đầu và lưng thẳng hàng, di chuyển càng ít càng tốt.",
+        "Đưa tới bác sĩ thú y ngay, kể cả khi thú có vẻ ổn: tổn thương bên trong thường không thấy được."
+      ],
+      "doNot": [
+        "Không cho ăn hoặc uống.",
+        "Không cho uống thuốc giảm đau của người.",
+        "Không kéo hoặc cố nắn thẳng chân bị gãy."
+      ]
+    },
+    {
+      "code": "BLEEDING",
+      "title": "Chảy máu",
+      "urgentSigns": ["Máu phun thành tia", "Máu thấm qua lớp vải ép sau vài phút", "Thú lả đi"],
+      "steps": [
+        "Ép chặt một miếng vải sạch hoặc gạc lên vết thương, giữ liên tục ít nhất 5 phút.",
+        "Nếu máu thấm qua, đặt thêm lớp vải lên trên và tiếp tục ép; không gỡ lớp cũ ra.",
+        "Băng giữ miếng vải vừa đủ chặt, vẫn luồn được một ngón tay dưới băng.",
+        "Đưa tới bác sĩ thú y."
+      ],
+      "doNot": [
+        "Không garô nếu chưa được hướng dẫn.",
+        "Không rút vật đang cắm trong vết thương.",
+        "Không đổ cồn hay oxy già vào vết thương sâu."
+      ]
+    },
+    {
+      "code": "POISONING",
+      "title": "Nghi ngộ độc",
+      "urgentSigns": ["Co giật", "Nôn hoặc tiêu chảy liên tục", "Chảy nhiều dãi", "Lơ mơ, đi loạng choạng"],
+      "steps": [
+        "Đưa thú ra khỏi chỗ có chất độc.",
+        "Giữ lại bao bì, mẫu thức ăn hoặc chất thú đã ăn phải, ghi lại thời điểm.",
+        "Gọi bác sĩ thú y ngay và làm theo hướng dẫn của họ."
+      ],
+      "doNot": [
+        "Không tự gây nôn khi chưa có chỉ định của bác sĩ thú y: một số chất gây hại thêm khi nôn ra.",
+        "Không cho uống sữa, dầu hay nước muối.",
+        "Không cho uống thuốc của người; paracetamol rất độc với mèo."
+      ]
+    },
+    {
+      "code": "HEATSTROKE",
+      "title": "Say nắng, sốc nhiệt",
+      "urgentSigns": ["Thở dốc dữ dội", "Lưỡi đỏ sẫm hoặc tím", "Nôn", "Lả, không đứng được"],
+      "steps": [
+        "Đưa thú vào bóng râm hoặc chỗ thoáng mát.",
+        "Làm ướt người bằng nước mát (không phải nước đá), nhất là bụng, nách và bàn chân; quạt cho thú.",
+        "Nếu thú tỉnh, cho uống từng ít nước mát.",
+        "Đưa tới bác sĩ thú y, kể cả khi thú đã đỡ."
+      ],
+      "doNot": [
+        "Không dùng nước đá hoặc chườm đá.",
+        "Không trùm kín người thú bằng khăn ướt, vì khăn giữ nhiệt lại.",
+        "Không đổ nước vào miệng thú đang lơ mơ."
+      ]
+    },
+    {
+      "code": "NEWBORN_ALONE",
+      "title": "Chó mèo sơ sinh bị bỏ lại",
+      "urgentSigns": ["Người lạnh", "Bị thương", "Ở nơi nguy hiểm: lòng đường, trời mưa, có kiến"],
+      "steps": [
+        "Nếu chỗ đó an toàn, đứng xa quan sát 1–2 giờ: mẹ có thể đang đi kiếm ăn và sẽ quay lại.",
+        "Nếu phải mang đi, giữ ấm trước tiên: chai nước ấm bọc khăn, đặt cạnh thú.",
+        "Chỉ cho ăn khi thú đã ấm, bằng sữa dành riêng cho chó mèo con.",
+        "Liên hệ bác sĩ thú y hoặc nhóm cứu hộ để được hướng dẫn chăm sóc."
+      ],
+      "doNot": [
+        "Không cho uống sữa bò.",
+        "Không cho ăn khi thú đang lạnh.",
+        "Không bơm sữa nhanh vào miệng, thú có thể sặc.",
+        "Không tắm bằng nước lạnh."
+      ]
+    },
+    {
+      "code": "TRAPPED",
+      "title": "Mắc kẹt (cống, mái nhà, dây, khe hẹp)",
+      "urgentSigns": ["Dây siết vào cổ hoặc chân", "Nước đang dâng", "Thú kiệt sức"],
+      "steps": [
+        "Giữ khoảng cách, nói nhỏ để thú không vùng vẫy làm kẹt thêm.",
+        "Gọi người hỗ trợ; nơi cao, cống sâu hoặc cần dụng cụ thì gọi 114 (cứu nạn, cứu hộ).",
+        "Đặt thức ăn hoặc nước gần lối ra để dụ thú tự ra nếu có thể."
+      ],
+      "doNot": [
+        "Không giật mạnh thú hoặc dây đang siết.",
+        "Không một mình leo lên chỗ cao hay xuống cống sâu."
+      ]
+    },
+    {
+      "code": "SCARED_OR_AGGRESSIVE",
+      "title": "Thú hoảng sợ, có thể cắn",
+      "urgentSigns": ["Bạn hoặc người khác đã bị cắn, cào"],
+      "steps": [
+        "Giữ khoảng cách, đứng nghiêng người, không dồn thú vào góc.",
+        "Dùng khăn dày hoặc chăn để bế, đeo găng dày nếu có.",
+        "Đặt thức ăn trong lồng hoặc thùng có nắp để dụ thú vào.",
+        "Nếu bị cắn hoặc cào: rửa vết thương bằng xà phòng dưới vòi nước chảy khoảng 15 phút, rồi tới cơ sở y tế để được tư vấn phòng dại."
+      ],
+      "doNot": [
+        "Không bắt thú bằng tay không.",
+        "Không đuổi theo thú.",
+        "Không bỏ qua vết cắn, kể cả vết nhỏ."
+      ]
+    }
+  ]
+}

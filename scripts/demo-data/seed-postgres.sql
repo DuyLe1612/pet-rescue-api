@@ -2,7 +2,7 @@
 -- Pet Rescue demo data (PostgreSQL) — for staging and load tests, NEVER production.
 --
 -- Not a Flyway migration: it runs only when someone runs it. Needs every migration applied
--- (V33 or later: the data follows its rules, catalog values in English, enum constants in
+-- (V35 or later: the data follows its rules, catalog values in English, enum constants in
 -- upper case, tag codes as slugs).
 --
 --   psql "$STAGING_DB_URL" -v ON_ERROR_STOP=1 -f scripts/demo-data/seed-postgres.sql

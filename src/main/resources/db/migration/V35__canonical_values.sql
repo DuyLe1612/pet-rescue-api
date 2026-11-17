@@ -1,5 +1,5 @@
 -- ============================================================
--- V33: one stored form for every catalog value and enum
+-- V35: one stored form for every catalog value and enum
 --
 -- The database keeps one canonical value per thing: English catalog names ("Dog"), upper-case
 -- enum constants ("MALE"), slug tag codes ("lost-pet"). Spellings such as "dog", "DOG", "Chó"
@@ -217,7 +217,14 @@ BEGIN
         ('pet_medical_records',     'record_type',   'ck_medical_records_type',      'VACCINATION,TREATMENT,SURGERY'),
         ('pets_current_owner',      'owner_type',    'ck_pets_current_owner_type',   'USER,ORGANIZATION'),
         ('pet_ownerships',          'owner_type',    'ck_pet_ownerships_type',       'USER,ORGANIZATION'),
-        ('friend_requests',         'status',        'ck_friend_requests_status',    'PENDING,ACCEPTED,REJECTED')
+        ('friend_requests',         'status',        'ck_friend_requests_status',    'PENDING,ACCEPTED,REJECTED'),
+        ('rescue_cases',            'case_type',     'ck_rescue_cases_case_type',    'RESCUE,LOST,FOUND'),
+        ('rescue_cases',            'holding_status','ck_rescue_cases_holding',      'ON_STREET,AT_HOME,AT_ORGANIZATION'),
+        ('rescue_cases',            'pet_status_before_lost', 'ck_rescue_cases_pet_status_before_lost', 'FOSTERING,AVAILABLE,ADOPTED,LOST,DECEASED'),
+        ('pets',                    'visibility',    'ck_pets_visibility',           'PRIVATE,PUBLIC'),
+        ('pets_current_owner',      'acquisition_type', 'ck_pets_current_owner_acquisition', 'SELF_REGISTERED,ADOPTED,ORG_INTAKE,TRANSFERRED'),
+        ('pet_ownerships',          'acquisition_type', 'ck_pet_ownerships_acquisition',     'SELF_REGISTERED,ADOPTED,ORG_INTAKE,TRANSFERRED'),
+        ('case_match_suggestions',  'status',        'ck_case_match_status',         'PENDING,CONFIRMED,REJECTED,DISMISSED')
     ) AS v (tbl, col, name, allowed)
     LOOP
         EXECUTE format('ALTER TABLE %I DROP CONSTRAINT IF EXISTS %I', c.tbl, c.name);

@@ -89,17 +89,18 @@ public class UserController {
 
     @GetMapping("/me/pets")
     @Operation(summary = "Pets I own",
-            description = "Every pet whose current owner is the caller: self-registered, adopted, or kept after a rescue.")
+            description = "Every pet whose current owner is the caller, with how they came to have it (acquisitionType) and, "
+                    + "for an adopted pet, the organization it came from. Filter with type=SELF_REGISTERED|ADOPTED|TRANSFERRED.")
     public ResponseEntity<ApiResponse<PageResponse<com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto>>> getMyPets(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder,
+            @RequestParam(required = false) com.uit.petrescueapi.domain.valueobject.AcquisitionType type,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(petQueryPort.findAllWithFilters(
-                null, null, null, null, null, userId, null, null,
-                PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(petQueryPort.findOwnedBy(
+                userId, type, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
     }
 
     @GetMapping("/{id}")

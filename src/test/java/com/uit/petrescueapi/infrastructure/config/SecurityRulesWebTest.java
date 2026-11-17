@@ -87,6 +87,11 @@ class SecurityRulesWebTest {
     @MockitoBean UserCommandPort userCommandPort;
     @MockitoBean UserQueryPort userQueryPort;
     @MockitoBean UserWebMapper userMapper;
+    @MockitoBean com.uit.petrescueapi.application.port.command.RescueCaseCommunityPort rescueCaseCommunityPort;
+    @MockitoBean com.uit.petrescueapi.application.port.command.LostAndFoundPort lostAndFoundPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.EvaluationMetricsQueryPort evaluationMetricsQueryPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCaseCommunityQueryPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.FirstAidQueryPort firstAidQueryPort;
 
     private final UUID id = UUID.randomUUID();
 
@@ -118,8 +123,13 @@ class SecurityRulesWebTest {
     }
 
     @Test
+    void anonymousCannotReadTheAiTriageOfACase() throws Exception {
+        mvc.perform(get("/api/v1/rescue-cases/" + id + "/triage")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void anonymousCanStillReadRescueCases() throws Exception {
-        when(rescueQueryPort.findMapMarkers(any(), any(), any())).thenReturn(java.util.List.of());
+        when(rescueQueryPort.findMapMarkers(any(), any(), any(), any())).thenReturn(java.util.List.of());
         mvc.perform(get("/api/v1/rescue-cases/map/markers")).andExpect(status().isOk());
     }
 

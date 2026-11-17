@@ -42,6 +42,7 @@ class Phase0WorkflowRulesTest {
         return new RescueCaseCommandUseCase(domain, access, mock(RescueClaimDomainService.class),
                 mock(com.uit.petrescueapi.application.port.command.PetCommandPort.class), mock(PetDomainService.class),
                 mock(MediaQueryPort.class), mock(org.springframework.context.ApplicationEventPublisher.class),
+                mock(LostAndFoundDomainService.class),
                 mock(RescueCaseMediaRepository.class), mock(RescueCompletionMediaRepository.class),
                 mock(com.uit.petrescueapi.application.service.SpeciesResolver.class));
     }
@@ -118,7 +119,7 @@ class Phase0WorkflowRulesTest {
     final AccessControlDomainService adoptionAccess = mock(AccessControlDomainService.class);
     final AdoptionDomainService adoptionDomain = new AdoptionDomainService(applications, pets,
             mock(VisualCodeRepository.class), mock(OrganizationDomainService.class), adoptionAccess, owners,
-            mock(ReputationDomainService.class), mock(ReclaimLogRepository.class), mock(NotificationDomainService.class));
+            mock(ReputationDomainService.class), mock(ReclaimLogRepository.class), mock(NotificationDomainService.class), mock(FollowupDomainService.class));
 
     private UUID pendingApplication(UUID orgId, UUID applicantId) {
         UUID id = UUID.randomUUID();

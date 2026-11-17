@@ -13,20 +13,31 @@ import java.util.UUID;
  * @param species    matched case-insensitively against the reporter's free text
  * @param province   a province code, or a province name (case-insensitive)
  * @param reporterId only cases this user reported
+ * @param types      RESCUE, LOST, FOUND; empty means every type
  */
 public record RescueCaseFilter(List<RescueCaseStatus> statuses, List<RescuePriority> priorities,
-                               String species, String province, UUID reporterId) {
+                               String species, String province, UUID reporterId,
+                               List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
 
     public RescueCaseFilter(List<RescueCaseStatus> statuses, List<RescuePriority> priorities, String species, String province) {
-        this(statuses, priorities, species, province, null);
+        this(statuses, priorities, species, province, null, null);
+    }
+
+    public RescueCaseFilter(List<RescueCaseStatus> statuses, List<RescuePriority> priorities, String species, String province,
+                            UUID reporterId) {
+        this(statuses, priorities, species, province, reporterId, null);
     }
 
     public static RescueCaseFilter none() {
-        return new RescueCaseFilter(null, null, null, null, null);
+        return new RescueCaseFilter(null, null, null, null, null, null);
     }
 
     public static RescueCaseFilter reportedBy(UUID reporterId, List<RescueCaseStatus> statuses) {
-        return new RescueCaseFilter(statuses, null, null, null, reporterId);
+        return new RescueCaseFilter(statuses, null, null, null, reporterId, null);
+    }
+
+    public RescueCaseFilter withTypes(List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> caseTypes) {
+        return new RescueCaseFilter(statuses, priorities, species, province, reporterId, caseTypes);
     }
 
     public RescueCaseFilter {

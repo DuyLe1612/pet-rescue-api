@@ -8,7 +8,7 @@ Các script không phải migration của Flyway, nên chỉ chạy khi có ngư
 
 Script chạy từ máy của bạn và kết nối thẳng tới database, nên staging trên Render free (không có shell) vẫn dùng được.
 
-1. Deploy API lên staging và chờ khởi động xong, để Flyway và `MongoSchemaInitializer` tạo schema. Script PostgreSQL cần migration `V33` trở lên.
+1. Deploy API lên staging và chờ khởi động xong, để Flyway và `MongoSchemaInitializer` tạo schema. Script PostgreSQL cần migration `V35` trở lên.
 2. Lấy connection string của PostgreSQL và MongoDB. Với Neon, nên dùng URL trực tiếp (không có `-pooler`) dạng `postgresql://user:pass@host/db?sslmode=require`.
 3. Nếu database có giới hạn IP (ví dụ Network Access của Atlas), cho phép IP máy của bạn.
 4. Chạy trong PowerShell tại thư mục gốc của repo. Chỉ cần Docker, không phải cài `psql` hay `mongosh`:

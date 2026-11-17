@@ -43,6 +43,9 @@ public interface PetCommandPort {
 
     Pet changeStatus(UUID id, PetStatus newStatus, UUID requesterId);
 
+    /** Show or hide the pet's page and its place in public lists. Whoever manages the pet may do it. */
+    Pet changeVisibility(UUID id, com.uit.petrescueapi.domain.valueobject.PetVisibility visibility, UUID requesterId);
+
     /**
      * Manually transfer pet ownership to a new owner.
      * Only admins and organization owners can perform this operation.
