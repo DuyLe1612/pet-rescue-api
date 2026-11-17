@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.rescue;
 
+import com.uit.petrescueapi.domain.valueobject.PetSize;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import lombok.*;
 import com.uit.petrescueapi.validation.Phone;
@@ -27,6 +29,7 @@ public class CreateRescueCaseRequestDto {
     private String distinctiveMarks;
     private String species;
     private String color;
+    @CanonicalEnum(PetSize.class)
     private String size;
     private RescuePriority priority;
     private String description;

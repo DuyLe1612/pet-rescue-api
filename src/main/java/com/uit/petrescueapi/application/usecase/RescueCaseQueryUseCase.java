@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter;
+import com.uit.petrescueapi.application.service.SpeciesResolver;
 import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.domain.entity.RescueCaseClaim;
@@ -54,6 +55,7 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     private final OrganizationMemberRepository memberRepository;
     private final AccessControlDomainService accessControl;
     private final com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triageRepository;
+    private final SpeciesResolver speciesResolver;
     @Override
     public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
         log.debug("Query: find rescue case by id {}", caseId);
@@ -90,7 +92,7 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, String species, Double radiusMeters, Integer hours) {
         double radius = radiusMeters == null ? DUPLICATE_RADIUS_METERS : Math.clamp(radiusMeters, 1, DUPLICATE_MAX_RADIUS_METERS);
         int window = hours == null ? DUPLICATE_WINDOW_HOURS : Math.clamp(hours, 1, DUPLICATE_MAX_WINDOW_HOURS);
-        String wanted = species == null || species.isBlank() ? null : species.trim();
+        String wanted = speciesResolver.canonicalForFilter(species);
         log.debug("Query: possible duplicate rescue cases near ({}, {}) within {} m, {} h", lat, lng, radius, window);
         return queryDataPort.findPossibleDuplicates(lat, lng, radius, wanted, window, DUPLICATE_MAX_RESULTS);
     }
@@ -101,8 +103,13 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
         return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, orNone(filter), pageable);
     }
 
-    private static RescueCaseFilter orNone(RescueCaseFilter filter) {
-        return filter == null ? RescueCaseFilter.none() : filter;
+    /** A filter on "chó" or "DOG" looks for the stored "Dog". */
+    private RescueCaseFilter orNone(RescueCaseFilter filter) {
+        if (filter == null) {
+            return RescueCaseFilter.none();
+        }
+        return new RescueCaseFilter(filter.statuses(), filter.priorities(),
+                speciesResolver.canonicalForFilter(filter.species()), filter.province(), filter.reporterId(), filter.types());
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -120,12 +127,13 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
                                                            List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
         log.debug("Query: find map markers with filters - bounds ({},{}) to ({},{}), status={}, priority={}, species={}",
                 minLat, minLng, maxLat, maxLng, status, priority, species);
-        return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species, types);
+        return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority,
+                speciesResolver.canonicalForFilter(species), types);
     }
 
     public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
         log.debug("Query: find global map markers (no bbox), status={}, priority={}, species={}", status, priority, species);
-        return queryDataPort.findMapMarkers(status, priority, species, types);
+        return queryDataPort.findMapMarkers(status, priority, speciesResolver.canonicalForFilter(species), types);
     }
 
     @Override

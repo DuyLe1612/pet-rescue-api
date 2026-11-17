@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.pet.CreatePetRequestDto;
+import com.uit.petrescueapi.application.service.SpeciesResolver;
 import com.uit.petrescueapi.application.dto.rescue.ClaimRescueCaseRequestDto;
 import com.uit.petrescueapi.application.dto.rescue.CreateRescueCaseRequestDto;
 import com.uit.petrescueapi.application.dto.rescue.ReleaseRescueClaimRequestDto;
@@ -56,6 +57,7 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
     private final com.uit.petrescueapi.domain.service.LostAndFoundDomainService lostAndFound;
     private final RescueCaseMediaRepository rescueCaseMediaRepository;
     private final RescueCompletionMediaRepository rescueCompletionMediaRepository;
+    private final SpeciesResolver speciesResolver;
 
     @Override
     public RescueCase report(CreateRescueCaseRequestDto cmd, UUID reporterId) {
@@ -305,7 +307,8 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
                 .holdingStatus(cmd.getHoldingStatus())
                 .lastSeenAt(cmd.getLastSeenAt())
                 .distinctiveMarks(cmd.getDistinctiveMarks())
-                .species(cmd.getSpecies())
+                // Stored as the catalog's English name ("Chó", "dog" -> "Dog") so filters and the feed agree.
+                .species(speciesResolver.canonicalOrOther(cmd.getSpecies()))
                 .color(cmd.getColor())
                 .size(cmd.getSize())
                 .priority(cmd.getPriority())

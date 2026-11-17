@@ -1017,7 +1017,7 @@ class QueryBehaviorIntegrationTest {
 
     @Test
     void everyCaseListRowCanBeDrawnOnAMap() throws Exception {
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         UUID caseId = caseAt(person(), species, "HIGH", "REPORTED");
         jdbc.update("UPDATE rescue_cases SET needs_help = TRUE WHERE case_id = ?", caseId);
 
@@ -1069,7 +1069,7 @@ class QueryBehaviorIntegrationTest {
     @Test
     void prioritySortPutsTheMostUrgentFirst() throws Exception {
         UUID reporter = person();
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         String low = caseAt(reporter, species, "LOW", "REPORTED").toString();
         String critical = caseAt(reporter, species, "CRITICAL", "REPORTED").toString();
         String normal = caseAt(reporter, species, "NORMAL", "REPORTED").toString();
@@ -1196,7 +1196,7 @@ class QueryBehaviorIntegrationTest {
     @Test
     void caseListAppliesStatusPrioritySpeciesAndProvince() throws Exception {
         UUID reporter = person();
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         UUID match = filterCase(reporter, species, "CRITICAL", "REPORTED", "79", "Hồ Chí Minh");
         UUID otherStatus = filterCase(reporter, species, "CRITICAL", "CLOSED", "79", "Hồ Chí Minh");
         UUID otherPriority = filterCase(reporter, species, "LOW", "REPORTED", "79", "Hồ Chí Minh");
@@ -1217,7 +1217,7 @@ class QueryBehaviorIntegrationTest {
     @Test
     void nearbyAndBoundingBoxListsApplyTheSameFilters() throws Exception {
         UUID reporter = person();
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         UUID open = filterCase(reporter, species, "HIGH", "REPORTED", "79", "Hồ Chí Minh");
         filterCase(reporter, species, "HIGH", "CLOSED", "79", "Hồ Chí Minh");
 
@@ -2394,6 +2394,16 @@ class QueryBehaviorIntegrationTest {
                 VALUES (?, ?, 'SHELTER', '79', ?, ?, ?)
                 """, id, "Org " + id, organizationStatus, id.toString().substring(0, 12), Timestamp.valueOf(createdAt));
         return id;
+    }
+
+    /**
+     * A species only this test uses, so filters see only its own rows. It goes into the catalog
+     * first: a case's species must be a catalog name (V35).
+     */
+    private String newSpecies() {
+        String name = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("INSERT INTO pet_species (species_id, name, name_vi) VALUES (?, ?, ?)", UUID.randomUUID(), name, name);
+        return name;
     }
 
     private void insertCase(UUID reporter, String caseStatus, LocalDateTime createdAt) {

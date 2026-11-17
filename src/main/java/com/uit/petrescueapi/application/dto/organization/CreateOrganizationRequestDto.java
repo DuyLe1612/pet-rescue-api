@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.organization;
 
+import com.uit.petrescueapi.domain.valueobject.OrganizationType;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import jakarta.validation.constraints.Email;
@@ -31,6 +33,7 @@ public class CreateOrganizationRequestDto {
     @Schema(example = "SHELTER", allowableValues = {"SHELTER", "VET_CENTER"})
     @NotBlank
     @Size(max = 50)
+    @CanonicalEnum(OrganizationType.class)
     private String type;
 
     @Schema(example = "123 Nguyen Trai")

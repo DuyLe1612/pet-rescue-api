@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.user;
 
+import com.uit.petrescueapi.domain.valueobject.PersonGender;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import com.uit.petrescueapi.validation.Phone;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
@@ -36,6 +38,7 @@ public class UpdateUserProfileRequestDto {
 
     @Schema(example = "MALE", allowableValues = {"MALE", "FEMALE", "OTHER"})
     @Size(max = 20)
+    @CanonicalEnum(PersonGender.class)
     private String gender;
 
     @Schema(example = "123 Nguyen Trai Street")
