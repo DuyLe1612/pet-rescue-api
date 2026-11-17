@@ -63,6 +63,10 @@ public class PetSummaryResponseDto {
     @Schema(example = "Phường 1")
     private String ward;
 
+    @Schema(description = "Only in a sort=match listing: how well this pet fits the caller")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    private com.uit.petrescueapi.application.dto.matching.MatchResultDto match;
+
     @Schema(description = "Thumbnail image URL (first image)", example = "https://storage.example.com/pets/buddy-01.jpg")
     private String imageUrl;
 }

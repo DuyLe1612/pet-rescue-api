@@ -60,6 +60,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
@@ -73,6 +78,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
@@ -84,6 +94,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             @Param("name") String name,
             @Param("ownerUserId") UUID ownerUserId,
             @Param("ownerOrganizationId") UUID ownerOrganizationId,
+            @Param("province") String province,
             Pageable pageable);
 
     @Query(value = """
@@ -124,6 +135,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND p.status IN (:statuses)
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
@@ -138,6 +154,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND (:name IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :name, '%')))
           AND p.status IN (:statuses)
           AND (:ownerUserId IS NULL OR (pco.owner_type = 'USER' AND pco.owner_id = :ownerUserId))
@@ -151,6 +172,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             @Param("statuses") List<String> statuses,
             @Param("ownerUserId") UUID ownerUserId,
             @Param("ownerOrganizationId") UUID ownerOrganizationId,
+            @Param("province") String province,
             Pageable pageable);
 
     @Query(value = """
@@ -191,6 +213,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND p.status = :status
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
     """, countQuery = """
@@ -203,6 +230,11 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
+                SELECT 1 FROM organizations po
+                WHERE po.organization_id = p.shelter_id
+                  AND (po.province_code = CAST(:province AS VARCHAR)
+                       OR LOWER(po.province_name) = LOWER(CAST(:province AS VARCHAR)))))
           AND p.status = :status
           AND (:ownerOrganizationId IS NULL OR (pco.owner_type = 'ORGANIZATION' AND pco.owner_id = :ownerOrganizationId))
     """, nativeQuery = true)
@@ -212,6 +244,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             @Param("gender") String gender,
             @Param("status") String status,
             @Param("ownerOrganizationId") UUID ownerOrganizationId,
+            @Param("province") String province,
             Pageable pageable);
 
     // ── Detail (single pet) ─────────────────────

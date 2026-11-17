@@ -53,6 +53,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -104,9 +105,13 @@ class QueryBehaviorIntegrationTest {
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
     @MockitoBean CloudStoragePort cloud;
+    /** There is no broker in this test, and every message it is given is refused. */
+    @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
 
     @BeforeEach
     void cloudBuildsUrls() {
+        org.mockito.Mockito.doThrow(new org.springframework.amqp.AmqpConnectException(new java.net.ConnectException("refused")))
+                .when(rabbit).convertAndSend(anyString(), anyString(), any(Object.class));
         when(cloud.buildUrl(anyString())).thenAnswer(i -> "https://cdn.test/" + i.getArgument(0));
     }
 
@@ -184,6 +189,33 @@ class QueryBehaviorIntegrationTest {
         assertThat(JsonPath.<List<String>>read(body, row + ".locationText")).containsExactly("Cầu Thị Nghè");
         assertThat(JsonPath.<List<Number>>read(body, row + ".distanceMeters")).singleElement()
                 .satisfies(d -> assertThat(d.doubleValue()).isLessThan(1));
+    }
+
+    @Test
+    void someoneAboutToReportSeesOpenRecentCasesOfTheSameAnimalNearby() throws Exception {
+        UUID reporter = person();
+        double lat = 11.25, lng = 107.35;
+        UUID sameDog = reportAt(reporter, "Dog", lat, lng);
+        UUID unknownSpecies = reportAt(reporter, null, lat + 0.0005, lng);
+        UUID cat = reportAt(reporter, "Cat", lat, lng);
+        UUID farAway = reportAt(reporter, "Dog", lat + 0.05, lng);
+        UUID lastWeek = reportAt(reporter, "Dog", lat, lng);
+        jdbc.update("UPDATE rescue_cases SET reported_at = now() - interval '5 days' WHERE case_id = ?", lastWeek);
+        UUID closed = reportAt(reporter, "Dog", lat, lng);
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?", closed);
+
+        String body = mvc.perform(get("/api/v1/rescue-cases/possible-duplicates?lat=" + lat + "&lng=" + lng + "&species=dog"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        List<String> ids = JsonPath.read(body, "$.data[*].caseId");
+        assertThat(ids).containsExactly(sameDog.toString(), unknownSpecies.toString());
+        assertThat(ids).doesNotContain(cat.toString(), farAway.toString(), lastWeek.toString(), closed.toString());
+
+        String wider = mvc.perform(get("/api/v1/rescue-cases/possible-duplicates?lat=" + lat + "&lng=" + lng + "&hours=168"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(wider, "$.data[*].caseId"))
+                .contains(sameDog.toString(), cat.toString(), lastWeek.toString())
+                .doesNotContain(farAway.toString(), closed.toString());
     }
 
     @Test
@@ -550,10 +582,6 @@ class QueryBehaviorIntegrationTest {
             mvc.perform(get(url + "&priority=LOW")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openCat)))
                     .andExpect(jsonPath("$.data.content[*].caseId", not(hasItem(openDog))));
-            // a geo list is searchable like the plain one
-            mvc.perform(get(url + "&search=" + openCat.substring(0, 12))).andExpect(status().isOk())
-                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openCat)))
-                    .andExpect(jsonPath("$.data.content[*].caseId", not(hasItem(openDog))));
             // no status asked for: every status, as before
             mvc.perform(get(url + "&species=Dog&priority=HIGH")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content[*].caseId", hasItem(closedDog)));
@@ -562,11 +590,12 @@ class QueryBehaviorIntegrationTest {
 
     @Test
     void everyCaseListRowCanBeDrawnOnAMap() throws Exception {
-        UUID caseId = caseAt(person(), "Dog", "HIGH", "REPORTED");
+        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        UUID caseId = caseAt(person(), species, "HIGH", "REPORTED");
         jdbc.update("UPDATE rescue_cases SET needs_help = TRUE WHERE case_id = ?", caseId);
 
         for (String url : CASE_LISTS) {
-            String body = mvc.perform(get(url + "&search=" + caseId.toString().substring(0, 12))).andExpect(status().isOk())
+            String body = mvc.perform(get(url + "&species=" + species)).andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
             String row = "$.data.content[?(@.caseId=='" + caseId + "')]";
             assertThat(JsonPath.<List<Double>>read(body, row + ".latitude")).containsExactly(10.5);
@@ -726,6 +755,543 @@ class QueryBehaviorIntegrationTest {
         assertThat(JsonPath.<List<String>>read(body, row + ".firstImageUrl")).singleElement().asString().startsWith("https://cdn.test/");
     }
 
+    @Test
+    void sizeIsAcceptedAsAnAliasOfPageSize() throws Exception {
+        mvc.perform(get("/api/v1/rescue-cases?size=3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.size").value(3));
+        mvc.perform(get("/api/v1/rescue-cases?size=3&pageSize=7"))
+                .andExpect(jsonPath("$.data.size").value(7));
+    }
+
+    // ── Filters ─────────────────────────────────────
+
+    @Test
+    void caseListAppliesStatusPrioritySpeciesAndProvince() throws Exception {
+        UUID reporter = person();
+        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        UUID match = filterCase(reporter, species, "CRITICAL", "REPORTED", "79", "Hồ Chí Minh");
+        UUID otherStatus = filterCase(reporter, species, "CRITICAL", "CLOSED", "79", "Hồ Chí Minh");
+        UUID otherPriority = filterCase(reporter, species, "LOW", "REPORTED", "79", "Hồ Chí Minh");
+        UUID otherProvince = filterCase(reporter, species, "CRITICAL", "REPORTED", "01", "Hà Nội");
+
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species.toUpperCase()))
+                .containsExactlyInAnyOrder(match, otherStatus, otherPriority, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED"))
+                .containsExactlyInAnyOrder(match, otherPriority, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED&status=CLOSED&priority=CRITICAL"))
+                .containsExactlyInAnyOrder(match, otherStatus, otherProvince);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&status=REPORTED&priority=CRITICAL&province=79"))
+                .containsExactly(match);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&species=" + species + "&province=hà nội"))
+                .containsExactly(otherProvince);
+    }
+
+    @Test
+    void nearbyAndBoundingBoxListsApplyTheSameFilters() throws Exception {
+        UUID reporter = person();
+        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        UUID open = filterCase(reporter, species, "HIGH", "REPORTED", "79", "Hồ Chí Minh");
+        filterCase(reporter, species, "HIGH", "CLOSED", "79", "Hồ Chí Minh");
+
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&lat=10.5&lng=106.7&distance=500&species=" + species + "&status=REPORTED"))
+                .containsExactly(open);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&minLat=10.4&minLng=106.6&maxLat=10.6&maxLng=106.8&species="
+                + species + "&status=REPORTED")).containsExactly(open);
+        assertThat(caseIds("/api/v1/rescue-cases?pageSize=100&lat=10.5&lng=106.7&distance=500&species=" + species)).hasSize(2);
+    }
+
+    @Test
+    void petsFilterByTheProvinceOfTheirOrganization() throws Exception {
+        String code = "P" + UUID.randomUUID().toString().substring(0, 6);
+        UUID here = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET province_code = ?, province_name = 'Tỉnh Thử' WHERE organization_id = ?", code, here);
+        UUID elsewhere = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petHere = pet("ORGANIZATION", here, here);
+        pet("ORGANIZATION", elsewhere, elsewhere);
+        pet("USER", person(), null);
+
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&availableOnly=true&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&search=Mực&province=" + code)))).containsExactly(petHere);
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100&province=tỉnh thử")))).contains(petHere);
+    }
+
+    @Test
+    void anyoneCanAskForAvailablePetsButNotForOtherStatuses() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID available = pet("ORGANIZATION", shelter, shelter);
+        UUID adopted = pet("ORGANIZATION", shelter, shelter);
+        jdbc.update("UPDATE pets SET status = 'ADOPTED' WHERE pet_id = ?", adopted);
+        String scope = "/api/v1/pets?pageSize=100&organizationId=" + shelter;
+
+        assertThat(petIds(mvc.perform(get(scope + "&status=AVAILABLE")))).containsExactly(available);
+        // a restricted status is dropped for a stranger, as before, rather than honoured
+        assertThat(petIds(mvc.perform(get(scope + "&status=ADOPTED")))).containsExactlyInAnyOrder(available, adopted);
+        assertThat(petIds(call(get(scope + "&status=ADOPTED"), member(shelter, "STAFF")))).containsExactly(adopted);
+    }
+
+    @Test
+    void myPetsListsOnlyWhatICurrentlyOwn() throws Exception {
+        UUID me = person();
+        UUID mine = pet("USER", me, null);
+        pet("USER", person(), null);
+
+        assertThat(petIds(call(get("/api/v1/users/me/pets"), me))).containsExactly(mine);
+    }
+
+    @Test
+    void anotherUsersContactDetailsAreOnlyForThemAndAdmins() throws Exception {
+        UUID owner = person();
+        jdbc.update("UPDATE users SET phone = '0911111111', street_address = '1 Lê Lợi' WHERE user_id = ?", owner);
+
+        call(get("/api/v1/users/" + owner), person())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.username").exists())
+                .andExpect(jsonPath("$.data.email").doesNotExist())
+                .andExpect(jsonPath("$.data.phone").doesNotExist())
+                .andExpect(jsonPath("$.data.streetAddress").doesNotExist());
+        call(get("/api/v1/users/" + owner), owner).andExpect(jsonPath("$.data.phone").value("0911111111"));
+        call(get("/api/v1/users/" + owner), admin()).andExpect(jsonPath("$.data.email").exists());
+    }
+
+    // ── Posts and rescue cases ──────────────────────
+
+    private static final String CASE_FORM = """
+            {"species":"Dog","priority":"HIGH","description":"Bị thương ở chân","latitude":10.5,"longitude":106.7,
+             "locationText":"Cầu Thị Nghè","wardName":"Phường 1","provinceName":"Hồ Chí Minh","provinceCode":"79"%s}
+            """;
+
+    @Test
+    void reportingACaseCanPublishItsPostInTheSameCall() throws Exception {
+        UUID reporter = person();
+
+        String body = call(post("/api/v1/rescue-cases"), reporter, CASE_FORM.formatted(",\"shareAsPost\":true"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").isNotEmpty())
+                .andExpect(jsonPath("$.data.postShareFailed").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String caseId = JsonPath.read(body, "$.data.caseId");
+        String postId = JsonPath.read(body, "$.data.sharedPostId");
+        linkCaseImage(UUID.fromString(caseId), reporter);
+
+        // the post is written from the report, labelled as a rescue post, and shows the case as a card
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items.length()").value(1))
+                .andExpect(jsonPath("$.data.items[0].postId").value(postId))
+                .andExpect(jsonPath("$.data.items[0].content").value("Cần giúp đỡ: Dog tại Cầu Thị Nghè, Phường 1, Hồ Chí Minh. Bị thương ở chân"))
+                .andExpect(jsonPath("$.data.items[0].facets.category").value("RESCUE"))
+                .andExpect(jsonPath("$.data.items[0].facets.species").value("Dog"))
+                .andExpect(jsonPath("$.data.items[0].facets.needsRescue").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseId").value(caseId))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.caseCode").isNotEmpty())
+                .andExpect(jsonPath("$.data.items[0].rescueCase.status").value("REPORTED"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.open").value(true))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.priority").value("HIGH"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.locationText").value("Cầu Thị Nghè"))
+                .andExpect(jsonPath("$.data.items[0].rescueCase.imageUrl").value(startsWith("https://cdn.test/")));
+        mvc.perform(get("/api/v1/posts/feed?category=RESCUE&needsRescue=true&hasOpenCase=true"))
+                .andExpect(jsonPath("$.data.items[*].postId").value(hasItem(postId)));
+        // a guest reads the feed, a signed-in viewer also learns what they liked
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items[0].likedByMe").doesNotExist());
+        call(get("/api/v1/posts/feed?rescueCaseId=" + caseId), reporter).andExpect(jsonPath("$.data.items[0].likedByMe").value(false));
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+
+        // the card follows the case, not a copy made when the post was written
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?::uuid", caseId);
+        call(get("/api/v1/posts/" + postId), reporter)
+                .andExpect(jsonPath("$.data.rescueCase.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.rescueCase.open").value(false));
+    }
+
+    @Test
+    void aReportWithoutSharingPublishesNothing() throws Exception {
+        String body = call(post("/api/v1/rescue-cases"), person(), CASE_FORM.formatted(""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.sharedPostId").doesNotExist())
+                .andExpect(jsonPath("$.data.postShareFailed").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + JsonPath.<String>read(body, "$.data.caseId")))
+                .andExpect(jsonPath("$.data.items.length()").value(0));
+    }
+
+    @Test
+    void anyoneSharesAnOpenCaseOnceAndCanUnlinkTheirPost() throws Exception {
+        UUID reporter = person();
+        UUID sharer = person();
+        UUID caseId = report(reporter);
+        String shareBody = "{\"content\":\"Ai ở gần giúp bé với\",\"rescueCaseId\":\"" + caseId + "\"}";
+
+        String created = call(post("/api/v1/posts"), sharer, shareBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts"), sharer, shareBody)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_ALREADY_SHARED"));
+        call(post("/api/v1/posts"), reporter, shareBody).andExpect(status().isCreated());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(2));
+
+        call(put("/api/v1/posts/" + postId), sharer, "{\"removeRescueCase\":true}").andExpect(status().isOk());
+        mvc.perform(get("/api/v1/posts/feed?rescueCaseId=" + caseId)).andExpect(jsonPath("$.data.items.length()").value(1));
+        call(get("/api/v1/posts/" + postId), sharer).andExpect(jsonPath("$.data.rescueCase").doesNotExist());
+
+        jdbc.update("UPDATE rescue_cases SET status = 'RESCUED' WHERE case_id = ?", caseId);
+        call(put("/api/v1/posts/" + postId), sharer, "{\"rescueCaseId\":\"" + caseId + "\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("POST_RESCUE_CASE_CLOSED"));
+    }
+
+    @Test
+    void aSharedPostLinkOpensForGuestsWithItsComments() throws Exception {
+        UUID author = person();
+        UUID reader = person();
+        String created = call(post("/api/v1/posts"), author, "{\"content\":\"Bé mèo nhà mình hôm nay\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String postId = JsonPath.read(created, "$.data.postId");
+        call(post("/api/v1/posts/" + postId + "/comments"), reader, "{\"content\":\"Dễ thương quá\"}").andExpect(status().isCreated());
+        call(post("/api/v1/posts/" + postId + "/like"), reader).andExpect(status().isOk());
+
+        // a guest reads the post and its comments, without any "liked by me"
+        mvc.perform(get("/api/v1/posts/" + postId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("Bé mèo nhà mình hôm nay"))
+                .andExpect(jsonPath("$.data.rescueCase").doesNotExist())
+                .andExpect(jsonPath("$.data.likedByMe").doesNotExist());
+        mvc.perform(get("/api/v1/posts/" + postId + "/comments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].content").value("Dễ thương quá"));
+        call(get("/api/v1/posts/" + postId), reader).andExpect(jsonPath("$.data.likedByMe").value(true));
+        call(get("/api/v1/posts/" + postId), author).andExpect(jsonPath("$.data.likedByMe").value(false));
+
+        // writing still needs an account, and so do the list and the analysis
+        mvc.perform(post("/api/v1/posts/" + postId + "/comments").contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/posts/" + postId + "/like")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/posts/" + postId + "/analysis")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void myRescueCasesListsOnlyWhatIReported() throws Exception {
+        UUID me = person();
+        UUID open = report(me);
+        UUID closed = report(me);
+        jdbc.update("UPDATE rescue_cases SET status = 'CLOSED' WHERE case_id = ?", closed);
+        report(person());
+
+        String all = call(get("/api/v1/users/me/rescue-cases"), me).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[*].caseId"))
+                .containsExactlyInAnyOrder(open.toString(), closed.toString());
+        String stillOpen = call(get("/api/v1/users/me/rescue-cases?status=REPORTED&status=IN_PROGRESS"), me)
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(stillOpen, "$.data.content[*].caseId")).containsExactly(open.toString());
+    }
+
+    // ── Time on the wire ────────────────────────────
+
+    @Test
+    void everyDateTimeLeavesTheApiAsUtcWithZ() throws Exception {
+        UUID reporter = person();
+        LocalDateTime before = LocalDateTime.now(java.time.ZoneOffset.UTC).minusSeconds(5);
+        UUID caseId = report(reporter);
+
+        String detail = mvc.perform(get("/api/v1/rescue-cases/" + caseId)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String reportedAt = JsonPath.read(detail, "$.data.reportedAt");
+        assertThat(reportedAt).endsWith("Z");
+        // the instant is right, not shifted by the host's zone
+        assertThat(java.time.Instant.parse(reportedAt))
+                .isBetween(before.toInstant(java.time.ZoneOffset.UTC), java.time.Instant.now().plusSeconds(5));
+        assertThat(JsonPath.<String>read(detail, "$.timestamp")).endsWith("Z");
+
+        String nearby = mvc.perform(get("/api/v1/rescue-cases?lat=10.5&lng=106.7&distance=500&pageSize=100"))
+                .andReturn().getResponse().getContentAsString();
+        // the list queries convert in SQL, the detail in Java: both must give the same instant
+        assertThat(JsonPath.<List<String>>read(nearby, "$.data.content[?(@.caseId=='" + caseId + "')].reportedAt"))
+                .containsExactly(reportedAt);
+    }
+
+    @Test
+    void aCursorSentBackWithZWalksTheWholeFeed() throws Exception {
+        UUID author = person();
+        for (int i = 0; i < 3; i++) {
+            call(post("/api/v1/posts"), author, "{\"content\":\"tz cursor " + i + "\"}").andExpect(status().isCreated());
+        }
+
+        String first = mvc.perform(get("/api/v1/posts/feed?pageSize=2")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(first, "$.data.nextCursor");
+        String cursorId = JsonPath.read(first, "$.data.nextCursorId");
+        assertThat(cursor).endsWith("Z");
+
+        String second = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", cursor).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> firstIds = JsonPath.read(first, "$.data.items[*].postId");
+        List<String> secondIds = JsonPath.read(second, "$.data.items[*].postId");
+        assertThat(secondIds).isNotEmpty().doesNotContainAnyElementsOf(firstIds);
+
+        // an offset other than Z is the same instant
+        String shifted = java.time.Instant.parse(cursor).atOffset(java.time.ZoneOffset.ofHours(7)).toString();
+        String sameSecond = mvc.perform(get("/api/v1/posts/feed").param("pageSize", "2")
+                        .param("cursor", shifted).param("cursorId", cursorId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(sameSecond, "$.data.items[*].postId")).isEqualTo(secondIds);
+    }
+
+    @Test
+    void theDashboardCountsMonthsAsPeopleInVietnamDo() {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        int year = 2031;
+        // 31 Jan 18:00 UTC is already 1 Feb 01:00 in Vietnam
+        UUID earlyFebruary = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2031-01-31T18:00:00Z' WHERE application_id = ?", earlyFebruary);
+        // 31 Dec 18:00 UTC of the year before is already 1 Jan in Vietnam
+        UUID newYear = application(petId, person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET created_at = '2030-12-31T18:00:00Z' WHERE application_id = ?", newYear);
+
+        var trend = dashboard.getAdoptionTrend(year);
+        String months = String.valueOf(trend);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 1).mapToLong(m -> m.getPending()).sum()).isEqualTo(1);
+        assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 2).mapToLong(m -> m.getPending()).sum())
+                .as(months).isEqualTo(1);
+    }
+
+    // ── Adoption notifications ──────────────────────
+
+    @Test
+    void adoptionStepsReachTheApplicantAndTheOrganization() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID applicant = person();
+        UUID rival = person();
+        UUID rivalApplication = application(petId, rival, shelter, "PENDING");
+
+        // no signature: it is optional now
+        String body = call(post("/api/v1/adoptions"), applicant, """
+                {"petId":"%s","experience":"Đã nuôi chó mười năm","housingCondition":"%s","liveCondition":"Nhà có sân"}
+                """.formatted(petId, com.uit.petrescueapi.domain.valueobject.HousingCondition.values()[0].name()))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String applicationId = JsonPath.read(body, "$.data.applicationId");
+        assertThat(notificationTypes(owner)).containsExactly("ADOPTION_SUBMITTED");
+        assertThat(notificationTypes(staff)).containsExactly("ADOPTION_SUBMITTED");
+
+        call(patch("/api/v1/adoptions/" + applicationId + "/approve"), staff, "{}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTION_READY_AT_REQUIRED"));
+        call(patch("/api/v1/adoptions/" + applicationId + "/approve"), staff, "{\"readyAt\":\"2030-01-01T10:00:00\"}")
+                .andExpect(status().isOk());
+        call(patch("/api/v1/adoptions/" + applicationId + "/complete"), owner, "{}").andExpect(status().isOk());
+
+        assertThat(notificationTypes(applicant)).containsExactly("ADOPTION_APPROVED", "ADOPTION_COMPLETED");
+        assertThat(applicationStatus(rivalApplication)).isEqualTo("CANCELED");
+        assertThat(notificationTypes(rival)).containsExactly("ADOPTION_CANCELED");
+    }
+
+    // ── Matching ────────────────────────────────────
+
+    private static final String GOOD_HOME = """
+            {"housingType":"HOUSE","buildingRule":"ALLOWED","hoursAwayPerDay":4,"activityLevel":3,
+             "monthlyBudget":2000000,"adjustmentWeeksExpected":6,"experienceLevel":1,"consent":true%s}
+            """;
+    private static final String EASY_PET = """
+            {"friendlyPeople":5,"friendlyChildren":5,"fearStrangers":1,"fearNoise":1,"energy":3,"goodWithDogs":5,
+             "goodWithCats":5,"aloneMinutes":480,"size":"SMALL","noiseLevel":1,"monthlyCost":500000,
+             "careLevel":"LOW","sourceRole":"FOSTER"}
+            """;
+    private static final String HARD_PET = """
+            {"friendlyPeople":2,"fearStrangers":5,"energy":5,"goodWithCats":2,"aloneMinutes":30,"size":"LARGE",
+             "noiseLevel":5,"monthlyCost":9000000,"careLevel":"HIGH","sourceRole":"FOSTER"}
+            """;
+
+    @Test
+    void adopterProfileNeedsConsentAndCountsItsVersions() throws Exception {
+        UUID me = person();
+
+        call(get("/api/v1/users/me/adopter-profile"), me).andExpect(status().isNotFound());
+        call(put("/api/v1/users/me/adopter-profile"), me, "{\"housingType\":\"HOUSE\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTER_PROFILE_CONSENT_REQUIRED"));
+        call(put("/api/v1/users/me/adopter-profile"), me, "{\"consent\":true}").andExpect(status().isBadRequest());
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"hasCat\":true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.buildingRule").value("ALLOWED"));
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(""))
+                .andExpect(jsonPath("$.data.version").value(2));
+        call(get("/api/v1/users/me/adopter-profile"), me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.housingType").value("HOUSE"))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.consent").value(true));
+    }
+
+    @Test
+    void whoeverManagesAPetRecordsItsTraitsAndAnyoneReadsThem() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = dog(shelter);
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/traits"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.petId").value(petId.toString()))
+                .andExpect(jsonPath("$.data.energy").doesNotExist());
+        call(put("/api/v1/pets/" + petId + "/traits"), person(), EASY_PET).andExpect(status().isForbidden());
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, "{\"energy\":9}").andExpect(status().isBadRequest());
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, EASY_PET)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceRole").value("FOSTER"));
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/traits")).andExpect(jsonPath("$.data.energy").value(3));
+        mvc.perform(get("/api/v1/pets/" + UUID.randomUUID() + "/traits")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aMatchExplainsItselfAndKeepsTheNumberFromTheAdopter() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = dog(shelter);
+        call(put("/api/v1/pets/" + petId + "/traits"), member(shelter, "STAFF"), EASY_PET).andExpect(status().isOk());
+        UUID me = person();
+
+        mvc.perform(get("/api/v1/pets/" + petId + "/match")).andExpect(status().isUnauthorized());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("ADOPTER_PROFILE_REQUIRED"));
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted("")).andExpect(status().isOk());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.certainty").value("HIGH"))
+                .andExpect(jsonPath("$.data.score").doesNotExist())
+                .andExpect(jsonPath("$.data.reasons.length()").value(5))
+                .andExpect(jsonPath("$.data.reasons[0].code").value("LIFESTYLE"))
+                .andExpect(jsonPath("$.data.reasons[0].text").isNotEmpty())
+                .andExpect(jsonPath("$.data.warnings.length()").value(0));
+
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        call(get("/api/v1/pets/" + petId + "/match"), me)
+                .andExpect(jsonPath("$.data.level").value("NOT_SUITABLE"))
+                .andExpect(jsonPath("$.data.warnings[0].code").value("ALLERGY"))
+                .andExpect(jsonPath("$.data.warnings[0].text").isNotEmpty());
+    }
+
+    @Test
+    void sortByMatchPutsTheBestPetFirstAndWarnedPetsLast() throws Exception {
+        String province = "M" + UUID.randomUUID().toString().substring(0, 6);
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET province_code = ? WHERE organization_id = ?", province, shelter);
+        UUID staff = member(shelter, "STAFF");
+        UUID warned = dog(shelter);
+        UUID hard = dog(shelter);
+        UUID undescribed = dog(shelter);
+        UUID easy = dog(shelter);
+        UUID notAvailable = dog(shelter);
+        jdbc.update("UPDATE pets SET status = 'FOSTERING' WHERE pet_id = ?", notAvailable);
+        call(put("/api/v1/pets/" + easy + "/traits"), staff, EASY_PET).andExpect(status().isOk());
+        call(put("/api/v1/pets/" + hard + "/traits"), staff, HARD_PET).andExpect(status().isOk());
+        call(put("/api/v1/pets/" + warned + "/traits"), staff, "{\"goodWithCats\":1}").andExpect(status().isOk());
+        UUID me = person();
+        String url = "/api/v1/pets?sort=match&province=" + province;
+
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        call(get(url), me).andExpect(status().isUnprocessableEntity());
+        call(put("/api/v1/users/me/adopter-profile"), me, GOOD_HOME.formatted(",\"hasCat\":true")).andExpect(status().isOk());
+
+        String body = call(get(url), me).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(4))
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").doesNotExist())
+                .andExpect(jsonPath("$.data.content[3].match.level").value("NOT_SUITABLE"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(body, "$.data.content[*].petId"))
+                .containsExactly(easy.toString(), undescribed.toString(), hard.toString(), warned.toString());
+
+        // paging walks the same order
+        String second = call(get(url + "&page=1&pageSize=2"), me).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(second, "$.data.content[*].petId")).containsExactly(hard.toString(), warned.toString());
+    }
+
+    @Test
+    void anApplicationFreezesItsMatchAndAWarningOnlyNeedsAcknowledging() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID petId = dog(shelter);
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, EASY_PET).andExpect(status().isOk());
+        UUID fits = person();
+        UUID allergic = person();
+        UUID noProfile = person();
+        call(put("/api/v1/users/me/adopter-profile"), fits, GOOD_HOME.formatted("")).andExpect(status().isOk());
+        call(put("/api/v1/users/me/adopter-profile"), allergic, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        String form = "{\"petId\":\"" + petId + "\",\"experience\":\"Đã nuôi chó mười năm\",\"housingCondition\":\"HOUSE\",\"liveCondition\":\"Nhà có sân\"%s}";
+
+        call(post("/api/v1/adoptions"), allergic, form.formatted(""))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("MATCH_WARNING_NOT_ACKNOWLEDGED"));
+        String warnedId = applicationId(call(post("/api/v1/adoptions"), allergic, form.formatted(",\"acknowledgedWarnings\":true")));
+        String noProfileId = applicationId(call(post("/api/v1/adoptions"), noProfile, form.formatted("")));
+        String fitsId = applicationId(call(post("/api/v1/adoptions"), fits, form.formatted("")));
+
+        // reviewers: best match first, then the one nothing is known about, the flagged one last
+        String list = call(get("/api/v1/adoptions/organization/" + shelter + "?sort=match&petId=" + petId), staff)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").value(100.0))
+                .andExpect(jsonPath("$.data.content[1].match").doesNotExist())
+                .andExpect(jsonPath("$.data.content[2].match.level").value("NOT_SUITABLE"))
+                .andExpect(jsonPath("$.data.content[2].match.warnings[0].code").value("ALLERGY"))
+                .andExpect(jsonPath("$.data.content[2].match.warningsAcknowledged").value(true))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(list, "$.data.content[*].applicationId")).containsExactly(fitsId, noProfileId, warnedId);
+        call(get("/api/v1/adoptions/organization/" + shelter + "?petId=" + UUID.randomUUID()), staff)
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+
+        // the applicant reads the level and the reasons, the reviewer also the number
+        call(get("/api/v1/adoptions/" + fitsId), fits)
+                .andExpect(jsonPath("$.data.match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.match.score").doesNotExist())
+                .andExpect(jsonPath("$.data.match.reasons.length()").value(5));
+        call(get("/api/v1/adoptions/user/" + fits), fits)
+                .andExpect(jsonPath("$.data.content[0].match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.content[0].match.score").doesNotExist());
+
+        // what was true at submission stays on the application
+        call(put("/api/v1/pets/" + petId + "/traits"), staff, HARD_PET).andExpect(status().isOk());
+        call(put("/api/v1/users/me/adopter-profile"), fits, GOOD_HOME.formatted(",\"allergyDog\":true")).andExpect(status().isOk());
+        call(get("/api/v1/adoptions/" + fitsId), staff)
+                .andExpect(jsonPath("$.data.match.level").value("HIGH"))
+                .andExpect(jsonPath("$.data.match.score").value(100.0))
+                .andExpect(jsonPath("$.data.match.weightsVersion").value(1))
+                .andExpect(jsonPath("$.data.match.warnings.length()").value(0));
+        assertThat(jdbc.queryForObject("SELECT match_snapshot FROM adoption_applications WHERE application_id = ?::uuid",
+                String.class, fitsId)).contains("\"adopterProfile\"", "\"petTraits\"", "\"result\"");
+
+        call(patch("/api/v1/adoptions/" + warnedId + "/reject"), staff,
+                "{\"rejectReason\":\"Nhà có người dị ứng\",\"reasonCode\":\"MATCH_WARNING\"}").andExpect(status().isOk());
+        call(get("/api/v1/adoptions/" + warnedId), staff)
+                .andExpect(jsonPath("$.data.decisionReasonCode").value("MATCH_WARNING"));
+    }
+
+    private UUID dog(UUID shelter) {
+        UUID id = pet("ORGANIZATION", shelter, shelter);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Dog') WHERE pet_id = ?", id);
+        return id;
+    }
+
+    private String applicationId(ResultActions created) throws Exception {
+        return JsonPath.read(created.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(),
+                "$.data.applicationId");
+    }
+
     // ── Helpers ─────────────────────────────────────
 
     /** A case at (10.5, 106.7); its code is the first 12 characters of its id. */
@@ -737,6 +1303,30 @@ class QueryBehaviorIntegrationTest {
                 VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326), 'Cầu Thị Nghè', 'Phường 1', 'Hồ Chí Minh')
                 """, id, id.toString().substring(0, 12), species, priority, caseStatus, reporter);
         return id;
+    }
+
+    private List<String> notificationTypes(UUID userId) {
+        return jdbc.queryForList("SELECT type FROM notifications WHERE user_id = ? ORDER BY created_at, type", String.class, userId);
+    }
+
+    private UUID filterCase(UUID reporter, String species, String priority, String caseStatus, String provinceCode, String provinceName) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, species, priority, status, reported_by, reported_at, created_at,
+                                          province_code, province_name, location)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ?, ?, ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326))
+                """, id, id.toString().substring(0, 12), species, priority, caseStatus, reporter, provinceCode, provinceName);
+        return id;
+    }
+
+    private List<UUID> caseIds(String url) throws Exception {
+        String body = mvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.<List<String>>read(body, "$.data.content[*].caseId").stream().map(UUID::fromString).toList();
+    }
+
+    private List<UUID> petIds(ResultActions result) throws Exception {
+        String body = result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.<List<String>>read(body, "$.data.content[*].petId").stream().map(UUID::fromString).toList();
     }
 
     @FunctionalInterface
@@ -774,6 +1364,15 @@ class QueryBehaviorIntegrationTest {
                  "locationText":"Cầu Thị Nghè","wardName":"Phường 1","provinceName":"Hồ Chí Minh",
                  "provinceCode":"79","contactPhone":"0900000000"}
                 """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        return UUID.fromString(JsonPath.read(body, "$.data.caseId"));
+    }
+
+    private UUID reportAt(UUID reporter, String species, double lat, double lng) throws Exception {
+        String speciesJson = species == null ? "null" : "\"" + species + "\"";
+        String body = call(post("/api/v1/rescue-cases"), reporter, """
+                {"species":%s,"priority":"HIGH","description":"Bị thương","latitude":%s,"longitude":%s,
+                 "locationText":"Ngã tư","provinceName":"Đồng Nai","provinceCode":"75","contactPhone":"0900000000"}
+                """.formatted(speciesJson, lat, lng)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         return UUID.fromString(JsonPath.read(body, "$.data.caseId"));
     }
 

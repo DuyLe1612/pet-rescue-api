@@ -24,6 +24,7 @@ public interface PetQueryPort {
             List<PetStatus> statuses,
             UUID ownerUserId,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     );
 
@@ -32,6 +33,7 @@ public interface PetQueryPort {
             String breed,
             String gender,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     );
 }

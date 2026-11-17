@@ -31,6 +31,11 @@ public class AdoptionApplicationRepositoryAdapter implements AdoptionApplication
     }
 
     @Override
+    public java.util.List<UUID> findOpenApplicantIdsForPet(UUID petId, UUID exceptApplicationId) {
+        return jpa.findOpenApplicantIdsForPet(petId, exceptApplicationId);
+    }
+
+    @Override
     public int cancelOpenForPet(UUID petId, UUID exceptApplicationId, String reason, java.time.LocalDateTime now) {
         return jpa.cancelOpenForPet(petId, exceptApplicationId, reason, now);
     }

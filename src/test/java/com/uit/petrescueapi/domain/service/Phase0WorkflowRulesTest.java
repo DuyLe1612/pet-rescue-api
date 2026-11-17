@@ -117,7 +117,7 @@ class Phase0WorkflowRulesTest {
     final AccessControlDomainService adoptionAccess = mock(AccessControlDomainService.class);
     final AdoptionDomainService adoptionDomain = new AdoptionDomainService(applications, pets,
             mock(VisualCodeRepository.class), mock(OrganizationDomainService.class), adoptionAccess, owners,
-            mock(ReputationDomainService.class), mock(ReclaimLogRepository.class));
+            mock(ReputationDomainService.class), mock(ReclaimLogRepository.class), mock(NotificationDomainService.class));
 
     private UUID pendingApplication(UUID orgId, UUID applicantId) {
         UUID id = UUID.randomUUID();

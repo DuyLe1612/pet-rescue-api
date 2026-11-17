@@ -61,6 +61,14 @@ public class PostDomainService {
         return postRepository.save(existing);
     }
 
+    /** Removes the link to a rescue case; the post itself stays. */
+    public Post unlinkRescueCase(UUID postId) {
+        Post existing = findById(postId);
+        existing.setRescueCaseId(null);
+        existing.setUpdatedAt(LocalDateTime.now());
+        return postRepository.save(existing);
+    }
+
     /**
      * Soft delete a post.
      */

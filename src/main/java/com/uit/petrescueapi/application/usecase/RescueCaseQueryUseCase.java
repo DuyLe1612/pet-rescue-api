@@ -39,6 +39,13 @@ import java.util.UUID;
 @Slf4j
 public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
+    /** Estimates, not measured: a street corner, and long enough to cover a second passer-by the next day. */
+    private static final double DUPLICATE_RADIUS_METERS = 300;
+    private static final double DUPLICATE_MAX_RADIUS_METERS = 2000;
+    private static final int DUPLICATE_WINDOW_HOURS = 48;
+    private static final int DUPLICATE_MAX_WINDOW_HOURS = 168;
+    private static final int DUPLICATE_MAX_RESULTS = 5;
+
     private final RescueCaseQueryDataPort queryDataPort;
     private final RescueCaseDomainService caseDomainService;
     private final RescueClaimDomainService claimDomainService;
@@ -57,21 +64,34 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     }
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAll(RescueCaseFilter filter, Pageable pageable) {
-        log.debug("Query: find all rescue cases (paginated, filter={})", filter);
-        return queryDataPort.findAllSummaries(filter, pageable);
+    public Page<RescueCaseSummaryResponseDto> findAll(String search, RescueCaseFilter filter, Pageable pageable) {
+        log.debug("Query: find all rescue cases (paginated, search={})", search);
+        return queryDataPort.findAllSummaries(search, orNone(filter), pageable);
     }
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
-        log.debug("Query: find rescue cases nearby ({}, {}) within {} meters, filter={}", lat, lng, distanceMeters, filter);
-        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, filter, pageable);
+        log.debug("Query: find rescue cases nearby ({}, {}) within {} meters", lat, lng, distanceMeters);
+        return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, orNone(filter), pageable);
+    }
+
+    @Override
+    public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, String species, Double radiusMeters, Integer hours) {
+        double radius = radiusMeters == null ? DUPLICATE_RADIUS_METERS : Math.clamp(radiusMeters, 1, DUPLICATE_MAX_RADIUS_METERS);
+        int window = hours == null ? DUPLICATE_WINDOW_HOURS : Math.clamp(hours, 1, DUPLICATE_MAX_WINDOW_HOURS);
+        String wanted = species == null || species.isBlank() ? null : species.trim();
+        log.debug("Query: possible duplicate rescue cases near ({}, {}) within {} m, {} h", lat, lng, radius, window);
+        return queryDataPort.findPossibleDuplicates(lat, lng, radius, wanted, window, DUPLICATE_MAX_RESULTS);
     }
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
-        log.debug("Query: find rescue cases within bounding box ({},{}) to ({},{}), filter={}", minLat, minLng, maxLat, maxLng, filter);
-        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, filter, pageable);
+        log.debug("Query: find rescue cases within bounding box ({},{}) to ({},{})", minLat, minLng, maxLat, maxLng);
+        return queryDataPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, orNone(filter), pageable);
+    }
+
+    private static RescueCaseFilter orNone(RescueCaseFilter filter) {
+        return filter == null ? RescueCaseFilter.none() : filter;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

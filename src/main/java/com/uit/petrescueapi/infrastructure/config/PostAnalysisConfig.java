@@ -26,7 +26,7 @@ public class PostAnalysisConfig {
                                                    AnalysisCatalogPort catalog,
                                                    PostAnalysisValidator validator,
                                                    @Value("${app.ai.post-analysis.model:claude-opus-5-5}") String defaultModel,
-                                                   @Value("${app.ai.post-analysis.allowed-models:claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,gemini-3.8-flash,gemini-3.5-flash-lite}") String[] allowedModels) {
+                                                   @Value("${app.ai.post-analysis.allowed-models:claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5,gemini-3.8-flash,gemini-3.5-flash-lite,openrouter/google/gemini-2.5-flash-lite,openrouter/openai/gpt-oss-120b}") String[] allowedModels) {
         return new PostAnalysisUseCase(store, Optional.ofNullable(ai.getIfAvailable()), catalog, validator,
                 defaultModel, List.of(allowedModels));
     }

@@ -54,6 +54,7 @@ public class PetController {
     private final UserDomainService userDomainService;
     private final OrganizationDomainService organizationDomainService;
     private final PetTaxonomyQueryPort taxonomyQueryPort;
+    private final com.uit.petrescueapi.application.port.query.MatchingQueryPort matchingQueryPort;
 
     // ── Commands (write) ─────────────────────────
 
@@ -158,6 +159,9 @@ public class PetController {
     @GetMapping
     @Operation(summary = "List all pets (paginated, with optional filters)",
             description = "Unified endpoint for listing pets. Supports filtering by status, user, organization, and availability. " +
+                    "province (code or name) matches the province of the pet's organization. " +
+                    "sort=match (signed in, with an adopter profile) ranks AVAILABLE pets for the caller, at most 500 candidates. " +
+                    "Anyone may ask for status=AVAILABLE; other statuses need admin or a member of organizationId. " +
                     "Use status=AVAILABLE or availableOnly=true for available pets. " +
                     "Use organizationId=X to filter by organization. Use userId=X to filter by owner.")
     public ResponseEntity<ApiResponse<PageResponse<PetSummaryResponseDto>>> getAll(
@@ -172,7 +176,9 @@ public class PetController {
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID organizationId,
-            @RequestParam(required = false) Boolean availableOnly) {
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) Boolean availableOnly,
+            @RequestParam(required = false) String sort) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
@@ -192,13 +198,25 @@ public class PetController {
             }
         }
 
+        if ("match".equalsIgnoreCase(sort) || "match".equalsIgnoreCase(sortBy)) {
+            if (requesterId == null) {
+                throw new com.uit.petrescueapi.domain.exception.UnauthorizedException("Sign in to sort by match");
+            }
+            // Always the AVAILABLE pets: ranking the others would recommend pets nobody can adopt.
+            return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                    matchingQueryPort.rankAvailable(species, breed, gender, organizationId, province, requesterId, page, pageSize))));
+        }
+
         boolean canUseStatus = admin || (requesterId != null && canUseOrgScopedPetStatusFilter(organizationId, requesterId));
 
         if (!admin) {
             userId = null;
         }
-        if (!canUseStatus) {
-            status = null;
+        if (!canUseStatus && status != null) {
+            // AVAILABLE is what the public adoption page lists; every other status stays restricted.
+            status = status.stream().anyMatch(PetStatus.AVAILABLE.name()::equals)
+                    ? List.of(PetStatus.AVAILABLE.name())
+                    : null;
         }
 
         List<PetStatus> statusList = status == null ? null :
@@ -211,7 +229,7 @@ public class PetController {
 
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
-                        species, breed, gender, search, statusList, userId, organizationId, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
+                        species, breed, gender, search, statusList, userId, organizationId, province, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

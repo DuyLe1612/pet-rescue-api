@@ -33,4 +33,13 @@ public interface AdoptionDetailProjection {
     String getDecidedByUsername();
     String getRejectReason();
     LocalDateTime getReadyAt();
+
+    String getMatchLevel();
+    java.math.BigDecimal getMatchScore();
+    String getMatchCertainty();
+    String getMatchWarnings();
+    Boolean getWarningsAcknowledged();
+    Integer getMatchWeightsVersion();
+    String getMatchSnapshot();
+    String getDecisionReasonCode();
 }

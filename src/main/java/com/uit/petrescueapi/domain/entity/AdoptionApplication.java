@@ -35,4 +35,23 @@ public class AdoptionApplication extends BaseEntity {
     private UUID decidedBy;
     private String rejectReason;
     private LocalDateTime readyAt;
+
+    // Match result frozen at submission; never recomputed, so history survives a change of weights.
+    private String matchLevel;
+    private java.math.BigDecimal matchScore;
+    private String matchCertainty;
+    private Integer matchWeightsVersion;
+    /** Comma-separated warning codes, null when none fired. */
+    private String matchWarnings;
+    private boolean warningsAcknowledged;
+    /** Reviewer sort key: the score, -1 without a match, -2 when a warning fired. */
+    @lombok.Builder.Default
+    private java.math.BigDecimal matchRank = java.math.BigDecimal.valueOf(-1);
+    /** JSON text of both profiles and the full result. */
+    private String matchSnapshot;
+    private String decisionReasonCode;
+
+    public boolean hasMatchWarnings() {
+        return matchWarnings != null && !matchWarnings.isBlank();
+    }
 }

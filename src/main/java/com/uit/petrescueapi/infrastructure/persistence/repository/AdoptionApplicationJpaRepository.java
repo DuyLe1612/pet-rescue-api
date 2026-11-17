@@ -18,6 +18,15 @@ public interface AdoptionApplicationJpaRepository extends JpaRepository<Adoption
 
     long countByApplicantIdAndStatusAndDeletedFalse(UUID applicantId, AdoptionApplicationStatus status);
 
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT DISTINCT a.applicantId FROM AdoptionApplicationJpaEntity a
+            WHERE a.petId = :petId AND a.applicationId <> :exceptId AND a.deleted = false
+              AND a.status IN (com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus.PENDING,
+                               com.uit.petrescueapi.domain.valueobject.AdoptionApplicationStatus.APPROVED)
+            """)
+    java.util.List<UUID> findOpenApplicantIdsForPet(@org.springframework.data.repository.query.Param("petId") UUID petId,
+                                                    @org.springframework.data.repository.query.Param("exceptId") UUID exceptId);
+
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true)
     @org.springframework.data.jpa.repository.Query("""
             UPDATE AdoptionApplicationJpaEntity a

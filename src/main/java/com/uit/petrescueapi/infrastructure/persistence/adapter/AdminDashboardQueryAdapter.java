@@ -55,8 +55,9 @@ public class AdminDashboardQueryAdapter implements DashboardDataPort {
 
     @Override
     public AdoptionTrendDto getAdoptionTrend(int year) {
-        LocalDateTime yearStart = LocalDateTime.of(year, 1, 1, 0, 0, 0);
-        LocalDateTime yearEnd = LocalDateTime.of(year + 1, 1, 1, 0, 0, 0);
+        LocalDateTime[] yearRange = com.uit.petrescueapi.application.support.AppTime.yearUtc(year);
+        LocalDateTime yearStart = yearRange[0];
+        LocalDateTime yearEnd = yearRange[1];
 
         var projections = projectionRepository.getAdoptionTrend(yearStart, yearEnd);
         List<AdoptionTrendItemDto> items = projections.stream()
@@ -154,16 +155,12 @@ public class AdminDashboardQueryAdapter implements DashboardDataPort {
                 .build();
     }
 
+    /** The month as people in Vietnam count it: from 00:00 (+07:00) on the 1st. */
     private LocalDateTime[] monthRange(int month, int year) {
-        LocalDateTime start = LocalDateTime.of(year, month, 1, 0, 0, 0);
-        LocalDateTime end = YearMonth.of(year, month).plusMonths(1).atDay(1).atStartOfDay();
-        return new LocalDateTime[]{start, end};
+        return com.uit.petrescueapi.application.support.AppTime.monthUtc(YearMonth.of(year, month));
     }
 
     private LocalDateTime[] monthRangePrev(int month, int year) {
-        YearMonth prev = YearMonth.of(year, month).minusMonths(1);
-        LocalDateTime start = prev.atDay(1).atStartOfDay();
-        LocalDateTime end = YearMonth.of(year, month).atDay(1).atStartOfDay();
-        return new LocalDateTime[]{start, end};
+        return com.uit.petrescueapi.application.support.AppTime.monthUtc(YearMonth.of(year, month).minusMonths(1));
     }
 }

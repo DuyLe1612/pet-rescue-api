@@ -46,7 +46,12 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
                a.createdAt       AS createdAt,
-               a.readyAt         AS readyAt
+               a.readyAt         AS readyAt,
+               a.matchLevel      AS matchLevel,
+               a.matchScore      AS matchScore,
+               a.matchCertainty  AS matchCertainty,
+               a.matchWarnings   AS matchWarnings,
+               a.warningsAcknowledged AS warningsAcknowledged
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
@@ -89,7 +94,15 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.decidedBy       AS decidedBy,
              d.username        AS decidedByUsername,
              a.rejectReason    AS rejectReason,
-             a.readyAt         AS readyAt
+             a.readyAt         AS readyAt,
+               a.matchLevel      AS matchLevel,
+               a.matchScore      AS matchScore,
+               a.matchCertainty  AS matchCertainty,
+               a.matchWarnings   AS matchWarnings,
+               a.warningsAcknowledged AS warningsAcknowledged,
+               a.matchWeightsVersion AS matchWeightsVersion,
+               a.matchSnapshot   AS matchSnapshot,
+               a.decisionReasonCode AS decisionReasonCode
         FROM AdoptionApplicationJpaEntity a
         LEFT JOIN PetJpaEntity p ON a.petId = p.id
         LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
@@ -118,7 +131,12 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
                a.createdAt       AS createdAt,
-               a.readyAt         AS readyAt
+               a.readyAt         AS readyAt,
+               a.matchLevel      AS matchLevel,
+               a.matchScore      AS matchScore,
+               a.matchCertainty  AS matchCertainty,
+               a.matchWarnings   AS matchWarnings,
+               a.warningsAcknowledged AS warningsAcknowledged
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
@@ -156,13 +174,19 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
                a.createdAt       AS createdAt,
-               a.readyAt         AS readyAt
+               a.readyAt         AS readyAt,
+               a.matchLevel      AS matchLevel,
+               a.matchScore      AS matchScore,
+               a.matchCertainty  AS matchCertainty,
+               a.matchWarnings   AS matchWarnings,
+               a.warningsAcknowledged AS warningsAcknowledged
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
          LEFT JOIN OrganizationJpaEntity o ON a.organizationId = o.organizationId
          WHERE a.deleted = false
           AND a.organizationId = :organizationId
+          AND (:petId IS NULL OR a.petId = :petId)
             AND a.status IN :statuses
             AND (:search IS NULL OR :search = '' OR
                 LOWER(a.adoptionCode) LIKE LOWER(CONCAT('%', :search, '%')) OR
@@ -171,6 +195,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
      """)
         Page<AdoptionSummaryProjection> findByOrganizationIdSummaries(
             @Param("organizationId") UUID organizationId,
+            @Param("petId") UUID petId,
             @Param("statuses") List<String> statuses,
             @Param("search") String search,
             Pageable pageable);

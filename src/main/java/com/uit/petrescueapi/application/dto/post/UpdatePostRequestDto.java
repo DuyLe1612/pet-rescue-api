@@ -23,4 +23,10 @@ public class UpdatePostRequestDto {
 
     @Size(max = 20)
     private List<String> tagCodes;
+
+    /** Link the post to this rescue case, replacing any current link. */
+    private java.util.UUID rescueCaseId;
+
+    /** True removes the link to a rescue case. Ignored when rescueCaseId is sent. */
+    private boolean removeRescueCase;
 }

@@ -46,58 +46,68 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                CASE rc.priority WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 1 ELSE 0 END AS priority_rank
         """;
 
-    /** The filters every case list shares. The lists are never empty: a flag says whether they apply. */
-    String SUMMARY_FILTER = """
-          AND (:anyStatus = true OR rc.status IN (:statuses))
-          AND (:anyPriority = true OR rc.priority IN (:priorities))
-          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
-          AND (CAST(:search AS VARCHAR) IS NULL OR CAST(:search AS VARCHAR) = '' OR
-               LOWER(rc.case_code) LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%')) OR
-               LOWER(rc.species) LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%')) OR
-               LOWER(rc.location_text) LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%')) OR
-               LOWER(u.username) LIKE LOWER(CONCAT('%', CAST(:search AS VARCHAR), '%')))
-        """;
-
-    String SUMMARY_COUNT = """
-        SELECT COUNT(rc.case_id)
-        FROM rescue_cases rc
-        LEFT JOIN users u ON rc.reported_by = u.user_id
-        WHERE rc.is_deleted = false
-        """;
-
     // ── Summary (list views) ────────────────────
 
     @Query(value = """
-        SELECT rc.case_id       AS caseId,
-               rc.case_code     AS caseCode,
-               rc.species       AS species,
-               rc.priority      AS priority,
-               rc.status        AS status,
-               rc.reported_at   AS reportedAt,
-               rc.location_text AS locationText,
-               u.username       AS reporterUsername,
-               (
-                 SELECT mf.public_id
-                 FROM rescue_media rm
-                 JOIN media_files mf ON mf.media_id = rm.media_id
-                 WHERE rm.case_id = rc.case_id
-                 ORDER BY mf.created_at ASC
-                 LIMIT 1
-               ) AS firstImageUrl
-        """ + SUMMARY_EXTRAS + """
-        FROM rescue_cases rc
-        LEFT JOIN users u ON rc.reported_by = u.user_id
-        WHERE rc.is_deleted = false
-        """ + SUMMARY_FILTER,
-            countQuery = SUMMARY_COUNT + SUMMARY_FILTER,
+      SELECT rc.case_id       AS caseId,
+           rc.case_code     AS caseCode,
+           rc.species       AS species,
+           rc.priority      AS priority,
+           rc.status        AS status,
+           rc.reported_at   AS reportedAt,
+           rc.location_text AS locationText,
+           u.username       AS reporterUsername,
+           (
+             SELECT mf.public_id
+             FROM rescue_media rm
+             JOIN media_files mf ON mf.media_id = rm.media_id
+             WHERE rm.case_id = rc.case_id
+             ORDER BY mf.created_at ASC
+             LIMIT 1
+           ) AS firstImageUrl
+    """ + SUMMARY_EXTRAS + """
+      FROM rescue_cases rc
+      LEFT JOIN users u ON rc.reported_by = u.user_id
+      WHERE rc.is_deleted = false
+         AND (:search IS NULL OR :search = '' OR
+              LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
+    """,
+            countQuery = """
+      SELECT COUNT(rc.case_id)
+      FROM rescue_cases rc
+      LEFT JOIN users u ON rc.reported_by = u.user_id
+      WHERE rc.is_deleted = false
+         AND (:search IS NULL OR :search = '' OR
+              LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
+              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
+    """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findAllSummaries(
             @Param("search") String search,
-            @Param("anyStatus") boolean anyStatus,
+            @Param("allStatuses") boolean allStatuses,
             @Param("statuses") List<String> statuses,
-            @Param("anyPriority") boolean anyPriority,
+            @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
+            @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
     // ── Detail (single rescue case) ─────────────
@@ -146,7 +156,6 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
 
     // ── Nearby (PostGIS spatial query) ──────────
 
-    /** Always nearest first; pass an unsorted page. */
     @Query(value = """
         SELECT rc.case_id AS caseId,
                rc.case_code AS caseCode,
@@ -165,29 +174,88 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  LIMIT 1
                ) AS firstImageUrl,
                ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
-        """ + SUMMARY_EXTRAS + """
+    """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
-        """ + SUMMARY_FILTER + """
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
         ORDER BY distance, rc.reported_at DESC
-        """,
-            countQuery = SUMMARY_COUNT + """
-          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
-        """ + SUMMARY_FILTER,
+    """,
+            countQuery = """
+                        SELECT COUNT(rc.case_id)
+                        FROM rescue_cases rc
+                        WHERE rc.is_deleted = false
+                          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
+                    """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findNearby(
             @Param("lng") double lng,
             @Param("lat") double lat,
             @Param("distanceMeters") double distanceMeters,
-            @Param("search") String search,
-            @Param("anyStatus") boolean anyStatus,
+            @Param("allStatuses") boolean allStatuses,
             @Param("statuses") List<String> statuses,
-            @Param("anyPriority") boolean anyPriority,
+            @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
+            @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
+
+    // ── Possible duplicates of a report about to be filed ──
+
+    /**
+     * Open cases reported recently near a point. A case with no species still matches, because
+     * the earlier reporter may not have known what the animal was.
+     */
+    @Query(value = """
+        SELECT rc.case_id AS caseId,
+               rc.case_code AS caseCode,
+               rc.species AS species,
+               rc.priority AS priority,
+               rc.status AS status,
+               (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
+               rc.location_text AS locationText,
+               u.username AS reporterUsername,
+               (
+                 SELECT mf.public_id
+                 FROM rescue_media rm
+                 JOIN media_files mf ON mf.media_id = rm.media_id
+                 WHERE rm.case_id = rc.case_id
+                 ORDER BY mf.created_at ASC
+                 LIMIT 1
+               ) AS firstImageUrl,
+               ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+    """ + SUMMARY_EXTRAS + """
+        FROM rescue_cases rc
+        LEFT JOIN users u ON rc.reported_by = u.user_id
+        WHERE rc.is_deleted = false
+          AND rc.status IN ('REPORTED', 'IN_PROGRESS')
+          AND rc.reported_at >= now() - make_interval(hours => :hours)
+          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (CAST(:species AS VARCHAR) IS NULL OR rc.species IS NULL
+               OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+        ORDER BY distance, rc.reported_at DESC
+        LIMIT :maxResults
+    """, nativeQuery = true)
+    List<RescueCaseSummaryProjection> findPossibleDuplicates(
+            @Param("lng") double lng,
+            @Param("lat") double lat,
+            @Param("distanceMeters") double distanceMeters,
+            @Param("species") String species,
+            @Param("hours") int hours,
+            @Param("maxResults") int maxResults);
 
     // ── Within bounding box (PostGIS spatial query) ──
 
@@ -208,27 +276,43 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  ORDER BY mf.created_at ASC
                  LIMIT 1
                ) AS firstImageUrl
-        """ + SUMMARY_EXTRAS + """
+    """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
-        """ + SUMMARY_FILTER,
-            countQuery = SUMMARY_COUNT + """
-          AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
-        """ + SUMMARY_FILTER,
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
+    """,
+            countQuery = """
+                        SELECT COUNT(rc.case_id)
+                        FROM rescue_cases rc
+                        WHERE rc.is_deleted = false
+                          AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
+          AND (:allStatuses = true OR rc.status IN (:statuses))
+          AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+          AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
+               OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
+          AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
+                    """,
             nativeQuery = true)
     Page<RescueCaseSummaryProjection> findWithinBoundingBox(
             @Param("minLng") double minLng,
             @Param("minLat") double minLat,
             @Param("maxLng") double maxLng,
             @Param("maxLat") double maxLat,
-            @Param("search") String search,
-            @Param("anyStatus") boolean anyStatus,
+            @Param("allStatuses") boolean allStatuses,
             @Param("statuses") List<String> statuses,
-            @Param("anyPriority") boolean anyPriority,
+            @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
             @Param("species") String species,
+            @Param("province") String province,
+            @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
     // ══════════════════════════════════════════════════════════════════════════

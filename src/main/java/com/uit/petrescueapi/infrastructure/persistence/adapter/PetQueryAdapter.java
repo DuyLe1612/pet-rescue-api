@@ -46,21 +46,23 @@ public class PetQueryAdapter implements PetQueryDataPort {
             List<PetStatus> statuses,
             UUID ownerUserId,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     ) {
+        province = province == null || province.isBlank() ? null : province.trim();
         List<String> statusNames = statuses != null ? statuses.stream().map(PetStatus::name).toList() : null;
         if (searchName != null && !searchName.isBlank()) {
-                        return petSearchPort.searchPets(searchName, species, breed, gender, statusNames, ownerUserId, ownerOrganizationId, pageable);
+                        return petSearchPort.searchPets(searchName, species, breed, gender, statusNames, ownerUserId, ownerOrganizationId, province, pageable);
         }
 
                 if (statusNames == null || statusNames.isEmpty()) {
                         return queryRepo.findAllWithFilters(
-                                        species, breed, gender, null, ownerUserId, ownerOrganizationId, pageable
+                                        species, breed, gender, null, ownerUserId, ownerOrganizationId, province, pageable
                         ).map(this::toSummaryDto);
                 }
 
                 return queryRepo.findAllWithFiltersAndStatuses(
-                                species, breed, gender, null, statusNames, ownerUserId, ownerOrganizationId, pageable
+                                species, breed, gender, null, statusNames, ownerUserId, ownerOrganizationId, province, pageable
                 ).map(this::toSummaryDto);
     }
 
@@ -70,6 +72,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
             String breed,
             String gender,
             UUID ownerOrganizationId,
+            String province,
             Pageable pageable
     ) {
         return queryRepo.findByStatusWithFilters(
@@ -78,6 +81,7 @@ public class PetQueryAdapter implements PetQueryDataPort {
                 gender,
                 PetStatus.AVAILABLE.name(),
                 ownerOrganizationId,
+                province == null || province.isBlank() ? null : province.trim(),
                 pageable
         ).map(this::toSummaryDto);
     }

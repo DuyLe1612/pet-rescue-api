@@ -17,4 +17,8 @@ public class DecisionRequestDto {
     @Size(max = 2000)
     private String rejectReason;
     private java.time.LocalDateTime readyAt;
+
+    /** Optional machine-readable reason for the decision, e.g. MATCH_WARNING, BETTER_FIT_FOUND, HOME_CHECK_OK. */
+    @jakarta.validation.constraints.Size(max = 50)
+    private String reasonCode;
 }

@@ -50,10 +50,13 @@ public class ApiResponse<T> {
     @Schema(description = "Human-readable message", example = "OK")
     private String message;
 
+    @Schema(description = "Machine-readable error code, only on business errors", example = "PET_NOT_AVAILABLE")
+    private String errorCode;
+
     @Schema(description = "Response payload")
     private T data;
 
-    @Schema(description = "ISO-8601 timestamp", example = "2026-02-26T18:00:00")
+    @Schema(description = "ISO-8601 timestamp", example = "2026-02-26T11:00:00Z")
     private String timestamp;
 
     @Schema(description = "Correlation ID for tracing", example = "550e8400-e29b-41d4-a716-446655440000")
@@ -71,7 +74,7 @@ public class ApiResponse<T> {
                 .status(200)
                 .message(message)
                 .data(data)
-                .timestamp(LocalDateTime.now().toString())
+                .timestamp(java.time.Instant.now().toString())
                 .correlationId(MDC.get("correlationId"))
                 .build();
     }
@@ -86,7 +89,7 @@ public class ApiResponse<T> {
                 .status(201)
                 .message(message)
                 .data(data)
-                .timestamp(LocalDateTime.now().toString())
+                .timestamp(java.time.Instant.now().toString())
                 .correlationId(MDC.get("correlationId"))
                 .build();
     }
@@ -96,9 +99,15 @@ public class ApiResponse<T> {
                 .success(true)
                 .status(204)
                 .message("No Content")
-                .timestamp(LocalDateTime.now().toString())
+                .timestamp(java.time.Instant.now().toString())
                 .correlationId(MDC.get("correlationId"))
                 .build();
+    }
+
+    public static <T> ApiResponse<T> error(int status, String message, String errorCode) {
+        ApiResponse<T> response = error(status, message);
+        response.setErrorCode(errorCode);
+        return response;
     }
 
     public static <T> ApiResponse<T> error(int status, String message) {
@@ -106,7 +115,7 @@ public class ApiResponse<T> {
                 .success(false)
                 .status(status)
                 .message(message)
-                .timestamp(LocalDateTime.now().toString())
+                .timestamp(java.time.Instant.now().toString())
                 .correlationId(MDC.get("correlationId"))
                 .build();
     }

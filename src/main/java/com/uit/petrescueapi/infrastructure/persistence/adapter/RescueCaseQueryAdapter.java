@@ -35,10 +35,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     // ======================================================
 
     @Override
-    public Page<RescueCaseSummaryResponseDto> findAllSummaries(RescueCaseFilter filter, Pageable pageable) {
-        return queryRepo.findAllSummaries(
-                        filter.search(), noneGiven(filter.statuses()), statusNames(filter), noneGiven(filter.priorities()),
-                        normalizePriorities(filter.priorities()), species(filter), pageable)
+    public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, RescueCaseFilter filter, Pageable pageable) {
+        return queryRepo.findAllSummaries(search, allStatuses(filter), statusNames(filter), allPriorities(filter),
+                        priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -53,19 +52,26 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
         // the query orders by distance itself
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
-        return queryRepo.findNearby(lng, lat, distanceMeters,
-                        filter.search(), noneGiven(filter.statuses()), statusNames(filter), noneGiven(filter.priorities()),
-                        normalizePriorities(filter.priorities()), species(filter), unsorted)
+        return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), unsorted)
                 .map(this::toSummaryDto);
+    }
+
+    @Override
+    public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(
+            double lat, double lng, double distanceMeters, String species, int hours, int maxResults) {
+
+        return queryRepo.findPossibleDuplicates(lng, lat, distanceMeters, species, hours, maxResults).stream()
+                .map(this::toSummaryDto)
+                .toList();
     }
 
     @Override
     public Page<RescueCaseSummaryResponseDto> findWithinBoundingBoxSummaries(
             double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 
-        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat,
-                        filter.search(), noneGiven(filter.statuses()), statusNames(filter), noneGiven(filter.priorities()),
-                        normalizePriorities(filter.priorities()), species(filter), pageable)
+        return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, allStatuses(filter), statusNames(filter),
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -164,25 +170,30 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .toList();
     }
 
+    // An empty IN () list is invalid SQL, so "no filter" travels as a flag plus a placeholder value.
+    private static final List<String> NO_VALUES = List.of("");
+
+    private static boolean allStatuses(RescueCaseFilter filter) {
+        return filter.statuses() == null || filter.statuses().isEmpty();
+    }
+
+    private static List<String> statusNames(RescueCaseFilter filter) {
+        return allStatuses(filter) ? NO_VALUES : filter.statuses().stream().map(Enum::name).toList();
+    }
+
+    private static boolean allPriorities(RescueCaseFilter filter) {
+        return filter.priorities() == null || filter.priorities().isEmpty();
+    }
+
+    private static List<String> priorityNames(RescueCaseFilter filter) {
+        return allPriorities(filter) ? NO_VALUES : filter.priorities().stream().map(Enum::name).toList();
+    }
+
     private List<String> normalizeStatuses(List<RescueCaseStatus> status) {
         if (status == null || status.isEmpty()) {
             return MAP_DEFAULT_STATUSES;
         }
         return status.stream().map(Enum::name).toList();
-    }
-
-    private static boolean noneGiven(List<?> values) {
-        return values == null || values.isEmpty();
-    }
-
-    /** Unlike the map, a list shows every status unless asked otherwise. Never empty, for the IN clause. */
-    private static List<String> statusNames(RescueCaseFilter filter) {
-        List<RescueCaseStatus> statuses = noneGiven(filter.statuses()) ? List.of(RescueCaseStatus.values()) : filter.statuses();
-        return statuses.stream().map(Enum::name).toList();
-    }
-
-    private static String species(RescueCaseFilter filter) {
-        return filter.species() == null || filter.species().isBlank() ? null : filter.species().trim();
     }
 
     private List<String> normalizePriorities(List<RescuePriority> priority) {

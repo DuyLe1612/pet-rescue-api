@@ -64,14 +64,14 @@ public interface AdminDashboardProjectionRepository extends Repository<PetJpaEnt
 
     @Query(value = """
         SELECT 
-            EXTRACT(MONTH FROM created_at) AS month,
+            EXTRACT(MONTH FROM created_at AT TIME ZONE 'Asia/Ho_Chi_Minh') AS month,
             COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pending,
             COUNT(CASE WHEN status = 'APPROVED' THEN 1 END) AS approved,
             COUNT(CASE WHEN status = 'REJECTED' THEN 1 END) AS rejected,
             COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END) AS completed
         FROM adoption_applications
         WHERE is_deleted = false AND created_at >= :yearStart AND created_at < :yearEnd
-        GROUP BY EXTRACT(MONTH FROM created_at)
+        GROUP BY EXTRACT(MONTH FROM created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')
         ORDER BY month
     """, nativeQuery = true)
     List<AdoptionTrendProjection> getAdoptionTrend(

@@ -33,6 +33,7 @@ public class UserController {
     private final UserCommandPort commandPort;
     private final UserQueryPort queryPort;
     private final com.uit.petrescueapi.application.port.query.RescueCaseQueryPort rescueQueryPort;
+    private final com.uit.petrescueapi.application.port.query.PetQueryPort petQueryPort;
     private final UserWebMapper mapper;
 
     @PutMapping("/me/profile")
@@ -72,10 +73,40 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(rescueQueryPort.findMyActiveClaims(UUID.fromString(authentication.getName()))));
     }
 
+    @GetMapping("/me/rescue-cases")
+    @Operation(summary = "Rescue cases I reported",
+            description = "Newest first. status narrows it, e.g. status=REPORTED&status=IN_PROGRESS for the ones still open.")
+    public ResponseEntity<ApiResponse<PageResponse<com.uit.petrescueapi.application.dto.rescue.RescueCaseSummaryResponseDto>>> getMyRescueCases(
+            @RequestParam(required = false) java.util.List<com.uit.petrescueapi.domain.valueobject.RescueCaseStatus> status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(rescueQueryPort.findAll(null,
+                com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter.reportedBy(userId, status),
+                PageableRequestFactory.ofNative(page, pageSize, "reportedAt", "desc")))));
+    }
+
+    @GetMapping("/me/pets")
+    @Operation(summary = "Pets I own",
+            description = "Every pet whose current owner is the caller: self-registered, adopted, or kept after a rescue.")
+    public ResponseEntity<ApiResponse<PageResponse<com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto>>> getMyPets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int pageSize,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder,
+            Authentication authentication) {
+        UUID userId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(petQueryPort.findAllWithFilters(
+                null, null, null, null, null, userId, null, null,
+                PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+    }
+
     @GetMapping("/{id}")
-    @Operation(summary = "Get user by ID")
-    public ResponseEntity<ApiResponse<UserResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findById(id)));
+    @Operation(summary = "Get user by ID",
+            description = "Email, phone and street address are only returned to the user themself and to admins.")
+    public ResponseEntity<ApiResponse<UserResponseDto>> getById(@PathVariable UUID id, Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findByIdForViewer(id, UUID.fromString(authentication.getName()))));
     }
 
     @GetMapping

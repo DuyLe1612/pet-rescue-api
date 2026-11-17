@@ -1,6 +1,5 @@
 package com.uit.petrescueapi.application.port.query;
 
-import com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter;
 import com.uit.petrescueapi.application.dto.rescue.RescueClaimResponseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseCompletionResponseDto;
@@ -18,10 +17,15 @@ import java.util.UUID;
 public interface RescueCaseQueryPort {
     /** {@code viewerId} is null for an anonymous caller. */
     RescueCaseResponseDto findById(UUID caseId, UUID viewerId);
-    Page<RescueCaseSummaryResponseDto> findAll(RescueCaseFilter filter, Pageable pageable);
-    /** Nearest first; the sort of {@code pageable} is not used. */
-    Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable);
-    Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findAll(String search, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
+    Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
+
+    /**
+     * Open cases reported near a point in the last hours, nearest first, so someone about to
+     * report can see the animal may already be known. Advisory only: it never blocks a report.
+     */
+    List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, String species, Double radiusMeters, Integer hours);
 
     // ── Map marker queries (optimized for fast map rendering) ──
     List<RescueMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng);

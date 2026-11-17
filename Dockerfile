@@ -45,7 +45,9 @@ EXPOSE 8080
 # Sized for a 512 MB container: non-heap (metaspace ~130 MB, code cache, threads) is ~250 MB,
 # so heap gets 50% and every off-heap region is capped. 75% heap was OOM-killed under load.
 # -XX:TieredStopAtLevel=1  → C1 only: smaller code cache, faster cold-start
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=180m -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1 -Xss512k -XX:MaxDirectMemorySize=32m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false"
+# The application also pins UTC in main(); TZ keeps logs and native tools on the same clock.
+ENV TZ=UTC
+ENV JAVA_TOOL_OPTIONS="-Duser.timezone=UTC -XX:+UseContainerSupport -XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=180m -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1 -Xss512k -XX:MaxDirectMemorySize=32m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD wget -qO- http://localhost:8080/actuator/health || exit 1

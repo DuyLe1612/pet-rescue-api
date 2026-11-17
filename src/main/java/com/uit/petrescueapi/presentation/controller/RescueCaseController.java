@@ -50,15 +50,24 @@ public class RescueCaseController {
     private final RescueCaseQueryPort queryPort;
     private final RescueCaseWebMapper mapper;
     private final PetWebMapper petMapper;
+    private final com.uit.petrescueapi.application.port.command.RescueCaseSharePort sharePort;
 
     @PostMapping
-    @Operation(summary = "Report a new rescue case")
+    @Operation(summary = "Report a new rescue case",
+            description = "shareAsPost=true also publishes a community post about the case (postContent is optional). "
+                    + "The case is saved first: if the post fails the response still is 201, with postShareFailed=true.")
     public ResponseEntity<ApiResponse<RescueCaseResponseDto>> report(
             @Valid @RequestBody CreateRescueCaseRequestDto cmd,
             Authentication authentication) {
         UUID userId = UUID.fromString(authentication.getName());
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created(mapper.toDto(commandPort.report(cmd, userId))));
+        com.uit.petrescueapi.domain.entity.RescueCase reported = commandPort.report(cmd, userId);
+        RescueCaseResponseDto body = mapper.toDto(reported);
+        if (cmd.isShareAsPost()) {
+            java.util.Optional<UUID> postId = sharePort.shareAsPost(reported, cmd.getPostContent(), userId);
+            body.setSharedPostId(postId.orElse(null));
+            body.setPostShareFailed(postId.isEmpty());
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(body));
     }
 
     @PutMapping("/{id}")
@@ -153,12 +162,28 @@ public class RescueCaseController {
                 petMapper.toDto(commandPort.keepPet(id, request, UUID.fromString(authentication.getName())))));
     }
 
+    @GetMapping("/possible-duplicates")
+    @Operation(summary = "Open cases near a point that may be the same animal",
+            description = "Call before filing a report. Returns at most 5 cases still REPORTED or IN_PROGRESS, " +
+                    "reported within the last hours (default 48, max 168) and within radius metres (default 300, max 2000), " +
+                    "nearest first. species is optional; cases with no species recorded always match. " +
+                    "Advisory only: the caller may still file a new report.")
+    public ResponseEntity<ApiResponse<List<RescueCaseSummaryResponseDto>>> possibleDuplicates(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) Double radius,
+            @RequestParam(required = false) Integer hours) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findPossibleDuplicates(lat, lng, species, radius, hours)));
+    }
+
     @GetMapping
     @Operation(summary = "List all rescue cases (paginated, with optional filters)",
-            description = "Unified endpoint for listing rescue cases. Supports geo filtering with lat/lng/distance for nearby results " +
+            description = "Unified endpoint for listing rescue cases. status, priority, species and province (code or name) " +
+                    "apply to every mode. Supports geo filtering with lat/lng/distance for nearby results " +
                     "or minLat/minLng/maxLat/maxLng for bounding box results. Use lat=X&lng=Y&distance=Z for nearby. " +
                     "Use minLat=X&minLng=Y&maxLat=Z&maxLng=W for bounding box. An incomplete area is a 400. " +
-                    "search, status, priority and species apply to all three; without status every status is returned. " +
+                    "search applies to the plain list only. " +
                     "sortBy: reportedAt, createdAt, caseCode, status, species, priority (desc = most urgent first). " +
                     "Nearby results are always nearest first.")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getAll(
@@ -170,6 +195,7 @@ public class RescueCaseController {
             @RequestParam(required = false) List<RescueCaseStatus> status,
             @RequestParam(required = false) List<RescuePriority> priority,
             @RequestParam(required = false) String species,
+            @RequestParam(required = false) String province,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) Double distance,
@@ -178,7 +204,7 @@ public class RescueCaseController {
             @RequestParam(required = false) Double maxLat,
             @RequestParam(required = false) Double maxLng) {
 
-        RescueCaseFilter filter = new RescueCaseFilter(search, status, priority, species);
+        RescueCaseFilter filter = new RescueCaseFilter(status, priority, species, province);
         boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
         boolean hasPoint = GeoParams.hasPoint(lat, lng, distance);
 
@@ -198,7 +224,7 @@ public class RescueCaseController {
 
         // Standard list
         return ResponseEntity.ok(ApiResponse.ok(
-            PageResponse.from(queryPort.findAll(filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, SORT_COLUMNS)))));
+            PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, SORT_COLUMNS)))));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
