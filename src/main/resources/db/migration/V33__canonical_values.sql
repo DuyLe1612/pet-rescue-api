@@ -1,5 +1,5 @@
 -- ============================================================
--- V29: one stored form for every catalog value and enum
+-- V33: one stored form for every catalog value and enum
 --
 -- The database keeps one canonical value per thing: English catalog names ("Dog"), upper-case
 -- enum constants ("MALE"), slug tag codes ("lost-pet"). Spellings such as "dog", "DOG", "Chó"

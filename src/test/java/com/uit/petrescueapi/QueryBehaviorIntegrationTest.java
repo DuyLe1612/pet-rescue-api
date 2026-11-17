@@ -1438,7 +1438,7 @@ class QueryBehaviorIntegrationTest {
 
     /**
      * A species only this test uses, so filters see only its own rows. It goes into the catalog
-     * first: a case's species must be a catalog name (V29).
+     * first: a case's species must be a catalog name (V33).
      */
     private String newSpecies() {
         String name = "Sp" + UUID.randomUUID().toString().substring(0, 8);

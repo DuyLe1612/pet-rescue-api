@@ -37,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * One stored form per value (V29 and the request normalization), on real PostGIS: the SQL key
+ * One stored form per value (V33 and the request normalization), on real PostGIS: the SQL key
  * function agrees with the Java one, the database refuses spelling duplicates, and a request
  * written in Vietnamese or in odd case is stored as the canonical English value.
  */

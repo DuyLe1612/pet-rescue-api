@@ -25,7 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * scripts/demo-data runs against the real schema: every migration applied, every V29 rule on.
+ * scripts/demo-data runs against the real schema: every migration applied, every V33 rule on.
  * Keeps the demo script working as tables change.
  */
 @SpringBootTest(properties = {
