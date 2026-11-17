@@ -22,4 +22,9 @@ public interface RescueCaseSummaryProjection {
     String getFirstImageUrl();
     /** Only the nearby query selects it. */
     Double getDistance();
+    Double getLatitude();
+    Double getLongitude();
+    String getWardName();
+    String getProvinceName();
+    Boolean getNeedsHelp();
 }

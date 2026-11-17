@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Response DTO for rescue case.
- * Excludes petName, reportedBy, organizationName, size, resolvedAt and createdAt.
+ * Excludes reportedBy, size, resolvedAt and createdAt.
  */
 @Data
 @Builder
@@ -38,7 +38,9 @@ public class RescueCaseResponseDto {
     @Schema(description = "Only for the reporter, people with an active claim, the handling organization and admins")
     private String contactPhone;
     private UUID organizationId;
+    private String organizationName;
     private UUID petId;
+    private String petName;
     private boolean needsHelp;
     private int activeClaimCount;
     private boolean viewerIsReporter;

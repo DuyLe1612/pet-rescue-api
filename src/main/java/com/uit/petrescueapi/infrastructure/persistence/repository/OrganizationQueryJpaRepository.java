@@ -81,6 +81,7 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                                          ST_X(o.location) AS longitude,
                                                                          o.phone AS phone,
                                                                          o.image_url AS imageUrl,
+                                                                         o.street_address AS streetAddress,
                                                                          o.ward_name AS wardName,
                                                                          o.province_name AS provinceName
                                                 FROM organizations o
@@ -119,7 +120,6 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                              LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR
                                                              LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR
                                                              LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%')))
-                                                ORDER BY o.created_at DESC
                                                 """,
                                                 countQuery = "SELECT COUNT(1) FROM organizations o WHERE o.is_deleted = false AND o.location IS NOT NULL AND ST_Within(o.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326)) AND o.status IN (:statuses) AND (:search IS NULL OR :search = '' OR LOWER(o.organization_code) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.type) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.phone) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.province_name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(o.ward_name) LIKE LOWER(CONCAT('%', :search, '%'))) ",
                                                 nativeQuery = true)
@@ -141,6 +141,7 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
                                                                          ST_X(o.location) AS longitude,
                                                                          o.phone AS phone,
                                                                          o.image_url AS imageUrl,
+                                                                         o.street_address AS streetAddress,
                                                                          o.ward_name AS wardName,
                                                                          o.province_name AS provinceName
                                                 FROM organizations o
