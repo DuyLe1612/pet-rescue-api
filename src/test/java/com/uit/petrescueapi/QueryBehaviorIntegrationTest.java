@@ -105,11 +105,13 @@ class QueryBehaviorIntegrationTest {
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
     @MockitoBean CloudStoragePort cloud;
-    /** No broker in this test: likes and comments publish counter events that nothing here consumes. */
+    /** There is no broker in this test, and every message it is given is refused. */
     @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
 
     @BeforeEach
     void cloudBuildsUrls() {
+        org.mockito.Mockito.doThrow(new org.springframework.amqp.AmqpConnectException(new java.net.ConnectException("refused")))
+                .when(rabbit).convertAndSend(anyString(), anyString(), any(Object.class));
         when(cloud.buildUrl(anyString())).thenAnswer(i -> "https://cdn.test/" + i.getArgument(0));
     }
 
