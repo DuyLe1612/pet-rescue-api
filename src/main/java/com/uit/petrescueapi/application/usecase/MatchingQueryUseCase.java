@@ -44,6 +44,19 @@ public class MatchingQueryUseCase implements MatchingQueryPort {
     private final PetQueryDataPort petQuery;
 
     @Override
+    public com.uit.petrescueapi.application.dto.matching.AdopterProfileSuggestionDto suggestAdopterProfile(UUID userId) {
+        var mine = petQuery.findOwnedBy(userId, null, org.springframework.data.domain.PageRequest.of(0, 100, org.springframework.data.domain.Sort.by("created_at")))
+                .getContent().stream()
+                .filter(p -> p.getStatus() != com.uit.petrescueapi.domain.valueobject.PetStatus.DECEASED
+                        && p.getStatus() != com.uit.petrescueapi.domain.valueobject.PetStatus.LOST)
+                .toList();
+        boolean dog = mine.stream().anyMatch(p -> SpeciesKind.fromName(p.getSpecies()) == SpeciesKind.DOG);
+        boolean cat = mine.stream().anyMatch(p -> SpeciesKind.fromName(p.getSpecies()) == SpeciesKind.CAT);
+        return new com.uit.petrescueapi.application.dto.matching.AdopterProfileSuggestionDto(dog, cat,
+                mine.stream().map(com.uit.petrescueapi.application.dto.pet.PetSummaryResponseDto::getPetId).toList());
+    }
+
+    @Override
     public AdopterProfileDto getAdopterProfile(UUID userId) {
         return AdopterProfileDto.from(profiles.getAdopterProfile(userId));
     }

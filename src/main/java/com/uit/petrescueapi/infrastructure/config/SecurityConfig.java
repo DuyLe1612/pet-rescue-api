@@ -70,6 +70,9 @@ public class SecurityConfig {
                )
                .authorizeHttpRequests(auth -> auth
                        .requestMatchers(PUBLIC_PATHS).permitAll()
+                       // The link in the follow-up email opens without signing in; the token is the credential.
+                       .requestMatchers(HttpMethod.GET, "/api/v1/followups/respond").permitAll()
+                       .requestMatchers(HttpMethod.POST, "/api/v1/followups/respond").permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/pets/**").permitAll()
                        // Before the rule below: the AI triage is for staff, so a guest must sign in first.
                        .requestMatchers(HttpMethod.GET, "/api/v1/rescue-cases/*/triage").authenticated()

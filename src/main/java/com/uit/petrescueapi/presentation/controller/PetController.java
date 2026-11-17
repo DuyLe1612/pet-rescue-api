@@ -27,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import com.uit.petrescueapi.domain.valueobject.PetVisibility;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -118,9 +120,22 @@ public class PetController {
     // ── Queries (read) ──────────────────────────
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get pet by ID (includes organization details)")
-    public ResponseEntity<ApiResponse<PetResponseDto>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.ok(petQueryPort.findById(id)));
+    @Operation(summary = "Get pet by ID (includes organization details)",
+            description = "A private pet is only found by whoever manages it and by admins; anyone else gets 404.")
+    public ResponseEntity<ApiResponse<PetResponseDto>> getById(@PathVariable UUID id, Authentication authentication) {
+        UUID viewerId = authentication == null || authentication instanceof AnonymousAuthenticationToken
+                || !authentication.isAuthenticated() ? null : UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(petQueryPort.findByIdForViewer(id, viewerId)));
+    }
+
+    @PatchMapping("/{id}/visibility")
+    @Operation(summary = "Make a pet private or public",
+            description = "Private: only whoever manages the pet and admins can open it or see it in lists.")
+    public ResponseEntity<ApiResponse<PetResponseDto>> changeVisibility(@PathVariable UUID id,
+                                                                        @RequestParam PetVisibility visibility,
+                                                                        Authentication authentication) {
+        UUID requesterId = UUID.fromString(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(mapper.toDto(petCommandPort.changeVisibility(id, visibility, requesterId))));
     }
 
     @GetMapping("/taxonomy")

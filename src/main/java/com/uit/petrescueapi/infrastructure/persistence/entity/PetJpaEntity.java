@@ -66,6 +66,11 @@ public class PetJpaEntity extends BaseJpaEntity {
     @Column(name = "health_status", length = 30)
     private HealthStatus healthStatus;
 
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 10)
+    @lombok.Builder.Default
+    private com.uit.petrescueapi.domain.valueobject.PetVisibility visibility = com.uit.petrescueapi.domain.valueobject.PetVisibility.PUBLIC;
+
     @Column(name = "is_vaccinated", nullable = false)
     private boolean vaccinated;
 

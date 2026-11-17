@@ -69,4 +69,11 @@ public class PetSummaryResponseDto {
 
     @Schema(description = "Thumbnail image URL (first image)", example = "https://storage.example.com/pets/buddy-01.jpg")
     private String imageUrl;
+
+    /** Only in "my pets": how the caller came to have the pet. */
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
+    /** Only in "my pets", for an adopted pet: the application that made it theirs. */
+    private UUID adoptionApplicationId;
+    /** Only in "my pets", for an adopted pet: the organization it came from. */
+    private OrganizationMinimalDto sourceOrganization;
 }

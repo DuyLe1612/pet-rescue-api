@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
@@ -101,6 +102,8 @@ class QueryBehaviorIntegrationTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.uit.petrescueapi.application.port.command.FollowupCommandPort followupCommands;
+    @Autowired com.uit.petrescueapi.domain.service.FollowupDomainService followups;
     @Autowired EntityManagerFactory emf;
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
@@ -432,6 +435,427 @@ class QueryBehaviorIntegrationTest {
         assertThat(applicationStatus(alreadyRejected)).isEqualTo("REJECTED");
     }
 
+    @Test
+    void adoptingRecordsHowTheNewOwnerGotThePetAndWhichApplicationDidIt() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        var current = jdbc.queryForMap("SELECT owner_type, owner_id, acquisition_type, adoption_application_id FROM pets_current_owner WHERE pet_id = ?", petId);
+        assertThat(current.get("owner_type")).isEqualTo("USER");
+        assertThat(current.get("owner_id")).isEqualTo(adopter);
+        assertThat(current.get("acquisition_type")).isEqualTo("ADOPTED");
+        assertThat(current.get("adoption_application_id")).isEqualTo(application);
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ? AND to_time IS NULL", String.class, petId))
+                .isEqualTo("ADOPTED");
+    }
+
+    @Test
+    void completingAnAdoptionSchedulesFourMilestonesOnceAndCancelsOnlyTheOpenOnes() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, person(), shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList("SELECT milestone FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("DAY_2", "WEEK_2", "MONTH_3", "MONTH_6");
+        assertThat(jdbc.queryForObject("SELECT completed_at IS NOT NULL FROM adoption_applications WHERE application_id = ?", Boolean.class, application)).isTrue();
+        // due two days after completion, as configured
+        assertThat(jdbc.queryForObject("""
+                SELECT f.due_at = a.completed_at + INTERVAL '2 days'
+                FROM adoption_followups f JOIN adoption_applications a ON a.application_id = f.application_id
+                WHERE f.application_id = ? AND f.milestone = 'DAY_2'""", Boolean.class, application)).isTrue();
+
+        followups.scheduleFor(application, LocalDateTime.now());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM adoption_followups WHERE application_id = ?", Integer.class, application)).isEqualTo(4);
+
+        jdbc.update("UPDATE adoption_followups SET status = 'RESPONDED' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        followups.cancelOpen(application);
+        assertThat(jdbc.queryForList("SELECT status FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("RESPONDED", "CANCELLED", "CANCELLED", "CANCELLED");
+    }
+
+    // ── Follow-up after an adoption ─────────────────
+
+    /** An adoption completed just now; its milestones are made due by the tests that need them. */
+    private UUID adoptedApplication(UUID shelter, UUID adopter) throws Exception {
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "APPROVED");
+        call(patch("/api/v1/adoptions/" + application + "/complete"), member(shelter, "OWNER")).andExpect(status().isOk());
+        return application;
+    }
+
+    private void makeDue(UUID application, String milestone) {
+        jdbc.update("UPDATE adoption_followups SET due_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = ?", application, milestone);
+    }
+
+    private static final String ANSWERS_FINE = "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"NONE\"}";
+
+    @Test
+    void aDueMilestoneIsSentOnceAndItsLinkWorksOnceWithoutSigningIn() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        long reputationLogs = jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, adopter);
+
+        var sent = followupCommands.dispatchDue(20);
+        assertThat(sent).hasSize(1);
+        assertThat(sent.get(0).followup().milestone()).isEqualTo("DAY_2");
+        assertThat(followupCommands.dispatchDue(20)).as("a second pass sends nothing more").isEmpty();
+        // only the hash is stored: the token itself is never in the database
+        String token = sent.get(0).token();
+        assertThat(jdbc.queryForObject("SELECT token_hash FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application))
+                .isNotEqualTo(token).hasSize(64);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_DUE'", Integer.class, adopter)).isEqualTo(1);
+
+        mvc.perform(get("/api/v1/followups/respond?token=" + token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.petName").value("Mực"))
+                .andExpect(jsonPath("$.data.milestone").value("DAY_2"))
+                .andExpect(jsonPath("$.data.questions", hasSize(5)));
+        mvc.perform(post("/api/v1/followups/respond").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"answers\":" + ANSWERS_FINE + "}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT status || '/' || severity FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application))
+                .isEqualTo("RESPONDED/GREEN");
+
+        // used, so it opens nothing and answers nothing; a made-up token is no different
+        mvc.perform(get("/api/v1/followups/respond?token=" + token)).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/followups/respond").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"answers\":" + ANSWERS_FINE + "}")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/followups/respond?token=not-a-real-token")).andExpect(status().isBadRequest());
+        // answering is not rewarded or punished
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, adopter)).isEqualTo(reputationLogs);
+    }
+
+    @Test
+    void anExpiredLinkOpensNothingAndWhenSeveralAreDueOnlyTheNewestIsAsked() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID application = adoptedApplication(shelter, person());
+        makeDue(application, "DAY_2");
+        jdbc.update("UPDATE adoption_followups SET due_at = now() - INTERVAL '1 day' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        makeDue(application, "WEEK_2");
+
+        var sent = followupCommands.dispatchDue(20);
+
+        assertThat(sent).extracting(d -> d.followup().milestone()).containsExactly("WEEK_2");
+        assertThat(jdbc.queryForObject("SELECT status FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application)).isEqualTo("EXPIRED");
+
+        jdbc.update("UPDATE adoption_followups SET expires_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = 'WEEK_2'", application);
+        mvc.perform(get("/api/v1/followups/respond?token=" + sent.get(0).token())).andExpect(status().isBadRequest());
+        assertThat(followupCommands.expire()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM adoption_followups WHERE application_id = ? AND milestone = 'WEEK_2'", String.class, application)).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void aMilestoneNobodyAnsweredIsRemindedOnceAfterTwoDays() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        followupCommands.dispatchDue(20);
+
+        assertThat(followupCommands.remind()).as("too soon").isZero();
+        jdbc.update("UPDATE adoption_followups SET sent_at = now() - INTERVAL '3 days' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        assertThat(followupCommands.remind()).isEqualTo(1);
+        assertThat(followupCommands.remind()).as("only once").isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_REMINDER'", Integer.class, adopter)).isEqualTo(1);
+    }
+
+    @Test
+    void theAdopterAnswersSignedInAndOnlyTheAdopterTheOrganizationAndAdminsReadTheTimeline() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        followupCommands.dispatchDue(20);
+        UUID followup = jdbc.queryForObject("SELECT followup_id FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", UUID.class, application);
+
+        call(post("/api/v1/followups/" + followup + "/answers"), person(), ANSWERS_FINE).andExpect(status().isNotFound());
+        call(post("/api/v1/followups/" + followup + "/answers"), adopter,
+                "{\"stillHasPet\":true,\"wellbeing\":\"WORRIED\",\"fear\":\"SOME\",\"incident\":\"NONE\",\"support\":\"NONE\",\"note\":\"Bé hơi sợ\"}")
+                .andExpect(status().isOk());
+
+        String url = "/api/v1/adoptions/" + application + "/followups";
+        call(get(url), adopter).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(4)))
+                .andExpect(jsonPath("$.data[0].milestone").value("DAY_2"))
+                .andExpect(jsonPath("$.data[0].severity").value("YELLOW"))
+                .andExpect(jsonPath("$.data[0].answers.note").value("Bé hơi sợ"));
+        call(get(url), member(shelter, "STAFF")).andExpect(status().isOk());
+        call(get(url), admin()).andExpect(status().isOk());
+        // another organization's staff, and a bystander, read nothing
+        call(get(url), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER")).andExpect(status().isForbidden());
+        call(get(url), person()).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+    }
+
+    /** Sends the milestone and answers it through the signed-in endpoint; returns the follow-up id. */
+    private UUID answered(UUID application, UUID adopter, String milestone, String answers) throws Exception {
+        makeDue(application, milestone);
+        followupCommands.dispatchDue(20);
+        UUID followup = jdbc.queryForObject("SELECT followup_id FROM adoption_followups WHERE application_id = ? AND milestone = ?", UUID.class, application, milestone);
+        call(post("/api/v1/followups/" + followup + "/answers"), adopter, answers).andExpect(status().isOk());
+        return followup;
+    }
+
+    @Test
+    void worryingAnswersBecomeWorkForTheOrganizationAndOnlyRedOnesNotifyStaffAtOnce() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+
+        answered(application, adopter, "DAY_2", ANSWERS_FINE);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM followup_alerts WHERE application_id = ?", Integer.class, application)).as("green makes no work").isZero();
+
+        answered(application, adopter, "WEEK_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"WORRIED\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).as("yellow waits in the queue").isZero();
+
+        answered(application, adopter, "MONTH_3",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"CONSIDERING_RETURN\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).isEqualTo(1);
+
+        // red on top, with every reason; the queue is the organization's own
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].severity").value("RED"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("CONSIDERING_RETURN"))
+                .andExpect(jsonPath("$.data[0].petName").value("Mực"))
+                .andExpect(jsonPath("$.data[1].severity").value("YELLOW"));
+        call(get("/api/v1/organizations/me/followup-alerts?status=RESOLVED"), staff).andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "STAFF"))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), adopter).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/organizations/me/followup-alerts")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anUnansweredFirstQuestionAsksTheOrganizationToCallButALaterOneDoesNot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        for (String milestone : List.of("DAY_2", "WEEK_2")) {
+            makeDue(application, milestone);
+            followupCommands.dispatchDue(20);
+            jdbc.update("UPDATE adoption_followups SET status = 'SENT', expires_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = ?", application, milestone);
+        }
+
+        assertThat(followupCommands.expire()).isEqualTo(2);
+
+        assertThat(jdbc.queryForList("SELECT severity || ':' || reason_codes FROM followup_alerts WHERE application_id = ?", String.class, application))
+                .containsExactly("YELLOW:NO_RESPONSE");
+    }
+
+    @Test
+    void staffTakeAndCloseAnAlertAndAnotherOrganizationCannot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        answered(application, adopter, "DAY_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"MUCH\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        UUID alert = jdbc.queryForObject("SELECT alert_id FROM followup_alerts WHERE application_id = ?", UUID.class, application);
+        String url = "/api/v1/followup-alerts/" + alert;
+
+        call(patch(url), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER"), "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), adopter, "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), staff, "{\"status\":\"DONE\"}").andExpect(status().isBadRequest());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\"}").andExpect(status().isBadRequest());
+
+        call(patch(url), staff, "{\"status\":\"IN_PROGRESS\",\"note\":\"Đã gọi, hẹn chiều nay\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.data.assignedTo").value(staff.toString()))
+                .andExpect(jsonPath("$.data.firstActionAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.resolvedAt").doesNotExist());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\",\"resolution\":\"ADVISED\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.resolution").value("ADVISED"))
+                .andExpect(jsonPath("$.data.note").value("Đã gọi, hẹn chiều nay"))
+                .andExpect(jsonPath("$.data.resolvedAt").isNotEmpty());
+    }
+
+    private long reputationLogCount(UUID user) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, user);
+    }
+
+    @Test
+    void anAdopterWhoCannotKeepThePetAsksToReturnItAndTheOrganizationBringsItBackWithoutCostingReputation() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        UUID petId = jdbc.queryForObject("SELECT pet_id FROM adoption_applications WHERE application_id = ?", UUID.class, application);
+        long reputationBefore = reputationLogCount(adopter);
+        String ask = "/api/v1/adoptions/" + application + "/return-request";
+
+        call(post(ask), person(), "{\"reasonCode\":\"HOUSING_MOVING\"}").andExpect(status().isNotFound());
+        call(post(ask), adopter, "{\"reasonCode\":\"NOPE\"}").andExpect(status().isBadRequest());
+        call(post(ask), adopter, "{\"reasonCode\":\"HOUSING_MOVING\",\"note\":\"Chuyển nhà ra nước ngoài\"}").andExpect(status().isOk());
+        call(post(ask), adopter, "{\"reasonCode\":\"HOUSING_MOVING\"}").andExpect(status().isOk());
+
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].severity").value("RED"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("RETURN_REQUESTED"))
+                .andExpect(jsonPath("$.data[0].reasons[1]").value("HOUSING_MOVING"))
+                .andExpect(jsonPath("$.data[0].note").value("Chuyển nhà ra nước ngoài"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).isEqualTo(1);
+
+        String outcome = "/api/v1/adoptions/" + application + "/outcome";
+        String returned = "{\"outcomeType\":\"RETURNED_BY_ADOPTER\",\"reasonCode\":\"HOUSING_MOVING\"}";
+        call(post(outcome), adopter, returned).andExpect(status().isForbidden());
+        call(post(outcome), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER"), returned).andExpect(status().isForbidden());
+        call(post(outcome), staff, "{\"outcomeType\":\"SOLD\"}").andExpect(status().isBadRequest());
+        call(post(outcome), staff, returned).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.outcomeType").value("RETURNED_BY_ADOPTER"))
+                .andExpect(jsonPath("$.data.daysSinceCompleted").value(0));
+
+        var owner = jdbc.queryForMap("SELECT owner_type, owner_id, acquisition_type FROM pets_current_owner WHERE pet_id = ?", petId);
+        assertThat(owner.get("owner_type")).isEqualTo("ORGANIZATION");
+        assertThat(owner.get("owner_id")).isEqualTo(shelter);
+        assertThat(owner.get("acquisition_type")).isEqualTo("ORG_INTAKE");
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("FOSTERING");
+        assertThat(jdbc.queryForObject("SELECT initiated_by FROM adoption_outcomes WHERE application_id = ?", UUID.class, application)).isEqualTo(adopter);
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT status FROM followup_alerts WHERE application_id = ?", String.class, application)).isEqualTo("RESOLVED");
+        assertThat(reputationLogCount(adopter)).as("giving a pet back costs nothing").isEqualTo(reputationBefore + 0);
+
+        // it ended: nothing more to record, ask or send
+        call(post(outcome), staff, returned).andExpect(status().isConflict());
+        call(post(ask), adopter, "{\"reasonCode\":\"OTHER\"}").andExpect(status().isConflict());
+        assertThat(followupCommands.dispatchDue(20)).isEmpty();
+    }
+
+    @Test
+    void aSupportRequestIsYellowWorkOnceAndTurningFollowUpOffStopsTheQuestions() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        String support = "/api/v1/adoptions/" + application + "/support-request";
+
+        call(post(support), adopter, "{\"note\":\"Bé không chịu ăn\"}").andExpect(status().isOk());
+        call(post(support), adopter, "{}").andExpect(status().isOk());
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].severity").value("YELLOW"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("SUPPORT_REQUESTED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).as("yellow does not page").isZero();
+
+        String preference = "/api/v1/adoptions/" + application + "/followup-preference";
+        call(patch(preference), person(), "{\"enabled\":false}").andExpect(status().isNotFound());
+        call(patch(preference), adopter, "{\"enabled\":false}").andExpect(status().isOk());
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        makeDue(application, "DAY_2");
+        assertThat(followupCommands.dispatchDue(20)).isEmpty();
+
+        call(patch(preference), adopter, "{\"enabled\":true}").andExpect(status().isOk());
+        // WEEK_2, MONTH_3 and MONTH_6 are still ahead; DAY_2 was already due, so it stays cancelled
+        assertThat(jdbc.queryForList("SELECT milestone || ':' || status FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("DAY_2:CANCELLED", "WEEK_2:SCHEDULED", "MONTH_3:SCHEDULED", "MONTH_6:SCHEDULED");
+    }
+
+    @Test
+    void reclaimingForAViolationIsRecordedAsAnOutcomeAndStillCostsReputation() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        UUID proof = tempMedia(owner);
+        when(cloud.moveToPermament(anyString(), any(), any())).thenReturn("pet-rescue/reclaims/proof");
+
+        call(post("/api/v1/adoptions/" + application + "/reclaim"), owner,
+                "{\"reason\":\"Bị bỏ đói nhiều ngày liền\",\"proofId\":\"" + proof + "\"}").andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("SELECT outcome_type FROM adoption_outcomes WHERE application_id = ?", String.class, application)).isEqualTo("RECLAIMED");
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(delta), 0) FROM reputation_logs WHERE user_id = ? AND reason = 'PET_RECLAIMED'", Integer.class, adopter)).isEqualTo(-300);
+    }
+
+    @Test
+    void theAdopterProfileFormIsPrefilledFromThePetsThePersonKeepsAlive() throws Exception {
+        UUID me = person();
+        String url = "/api/v1/users/me/adopter-profile/suggestion";
+        call(get(url), me).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasDog").value(false))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(0)));
+
+        UUID dog = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Dog'), status = 'ADOPTED' WHERE pet_id = ?", dog);
+        UUID deadCat = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat'), status = 'DECEASED' WHERE pet_id = ?", deadCat);
+        UUID someoneElsesCat = pet("USER", person(), null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat') WHERE pet_id = ?", someoneElsesCat);
+
+        call(get(url), me).andExpect(jsonPath("$.data.hasDog").value(true))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(1)))
+                .andExpect(jsonPath("$.data.basedOnPetIds[0]").value(dog.toString()));
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+    }
+
+    private long metric(String json, String path) {
+        List<Number> found = JsonPath.read(json, path);
+        return found.isEmpty() ? 0 : found.get(0).longValue();
+    }
+
+    @Test
+    void followUpNumbersCountNotAnsweringOnItsOwnAndAreForAdminsOnly() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        String url = "/api/v1/admin/followups/metrics";
+        call(get(url), staff).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        String before = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        UUID answeringAdopter = person();
+        UUID answering = adoptedApplication(shelter, answeringAdopter);
+        answered(answering, answeringAdopter, "DAY_2", ANSWERS_FINE);
+        UUID silent = adoptedApplication(shelter, person());
+        makeDue(silent, "DAY_2");
+        followupCommands.dispatchDue(20);
+        UUID leaving = adoptedApplication(shelter, person());
+        call(post("/api/v1/adoptions/" + leaving + "/outcome"), staff, "{\"outcomeType\":\"RETURNED_BY_ADOPTER\",\"reasonCode\":\"TIME\"}").andExpect(status().isOk());
+
+        String after = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String day2 = "$.data.milestones[?(@.milestone=='DAY_2')].";
+        assertThat(metric(after, day2 + "asked") - metric(before, day2 + "asked")).isEqualTo(2);
+        assertThat(metric(after, day2 + "responded") - metric(before, day2 + "responded")).isEqualTo(1);
+        assertThat(metric(after, day2 + "unanswered") - metric(before, day2 + "unanswered")).as("silence is its own number").isEqualTo(1);
+        assertThat(metric(after, day2 + "stillHasPet") - metric(before, day2 + "stillHasPet")).isEqualTo(1);
+        String returned = "$.data.outcomes[?(@.outcomeType=='RETURNED_BY_ADOPTER' && @.reasonCode=='TIME')].count";
+        assertThat(metric(after, returned) - metric(before, returned)).isEqualTo(1);
+    }
+
+    @Test
+    void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID person = person();
+        String body = "{\"name\":\"Bơ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}";
+
+        String created = call(post("/api/v1/pets"), person, body).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID mine = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT adoption_application_id FROM pets_current_owner WHERE pet_id = ?", UUID.class, mine)).isNull();
+
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "OWNER");
+        String orgBody = "{\"name\":\"Mướp\",\"speciesId\":\"" + species + "\",\"gender\":\"FEMALE\",\"shelterId\":\"" + shelter + "\"}";
+        String org = call(post("/api/v1/pets"), staff, orgBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID theirs = UUID.fromString(JsonPath.read(org, "$.data.petId"));
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, theirs)).isEqualTo("ORG_INTAKE");
+    }
+
     // ── External calls ──────────────────────────────
 
     @Test
@@ -612,6 +1036,65 @@ class QueryBehaviorIntegrationTest {
         pet("USER", person(), null);
 
         assertThat(petIds(call(get("/api/v1/users/me/pets"), me))).containsExactly(mine);
+    }
+
+    @Test
+    void myPetsShowHowIGotEachOneAndWhereAnAdoptedOneCameFrom() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID me = person();
+        UUID mine = pet("USER", me, null);
+        jdbc.update("UPDATE pets_current_owner SET acquisition_type = 'SELF_REGISTERED' WHERE pet_id = ?", mine);
+        UUID adopted = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(adopted, me, shelter, "APPROVED");
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        String all = call(get("/api/v1/users/me/pets"), me).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + mine + "')].acquisitionType")).containsExactly("SELF_REGISTERED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].acquisitionType")).containsExactly("ADOPTED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].adoptionApplicationId")).containsExactly(application.toString());
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].sourceOrganization.organizationId")).containsExactly(shelter.toString());
+        assertThat(JsonPath.<List<Object>>read(all, "$.data.content[?(@.petId=='" + mine + "')].sourceOrganization")).isEmpty();
+
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=ADOPTED"), me))).containsExactly(adopted);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=SELF_REGISTERED"), me))).containsExactly(mine);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?sortBy=name&sortOrder=asc"), me))).containsExactlyInAnyOrder(mine, adopted);
+        call(get("/api/v1/users/me/pets?type=NOPE"), me).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void aPetAPersonRegistersIsPrivateUntilTheyShowIt() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID owner = person();
+        UUID stranger = person();
+        String created = call(post("/api/v1/pets"), owner, "{\"name\":\"Cỏ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+        String url = "/api/v1/pets/" + id;
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID orgPet = pet("ORGANIZATION", shelter, shelter);
+
+        call(get(url), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.data.acquisitionType").value("SELF_REGISTERED"));
+        call(get(url), admin()).andExpect(status().isOk());
+        call(get(url), stranger).andExpect(status().isNotFound());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(orgPet).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/pets?pageSize=100"), stranger))).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/users/me/pets"), owner))).containsExactly(id);
+
+        // only whoever manages the pet decides who can see it
+        call(patch(url + "/visibility?visibility=PUBLIC"), stranger).andExpect(status().isForbidden());
+        mvc.perform(patch(url + "/visibility?visibility=PUBLIC")).andExpect(status().isUnauthorized());
+        call(patch(url + "/visibility?visibility=PUBLIC"), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(id);
+
+        call(patch(url + "/visibility?visibility=PRIVATE"), owner).andExpect(status().isOk());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
     }
 
     @Test

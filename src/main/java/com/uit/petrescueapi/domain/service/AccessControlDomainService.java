@@ -207,7 +207,7 @@ public class AccessControlDomainService {
         }
     }
 
-    private boolean canManagePet(UUID petId, UUID requesterId) {
+    public boolean canManagePet(UUID petId, UUID requesterId) {
         if (requesterId == null) {
             return false;
         }

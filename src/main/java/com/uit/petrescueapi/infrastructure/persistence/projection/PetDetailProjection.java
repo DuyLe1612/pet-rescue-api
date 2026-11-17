@@ -31,6 +31,8 @@ public interface PetDetailProjection {
     String getDescription();
     PetStatus getStatus();
     HealthStatus getHealthStatus();
+    String getVisibility();
+    String getAcquisitionType();
     boolean getVaccinated();
     boolean getNeutered();
     LocalDate getRescueDate();

@@ -31,6 +31,9 @@ public interface PetQueryDataPort {
             Pageable pageable
     );
 
+    /** Pets whose current owner is this user, optionally of one acquisition type. */
+    Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable);
+
     Page<PetSummaryResponseDto> findAvailableWithFilters(
             String species,
             String breed,

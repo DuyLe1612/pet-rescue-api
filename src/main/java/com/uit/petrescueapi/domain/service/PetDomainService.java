@@ -2,6 +2,7 @@ package com.uit.petrescueapi.domain.service;
 
 import com.uit.petrescueapi.domain.entity.Pet;
 import com.uit.petrescueapi.domain.entity.PetCurrentOwner;
+import com.uit.petrescueapi.domain.valueobject.AcquisitionType;
 import com.uit.petrescueapi.domain.entity.PetMedia;
 import com.uit.petrescueapi.domain.entity.PetOwnership;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -75,6 +76,7 @@ public class PetDomainService {
         }
         pet.setPetCode(visualCodeRepository.nextPetCode());
         pet.setStatus(PetStatus.ADOPTED);
+        pet.setVisibility(com.uit.petrescueapi.domain.valueobject.PetVisibility.PRIVATE);
         pet.setCreatedAt(LocalDateTime.now());
         Pet saved = petRepository.save(pet);
 
@@ -85,6 +87,7 @@ public class PetDomainService {
                 .ownerId(userId)
                 .fromTime(LocalDateTime.now())
                 .toTime(null)
+                .acquisitionType(AcquisitionType.SELF_REGISTERED)
                 .build();
         ownershipRepository.save(ownership);
         log.debug("Created ownership record: pet {} → user {}", saved.getId(), userId);
@@ -95,6 +98,7 @@ public class PetDomainService {
                 .ownerType("USER")
                 .ownerId(userId)
                 .caretakerUserId(null)
+                .acquisitionType(AcquisitionType.SELF_REGISTERED)
                 .build();
         currentOwnerRepository.upsert(currentOwner);
         log.debug("Updated current owner: pet {} → user {}", saved.getId(), userId);
@@ -123,6 +127,7 @@ public class PetDomainService {
                 .ownerId(shelterId)
                 .fromTime(LocalDateTime.now())
                 .toTime(null)
+                .acquisitionType(AcquisitionType.ORG_INTAKE)
                 .build();
         ownershipRepository.save(ownership);
         log.debug("Created ownership record: pet {} → organization {}", saved.getId(), shelterId);
@@ -133,6 +138,7 @@ public class PetDomainService {
                 .ownerType("ORGANIZATION")
                 .ownerId(shelterId)
                 .caretakerUserId(null)
+                .acquisitionType(AcquisitionType.ORG_INTAKE)
                 .build();
         currentOwnerRepository.upsert(currentOwner);
         log.debug("Updated current owner: pet {} → organization {}", saved.getId(), shelterId);
@@ -145,6 +151,13 @@ public class PetDomainService {
      * Ends current ownership and creates new ownership record.
      */
     public void transferOwnership(UUID petId, String newOwnerType, UUID newOwnerId) {
+        transferOwnership(petId, newOwnerType, newOwnerId,
+                "ORGANIZATION".equals(newOwnerType) ? AcquisitionType.ORG_INTAKE : AcquisitionType.TRANSFERRED, null);
+    }
+
+    /** {@code adoptionApplicationId} is only set when the move is the completion of an adoption. */
+    public void transferOwnership(UUID petId, String newOwnerType, UUID newOwnerId,
+                                  AcquisitionType acquisition, UUID adoptionApplicationId) {
         log.info("Transferring ownership of pet {} to {} {}", petId, newOwnerType, newOwnerId);
         
         // Verify pet exists
@@ -161,6 +174,8 @@ public class PetDomainService {
                 .ownerId(newOwnerId)
                 .fromTime(now)
                 .toTime(null)
+                .acquisitionType(acquisition)
+                .adoptionApplicationId(adoptionApplicationId)
                 .build();
         ownershipRepository.save(newOwnership);
         
@@ -170,10 +185,19 @@ public class PetDomainService {
                 .ownerType(newOwnerType)
                 .ownerId(newOwnerId)
                 .caretakerUserId(null)
+                .acquisitionType(acquisition)
+                .adoptionApplicationId(adoptionApplicationId)
                 .build();
         currentOwnerRepository.upsert(currentOwner);
         
         log.info("Ownership transferred: pet {} → {} {}", petId, newOwnerType, newOwnerId);
+    }
+
+    public Pet changeVisibility(UUID id, com.uit.petrescueapi.domain.valueobject.PetVisibility visibility) {
+        Pet existing = findById(id);
+        existing.setVisibility(visibility);
+        existing.setUpdatedAt(LocalDateTime.now());
+        return petRepository.save(existing);
     }
 
     public Pet update(UUID id, Pet updated) {

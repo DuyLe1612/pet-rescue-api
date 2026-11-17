@@ -38,6 +38,21 @@ public class PetQueryAdapter implements PetQueryDataPort {
     // ── List (summary) queries with filters ──────────────────
 
     @Override
+    public Page<PetSummaryResponseDto> findOwnedBy(UUID ownerId, com.uit.petrescueapi.domain.valueobject.AcquisitionType type, Pageable pageable) {
+        return queryRepo.findOwnedBy(ownerId, type == null ? null : type.name(), pageable).map(p -> {
+            PetSummaryResponseDto dto = toSummaryDto(p);
+            dto.setAcquisitionType(p.getAcquisitionType() == null ? null
+                    : com.uit.petrescueapi.domain.valueobject.AcquisitionType.valueOf(p.getAcquisitionType()));
+            dto.setAdoptionApplicationId(p.getAdoptionApplicationId());
+            if (p.getSourceOrganizationId() != null) {
+                dto.setSourceOrganization(OrganizationMinimalDto.builder()
+                        .organizationId(p.getSourceOrganizationId()).name(p.getSourceOrganizationName()).build());
+            }
+            return dto;
+        });
+    }
+
+    @Override
     public Page<PetSummaryResponseDto> findAllWithFilters(
             String species,
             String breed,
@@ -159,6 +174,8 @@ public class PetQueryAdapter implements PetQueryDataPort {
         private PetResponseDto toResponseDto(PetDetailProjection p, String primaryImageUrl, List<String> imageUrls) {
         return PetResponseDto.builder()
                 .petId(p.getId())
+                .visibility(p.getVisibility() == null ? null : com.uit.petrescueapi.domain.valueobject.PetVisibility.valueOf(p.getVisibility()))
+                .acquisitionType(p.getAcquisitionType() == null ? null : com.uit.petrescueapi.domain.valueobject.AcquisitionType.valueOf(p.getAcquisitionType()))
                 .name(p.getName())
                 .speciesId(p.getSpeciesId())
                 .species(p.getSpecies())

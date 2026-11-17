@@ -18,4 +18,7 @@ public class PetCurrentOwner {
     private String ownerType;
     private UUID ownerId;
     private UUID caretakerUserId;
+
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
+    private UUID adoptionApplicationId;
 }

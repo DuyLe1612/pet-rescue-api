@@ -33,7 +33,7 @@ class AdoptionMatchRulesTest {
     final PetCurrentOwnerRepository owners = mock(PetCurrentOwnerRepository.class);
     final AdoptionDomainService adoptions = new AdoptionDomainService(applications, pets,
             mock(VisualCodeRepository.class), mock(OrganizationDomainService.class), mock(AccessControlDomainService.class),
-            owners, mock(ReputationDomainService.class), mock(ReclaimLogRepository.class), mock(NotificationDomainService.class));
+            owners, mock(ReputationDomainService.class), mock(ReclaimLogRepository.class), mock(NotificationDomainService.class), mock(FollowupDomainService.class));
 
     final UUID petId = UUID.randomUUID();
     final UUID applicant = UUID.randomUUID();
