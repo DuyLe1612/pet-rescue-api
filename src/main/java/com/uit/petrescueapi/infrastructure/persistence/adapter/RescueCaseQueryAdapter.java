@@ -37,7 +37,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     @Override
     public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, RescueCaseFilter filter, Pageable pageable) {
         return queryRepo.findAllSummaries(search, allStatuses(filter), statusNames(filter), allPriorities(filter),
-                        priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -53,7 +53,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
         // the query orders by distance itself
         Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), unsorted)
+                        allPriorities(filter), priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), unsorted)
                 .map(this::toSummaryDto);
     }
 
@@ -71,7 +71,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 
         return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        allPriorities(filter), priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -127,14 +127,15 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double maxLat, double maxLng,
             List<RescueCaseStatus> status,
             List<RescuePriority> priority,
-            String species) {
+            String species,
+            List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
 
         List<String> statusNames = normalizeStatuses(status);
         List<String> priorityNames = normalizePriorities(priority);
 
         return queryRepo.findMarkersWithFilters(
                         minLng, minLat, maxLng, maxLat,
-                        statusNames, priorityNames, species)
+                        statusNames, priorityNames, markerTypes(types), species)
                 .stream()
                 .map(this::toMarkerDto)
                 .toList();
@@ -144,11 +145,13 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     public List<RescueMapMarkerDto> findMapMarkers(
             List<RescueCaseStatus> status,
             List<RescuePriority> priority,
-            String species) {
+            String species,
+            List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
 
         return queryRepo.findMapMarkers(
                         normalizeStatuses(status),
                         normalizePriorities(priority),
+                        markerTypes(types),
                         species)
                 .stream()
                 .map(this::toMarkerDto)
@@ -179,6 +182,20 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     private static List<String> statusNames(RescueCaseFilter filter) {
         return allStatuses(filter) ? NO_VALUES : filter.statuses().stream().map(Enum::name).toList();
+    }
+
+    private static boolean allTypes(RescueCaseFilter filter) {
+        return filter.types() == null || filter.types().isEmpty();
+    }
+
+    private static List<String> typeNames(RescueCaseFilter filter) {
+        return allTypes(filter) ? NO_VALUES : filter.types().stream().map(Enum::name).toList();
+    }
+
+    /** The map shows all three layers unless asked for some. */
+    private static List<String> markerTypes(List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
+        return (types == null || types.isEmpty() ? java.util.Arrays.asList(com.uit.petrescueapi.domain.valueobject.RescueCaseType.values()) : types)
+                .stream().map(Enum::name).toList();
     }
 
     private static boolean allPriorities(RescueCaseFilter filter) {
@@ -222,6 +239,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .reportedAt(p.getReportedAt())
                 .locationText(p.getLocationText())
                 .distanceMeters(p.getDistance())
+                .caseType(p.getCaseType())
+                .locationBlurMeters(p.getLocationBlurMeters())
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
                 .wardName(p.getWardName())
@@ -259,6 +278,15 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .organizationName(p.getOrganizationName())
                 .petId(p.getPetId())
                 .petName(p.getPetName())
+                .caseType(p.getCaseType())
+                .holdingStatus(p.getHoldingStatus())
+                .lastSeenAt(p.getLastSeenAt())
+                .distinctiveMarks(p.getDistinctiveMarks())
+                .resolution(p.getResolution())
+                .matchedCaseId(p.getMatchedCaseId())
+                .locationBlurMeters(p.getLocationBlurMeters())
+                .blurredLatitude(p.getBlurredLat())
+                .blurredLongitude(p.getBlurredLng())
                 .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .activeClaimCount(p.getActiveClaimCount() == null ? 0 : p.getActiveClaimCount().intValue())
                 .viewerIsReporter(viewerId != null && viewerId.equals(p.getReportedBy()))
@@ -362,6 +390,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                         : null)
                 .species(p.getSpecies())
                 .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
+                .caseType(p.getCaseType())
+                .holdingStatus(p.getHoldingStatus())
+                .locationBlurMeters(p.getLocationBlurMeters())
                 .reportedAt(p.getReportedAt())
                 .build();
     }

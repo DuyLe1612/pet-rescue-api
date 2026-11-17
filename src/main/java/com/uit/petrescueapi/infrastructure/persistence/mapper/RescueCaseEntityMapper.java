@@ -28,6 +28,7 @@ public interface RescueCaseEntityMapper {
     @Mapping(target = "location", source = ".", qualifiedByName = "latLngToPoint")
     @Mapping(target = "status", source = "status", qualifiedByName = "statusToString")
     @Mapping(target = "priority", source = "priority", qualifiedByName = "priorityToString")
+    @Mapping(target = "caseType", expression = "java(domain.typeOrRescue().name())")
     @Mapping(target = "reporter", ignore = true)
     @Mapping(target = "organization", ignore = true)
     @Mapping(target = "pet", ignore = true)

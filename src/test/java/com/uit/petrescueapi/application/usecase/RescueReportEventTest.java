@@ -35,7 +35,8 @@ class RescueReportEventTest {
     final RescueCaseMediaRepository caseMedia = mock(RescueCaseMediaRepository.class);
     final RescueCaseCommandUseCase useCase = new RescueCaseCommandUseCase(domain, mock(AccessControlDomainService.class),
             mock(RescueClaimDomainService.class), mock(PetCommandPort.class), mock(PetDomainService.class), mediaQuery,
-            events, caseMedia, mock(RescueCompletionMediaRepository.class));
+            events, mock(com.uit.petrescueapi.domain.service.LostAndFoundDomainService.class), caseMedia,
+            mock(RescueCompletionMediaRepository.class));
 
     @Test
     void aReportWithoutPhotosPublishesTheEvent() {

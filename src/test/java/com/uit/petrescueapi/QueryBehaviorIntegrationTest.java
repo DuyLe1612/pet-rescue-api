@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -2020,7 +2021,167 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hcmVet.toString()))));
     }
 
+    // ── Lost and found (phase 4) ────────────────────
+
+    @Test
+    void anOwnerReportsALostPetAFinderReportsItAndTheOwnerReunitesBothCases() throws Exception {
+        UUID owner = person();
+        UUID finder = person();
+        UUID petId = pet("USER", owner, null);
+        jdbc.update("UPDATE pets SET status = 'ADOPTED', color = 'vàng' WHERE pet_id = ?", petId);
+        String species = petSpecies(petId);
+
+        String lost = call(post("/api/v1/pets/" + petId + "/report-lost"), owner, """
+                {"latitude":10.5,"longitude":106.7,"locationText":"Chợ Bà Chiểu","provinceCode":"79","provinceName":"Hồ Chí Minh",
+                 "lastSeenAt":"%s","distinctiveMarks":"vòng cổ đỏ, cụt đuôi","contactPhone":"0900000001"}
+                """.formatted(daysAgo(2))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.caseType").value("LOST"))
+                .andExpect(jsonPath("$.data.petId").value(petId.toString()))
+                .andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("LOST");
+        // a second report for the same pet while the first is open
+        call(post("/api/v1/pets/" + petId + "/report-lost"), owner, "{\"latitude\":10.5,\"longitude\":106.7}").andExpect(status().isConflict());
+        call(post("/api/v1/pets/" + petId + "/report-lost"), person(), "{\"latitude\":10.5,\"longitude\":106.7}").andExpect(status().isForbidden());
+
+        String found = call(post("/api/v1/rescue-cases"), finder, """
+                {"caseType":"FOUND","holdingStatus":"AT_HOME","species":"%s","color":"Vàng",
+                 "description":"Chó nhỏ đeo vòng cổ đỏ, đuôi cụt","latitude":10.503,"longitude":106.702,"provinceCode":"79"}
+                """.formatted(species)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID foundId = UUID.fromString(JsonPath.read(found, "$.data.caseId"));
+
+        assertThat(notificationTypes(owner)).contains("RESCUE_MATCH_SUGGESTED");
+        String matches = call(get("/api/v1/rescue-cases/" + lostId + "/matches"), owner)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String row = "$.data[?(@.otherCase.caseId=='" + foundId + "')]";
+        assertThat(JsonPath.<List<String>>read(matches, row + ".status")).containsExactly("PENDING");
+        assertThat(JsonPath.<List<Number>>read(matches, row + ".score")).singleElement().satisfies(s -> assertThat(s.intValue()).isGreaterThan(50));
+        assertThat(JsonPath.<List<List<String>>>read(matches, row + ".reasons")).singleElement()
+                .satisfies(reasons -> assertThat(String.join(" ", reasons)).contains("Cùng loài").contains("vòng").contains("vàng"));
+        // the finder sees the same pair from their side; a stranger sees nothing
+        call(get("/api/v1/rescue-cases/" + foundId + "/matches"), finder)
+                .andExpect(jsonPath("$.data[*].otherCase.caseId", hasItem(lostId.toString())));
+        call(get("/api/v1/rescue-cases/" + lostId + "/matches"), person()).andExpect(status().isForbidden());
+
+        String suggestionId = JsonPath.<List<String>>read(matches, row + ".suggestionId").get(0);
+        // the suggestion belongs to the lost case, so the finder's case does not know it
+        call(post("/api/v1/rescue-cases/" + foundId + "/matches/" + suggestionId + "/confirm"), finder).andExpect(status().isNotFound());
+        call(post("/api/v1/rescue-cases/" + lostId + "/matches/" + suggestionId + "/confirm"), finder).andExpect(status().isForbidden());
+        call(post("/api/v1/rescue-cases/" + lostId + "/matches/" + suggestionId + "/confirm"), owner).andExpect(status().isOk());
+
+        for (UUID[] pair : List.of(new UUID[]{lostId, foundId}, new UUID[]{foundId, lostId})) {
+            call(get("/api/v1/rescue-cases/" + pair[0]), owner)
+                    .andExpect(jsonPath("$.data.status").value("CLOSED"))
+                    .andExpect(jsonPath("$.data.resolution").value("REUNITED"))
+                    .andExpect(jsonPath("$.data.matchedCaseId").value(pair[1].toString()));
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("ADOPTED");
+        assertThat(notificationTypes(finder)).contains("RESCUE_MATCH_CONFIRMED");
+    }
+
+    @Test
+    void aFoundAnimalOfAnotherSpeciesFarAwayOrLongAfterIsNotSuggested() throws Exception {
+        UUID owner = person();
+        String lost = call(post("/api/v1/rescue-cases"), owner, """
+                {"caseType":"LOST","species":"Cat","color":"tam thể","latitude":21.03,"longitude":105.85,"lastSeenAt":"%s"}
+                """.formatted(daysAgo(2))).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+
+        UUID finder = person();
+        call(post("/api/v1/rescue-cases"), finder, "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Dog\",\"latitude\":21.03,\"longitude\":105.85}")
+                .andExpect(status().isCreated());
+        // a cat 3 km away is out of a cat's range
+        call(post("/api/v1/rescue-cases"), finder, "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Cat\",\"latitude\":21.057,\"longitude\":105.85}")
+                .andExpect(status().isCreated());
+
+        call(get("/api/v1/rescue-cases/" + lostId + "/matches"), owner).andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void lostCasesAndFoundAnimalsKeptAtHomeAreShownAboutWhereNotExactly() throws Exception {
+        UUID owner = person();
+        String lost = call(post("/api/v1/rescue-cases"), owner, """
+                {"caseType":"LOST","species":"Dog","latitude":10.51234,"longitude":106.71234,"locationText":"12 Nguyễn Trãi"}
+                """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+        UUID onStreet = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), person(),
+                "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Dog\",\"latitude\":10.51234,\"longitude\":106.71234}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+
+        String detail = mvc.perform(get("/api/v1/rescue-cases/" + lostId)).andReturn().getResponse().getContentAsString();
+        assertBlurred(JsonPath.read(detail, "$.data.latitude"), JsonPath.read(detail, "$.data.longitude"));
+        assertThat(JsonPath.<Integer>read(detail, "$.data.locationBlurMeters")).isEqualTo(300);
+        assertThat(JsonPath.<Map<String, Object>>read(detail, "$.data")).doesNotContainKey("locationText");
+        call(get("/api/v1/rescue-cases/" + lostId), owner)
+                .andExpect(jsonPath("$.data.latitude").value(10.51234))
+                .andExpect(jsonPath("$.data.locationText").value("12 Nguyễn Trãi"));
+
+        String markers = mvc.perform(get("/api/v1/rescue-cases/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107&type=LOST&type=FOUND"))
+                .andReturn().getResponse().getContentAsString();
+        String lostRow = "$.data[?(@.caseId=='" + lostId + "')]";
+        assertBlurred(JsonPath.<List<Double>>read(markers, lostRow + ".latitude").get(0), JsonPath.<List<Double>>read(markers, lostRow + ".longitude").get(0));
+        assertThat(JsonPath.<List<String>>read(markers, lostRow + ".caseType")).containsExactly("LOST");
+        assertThat(JsonPath.<List<Double>>read(markers, "$.data[?(@.caseId=='" + onStreet + "')].latitude")).containsExactly(10.51234);
+
+        String list = mvc.perform(get("/api/v1/rescue-cases?type=LOST&pageSize=100&lat=10.5&lng=106.7&distance=5000"))
+                .andReturn().getResponse().getContentAsString();
+        String listRow = "$.data.content[?(@.caseId=='" + lostId + "')]";
+        assertBlurred(JsonPath.<List<Double>>read(list, listRow + ".latitude").get(0), JsonPath.<List<Double>>read(list, listRow + ".longitude").get(0));
+        assertThat(JsonPath.<List<String>>read(list, "$.data.content[*].caseType")).containsOnly("LOST");
+    }
+
+    @Test
+    void onlyRescueCasesAreClaimedOrCompletedAndFoundNeedsWhereTheAnimalIs() throws Exception {
+        UUID owner = person();
+        UUID lostId = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), owner,
+                "{\"caseType\":\"LOST\",\"species\":\"Dog\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+        UUID helper = person();
+
+        call(post("/api/v1/rescue-cases/" + lostId + "/claim"), helper, "{\"safetyAcknowledged\":true}").andExpect(status().isConflict());
+        call(post("/api/v1/rescue-cases/" + lostId + "/complete"), helper,
+                "{\"verificationImageIds\":[\"" + permanentMedia(helper) + "\"],\"confirmRescued\":true,\"outcome\":\"TEMP_HOLDING\"}")
+                .andExpect(status().isConflict());
+        call(post("/api/v1/rescue-cases"), helper, "{\"caseType\":\"FOUND\",\"species\":\"Dog\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isBadRequest());
+        // reporting a rescue case without a type still works as before
+        call(post("/api/v1/rescue-cases"), helper, "{\"species\":\"Dog\",\"priority\":\"HIGH\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.caseType").value("RESCUE"));
+    }
+
+    @Test
+    void aFinderTurnsAnInjuredFoundAnimalIntoARescueCase() throws Exception {
+        UUID finder = person();
+        UUID foundId = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), finder,
+                "{\"caseType\":\"FOUND\",\"holdingStatus\":\"AT_HOME\",\"species\":\"Cat\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+
+        call(post("/api/v1/rescue-cases/" + foundId + "/convert-to-rescue"), person(), "{\"priority\":\"HIGH\"}").andExpect(status().isForbidden());
+        call(post("/api/v1/rescue-cases/" + foundId + "/convert-to-rescue"), finder, "{\"priority\":\"HIGH\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.caseType").value("RESCUE"))
+                .andExpect(jsonPath("$.data.priority").value("HIGH"));
+        // now it can be claimed like any rescue case
+        call(post("/api/v1/rescue-cases/" + foundId + "/claim"), person(), "{\"safetyAcknowledged\":true}").andExpect(status().isOk());
+    }
+
     // ── Helpers ─────────────────────────────────────
+
+    private static String daysAgo(int days) {
+        return java.time.Instant.now().minus(java.time.Duration.ofDays(days)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
+    }
+
+    private String petSpecies(UUID petId) {
+        return jdbc.queryForObject("SELECT ps.name FROM pets p JOIN pet_species ps ON ps.species_id = p.species_id WHERE p.pet_id = ?",
+                String.class, petId);
+    }
+
+    /** Moved, but by no more than about 300 m, from (10.51234, 106.71234). */
+    private static void assertBlurred(Number latitude, Number longitude) {
+        assertThat(latitude.doubleValue()).isNotEqualTo(10.51234).isCloseTo(10.51234, org.assertj.core.data.Offset.offset(0.003));
+        assertThat(longitude.doubleValue()).isNotEqualTo(106.71234).isCloseTo(106.71234, org.assertj.core.data.Offset.offset(0.003));
+    }
 
     /** A case at (10.5, 106.7); its code is the first 12 characters of its id. */
     private UUID caseAt(UUID reporter, String species, String priority, String caseStatus) {

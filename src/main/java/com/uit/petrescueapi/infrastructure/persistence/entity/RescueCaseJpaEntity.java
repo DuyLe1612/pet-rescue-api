@@ -39,6 +39,27 @@ public class RescueCaseJpaEntity extends BaseJpaEntity {
     @Column(name = "needs_help", nullable = false)
     private boolean needsHelp;
 
+    @Column(name = "case_type", nullable = false, length = 10)
+    private String caseType;
+
+    @Column(name = "holding_status", length = 20)
+    private String holdingStatus;
+
+    @Column(name = "last_seen_at", columnDefinition = "TIMESTAMPTZ")
+    private LocalDateTime lastSeenAt;
+
+    @Column(name = "distinctive_marks", length = 500)
+    private String distinctiveMarks;
+
+    @Column(name = "resolution", length = 20)
+    private String resolution;
+
+    @Column(name = "matched_case_id")
+    private UUID matchedCaseId;
+
+    @Column(name = "pet_status_before_lost", length = 20)
+    private String petStatusBeforeLost;
+
     @Column(name = "case_code", nullable = false, updatable = false)
     private String caseCode;
 

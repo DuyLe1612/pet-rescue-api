@@ -17,6 +17,9 @@ public interface RescueMapMarkerProjection {
     String getPriority();
     String getStatus();
     String getSpecies();
+    String getCaseType();
+    String getHoldingStatus();
+    Integer getLocationBlurMeters();
     Boolean getNeedsHelp();
     LocalDateTime getReportedAt();
 }

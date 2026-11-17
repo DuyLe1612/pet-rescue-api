@@ -43,12 +43,12 @@ public interface RescueCaseQueryDataPort {
      */
         List<RescueMapMarkerDto> findMarkersWithFilters(
             double minLat, double minLng, double maxLat, double maxLng,
-            List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
+            List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types);
 
     /**
      * Find map markers without bounding box (global feed limited to 500). Filters optional.
      */
-    List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species);
+    List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types);
 
     RescueCaseCompletionResponseDto findCompletionById(UUID caseId);
 

@@ -45,4 +45,16 @@ public class RescueCase extends BaseEntity {
     private Long version;
     private String resolutionNote;
     private boolean needsHelp;
+    /** Null is read as RESCUE, so cases built before case types keep behaving as rescues. */
+    private com.uit.petrescueapi.domain.valueobject.RescueCaseType caseType;
+    private com.uit.petrescueapi.domain.valueobject.HoldingStatus holdingStatus;
+    private LocalDateTime lastSeenAt;
+    private String distinctiveMarks;
+    private String resolution;
+    private UUID matchedCaseId;
+    private String petStatusBeforeLost;
+
+    public com.uit.petrescueapi.domain.valueobject.RescueCaseType typeOrRescue() {
+        return caseType == null ? com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE : caseType;
+    }
 }

@@ -88,6 +88,7 @@ class SecurityRulesWebTest {
     @MockitoBean UserQueryPort userQueryPort;
     @MockitoBean UserWebMapper userMapper;
     @MockitoBean com.uit.petrescueapi.application.port.command.RescueCaseCommunityPort rescueCaseCommunityPort;
+    @MockitoBean com.uit.petrescueapi.application.port.command.LostAndFoundPort lostAndFoundPort;
     @MockitoBean com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCaseCommunityQueryPort;
     @MockitoBean com.uit.petrescueapi.application.port.query.FirstAidQueryPort firstAidQueryPort;
 
@@ -127,7 +128,7 @@ class SecurityRulesWebTest {
 
     @Test
     void anonymousCanStillReadRescueCases() throws Exception {
-        when(rescueQueryPort.findMapMarkers(any(), any(), any())).thenReturn(java.util.List.of());
+        when(rescueQueryPort.findMapMarkers(any(), any(), any(), any())).thenReturn(java.util.List.of());
         mvc.perform(get("/api/v1/rescue-cases/map/markers")).andExpect(status().isOk());
     }
 

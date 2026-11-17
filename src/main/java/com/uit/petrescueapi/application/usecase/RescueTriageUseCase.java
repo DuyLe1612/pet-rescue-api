@@ -64,6 +64,9 @@ public class RescueTriageUseCase implements RescueTriageCommandPort {
             return;
         }
         RescueCase rescueCase = cases.findById(caseId);
+        if (rescueCase.typeOrRescue() != com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE) {
+            return; // urgency labels are for animals in trouble, not for a lost or found notice
+        }
         if (rescueCase.getStatus() != RescueCaseStatus.REPORTED && rescueCase.getStatus() != RescueCaseStatus.IN_PROGRESS) {
             return; // nobody needs a label on a finished case
         }

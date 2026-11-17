@@ -56,6 +56,20 @@ public class PetController {
     private final UserDomainService userDomainService;
     private final OrganizationDomainService organizationDomainService;
     private final PetTaxonomyQueryPort taxonomyQueryPort;
+    private final com.uit.petrescueapi.application.port.command.LostAndFoundPort lostAndFoundPort;
+    private final com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper rescueCaseMapper;
+
+    @PostMapping("/{id}/report-lost")
+    @Operation(summary = "Report my pet lost",
+            description = "For the pet's owner or manager. Opens a LOST case with the pet's species and colour, and the pet becomes "
+                    + "LOST until it is found. The point is shown to the public as a ~300 m cell. 409 when it is already reported lost.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.application.dto.rescue.RescueCaseResponseDto>> reportLost(
+            @PathVariable UUID id,
+            @Valid @RequestBody com.uit.petrescueapi.application.dto.rescue.ReportLostPetRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(rescueCaseMapper.toDto(
+                lostAndFoundPort.reportLost(id, request, UUID.fromString(authentication.getName())))));
+    }
     private final com.uit.petrescueapi.application.port.query.MatchingQueryPort matchingQueryPort;
 
     // ── Commands (write) ─────────────────────────

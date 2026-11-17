@@ -35,14 +35,27 @@ import java.util.UUID;
 @Repository
 public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJpaEntity, UUID> {
 
+    /**
+     * A lost pet's last place, or a finder's home, is shown as a cell of about 300 m to anyone who
+     * reads a list or the map. The grid is fixed, so asking many times cannot average it back.
+     */
+    String BLURRED = "(rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME'))";
+
+    String SHOWN_POINT = "(CASE WHEN " + BLURRED + " THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)";
+
     /** What a list row adds to the columns each list query already selects. */
     String SUMMARY_EXTRAS = """
                ,
-               ST_Y(rc.location) AS latitude,
-               ST_X(rc.location) AS longitude,
+               ST_Y(""" + SHOWN_POINT + """
+               ) AS latitude,
+               ST_X(""" + SHOWN_POINT + """
+               ) AS longitude,
                rc.ward_name     AS wardName,
                rc.province_name AS provinceName,
                rc.needs_help    AS needsHelp,
+               rc.case_type     AS caseType,
+               CASE WHEN """ + BLURRED + """
+                THEN 300 END AS locationBlurMeters,
                CASE rc.priority WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 1 ELSE 0 END AS priority_rank
         """;
 
@@ -55,7 +68,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
            rc.priority      AS priority,
            rc.status        AS status,
            rc.reported_at   AS reportedAt,
-           rc.location_text AS locationText,
+           CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
            u.username       AS reporterUsername,
            (
              SELECT mf.public_id
@@ -76,6 +89,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -93,6 +107,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -105,6 +120,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("statuses") List<String> statuses,
             @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
+            @Param("allTypes") boolean allTypes,
+            @Param("types") List<String> types,
             @Param("species") String species,
             @Param("province") String province,
             @Param("reporterId") UUID reporterId,
@@ -126,6 +143,15 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.organization_id AS organizationId,
                o.name           AS organizationName,
                rc.pet_id        AS petId,
+               rc.case_type     AS caseType,
+               rc.holding_status AS holdingStatus,
+               rc.last_seen_at  AS lastSeenAt,
+               rc.distinctive_marks AS distinctiveMarks,
+               rc.resolution    AS resolution,
+               rc.matched_case_id AS matchedCaseId,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN 300 END AS locationBlurMeters,
+               ST_Y(ST_SnapToGrid(rc.location, 0.003)) AS blurredLat,
+               ST_X(ST_SnapToGrid(rc.location, 0.003)) AS blurredLng,
                p.name           AS petName,
                rc.color         AS color,
                rc.description   AS description,
@@ -166,7 +192,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
-               rc.location_text AS locationText,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
                u.username AS reporterUsername,
                (
                  SELECT mf.public_id
@@ -176,7 +202,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  ORDER BY mf.created_at ASC
                  LIMIT 1
                ) AS firstImageUrl,
-               ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+               ST_Distance((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
     """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
@@ -184,6 +210,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -197,6 +224,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                           AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -211,6 +239,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("statuses") List<String> statuses,
             @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
+            @Param("allTypes") boolean allTypes,
+            @Param("types") List<String> types,
             @Param("species") String species,
             @Param("province") String province,
             @Param("reporterId") UUID reporterId,
@@ -229,7 +259,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
-               rc.location_text AS locationText,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
                u.username AS reporterUsername,
                (
                  SELECT mf.public_id
@@ -239,7 +269,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  ORDER BY mf.created_at ASC
                  LIMIT 1
                ) AS firstImageUrl,
-               ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+               ST_Distance((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
     """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
@@ -269,7 +299,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
-               rc.location_text AS locationText,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
                u.username AS reporterUsername,
                (
                  SELECT mf.public_id
@@ -286,6 +316,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -298,6 +329,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
+          AND (:allTypes = true OR rc.case_type IN (:types))
           AND (CAST(:species AS VARCHAR) IS NULL OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
@@ -313,6 +345,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("statuses") List<String> statuses,
             @Param("allPriorities") boolean allPriorities,
             @Param("priorities") List<String> priorities,
+            @Param("allTypes") boolean allTypes,
+            @Param("types") List<String> types,
             @Param("species") String species,
             @Param("province") String province,
             @Param("reporterId") UUID reporterId,
@@ -331,8 +365,11 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     @Query(value = """
         SELECT rc.case_id AS caseId,
                rc.case_code AS caseCode,
-               ST_Y(rc.location) AS latitude,
-               ST_X(rc.location) AS longitude,
+               ST_Y((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS latitude,
+               ST_X((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS longitude,
+               rc.case_type AS caseType,
+               rc.holding_status AS holdingStatus,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN 300 END AS locationBlurMeters,
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
@@ -359,8 +396,11 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     @Query(value = """
         SELECT rc.case_id AS caseId,
                rc.case_code AS caseCode,
-               ST_Y(rc.location) AS latitude,
-               ST_X(rc.location) AS longitude,
+               ST_Y((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS latitude,
+               ST_X((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS longitude,
+               rc.case_type AS caseType,
+               rc.holding_status AS holdingStatus,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN 300 END AS locationBlurMeters,
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
@@ -372,6 +412,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND ST_Within(rc.location, ST_MakeEnvelope(:minLng, :minLat, :maxLng, :maxLat, 4326))
           AND rc.status IN (:status)
           AND rc.priority IN (:priority)
+          AND rc.case_type IN (:types)
           AND (:species IS NULL OR rc.species = :species)
         ORDER BY 
           CASE rc.priority
@@ -391,13 +432,17 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("maxLat") double maxLat,
             @Param("status") java.util.List<String> status,
             @Param("priority") java.util.List<String> priority,
+            @Param("types") java.util.List<String> types,
             @Param("species") String species);
 
     @Query(value = """
         SELECT rc.case_id AS caseId,
                rc.case_code AS caseCode,
-               ST_Y(rc.location) AS latitude,
-               ST_X(rc.location) AS longitude,
+               ST_Y((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS latitude,
+               ST_X((CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN ST_SnapToGrid(rc.location, 0.003) ELSE rc.location END)) AS longitude,
+               rc.case_type AS caseType,
+               rc.holding_status AS holdingStatus,
+               CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN 300 END AS locationBlurMeters,
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
@@ -408,6 +453,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND rc.location IS NOT NULL
           AND rc.status IN (:status)
           AND rc.priority IN (:priority)
+          AND rc.case_type IN (:types)
           AND (:species IS NULL OR rc.species = :species)
         ORDER BY rc.reported_at DESC
         LIMIT 500
@@ -415,6 +461,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     List<RescueMapMarkerProjection> findMapMarkers(
             @Param("status") java.util.List<String> status,
             @Param("priority") java.util.List<String> priority,
+            @Param("types") java.util.List<String> types,
             @Param("species") String species);
 
     @Query(value = """
@@ -565,7 +612,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rc.priority AS priority,
         rc.status AS status,
         rc.description AS description,
-        rc.location_text AS locationText,
+        CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
         (SELECT mf.public_id FROM rescue_media rm JOIN media_files mf ON mf.media_id = rm.media_id
           WHERE rm.case_id = rc.case_id ORDER BY mf.created_at ASC LIMIT 1) AS firstImageUrl,
         rc.province_name AS provinceName,
@@ -584,6 +631,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     LEFT JOIN rescue_case_triage t ON t.case_id = rc.case_id
     WHERE rc.is_deleted = false
       AND rc.organization_id IS NULL
+      AND rc.case_type = 'RESCUE'
       AND (CAST(:provinceCode AS VARCHAR) IS NULL OR rc.province_code = :provinceCode OR rc.province_code IS NULL)
       AND (rc.status IN ('REPORTED', 'IN_PROGRESS')
         OR (rc.status = 'RESCUED' AND rc.pet_id IS NULL AND EXISTS (
@@ -603,6 +651,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
     FROM rescue_cases rc
     WHERE rc.is_deleted = false
       AND rc.organization_id IS NULL
+      AND rc.case_type = 'RESCUE'
       AND (CAST(:provinceCode AS VARCHAR) IS NULL OR rc.province_code = :provinceCode OR rc.province_code IS NULL)
       AND (rc.status IN ('REPORTED', 'IN_PROGRESS')
         OR (rc.status = 'RESCUED' AND rc.pet_id IS NULL AND EXISTS (

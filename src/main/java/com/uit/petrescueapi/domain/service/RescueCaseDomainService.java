@@ -10,6 +10,7 @@ import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.*;
 import com.uit.petrescueapi.domain.valueobject.NotificationType;
 import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
+import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import com.uit.petrescueapi.domain.valueobject.RescueCompletionStatus;
 import com.uit.petrescueapi.domain.valueobject.RescueOutcome;
 import lombok.RequiredArgsConstructor;
@@ -98,6 +99,7 @@ public class RescueCaseDomainService {
         UUID submitter = completion.getSubmittedBy();
         RescueCase rescueCase = rescueCaseRepository.findByIdForUpdate(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("RescueCase", "caseId", caseId));
+        requireRescueType(rescueCase);
         requireOpen(rescueCase);
         if (rescueCaseCompletionRepository.findOpenByCaseId(caseId).isPresent()) {
             throw new ConflictException("A completion report already exists for this case", "RESCUE_COMPLETION_EXISTS");
@@ -375,6 +377,51 @@ public class RescueCaseDomainService {
         if (source.getProvinceCode() != null) target.setProvinceCode(source.getProvinceCode());
         if (source.getWardCode() != null)     target.setWardCode(source.getWardCode());
         if (source.getOrganizationId() != null) target.setOrganizationId(source.getOrganizationId());
+        if (source.getDistinctiveMarks() != null) target.setDistinctiveMarks(source.getDistinctiveMarks());
+        // the type never changes here; these only mean something for their own type
+        if (source.getHoldingStatus() != null && target.typeOrRescue() == com.uit.petrescueapi.domain.valueobject.RescueCaseType.FOUND) {
+            target.setHoldingStatus(source.getHoldingStatus());
+        }
+        if (source.getLastSeenAt() != null && target.typeOrRescue() == com.uit.petrescueapi.domain.valueobject.RescueCaseType.LOST) {
+            target.setLastSeenAt(source.getLastSeenAt());
+        }
+    }
+
+    /** Only a rescue is claimed, completed and taken in by an organization. */
+    public static void requireRescueType(RescueCase rescueCase) {
+        if (rescueCase.typeOrRescue() != com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE) {
+            throw new ConflictException("Only a rescue case can be claimed or completed; a lost or found case closes when the pet is home",
+                    "RESCUE_CASE_TYPE");
+        }
+    }
+
+    /** A found animal that is hurt, or that the finder cannot keep, becomes a rescue. The reporter's data stays. */
+    public RescueCase convertToRescue(UUID caseId, RescuePriority priority) {
+        RescueCase rescueCase = findById(caseId);
+        requireOpen(rescueCase);
+        if (rescueCase.typeOrRescue() != com.uit.petrescueapi.domain.valueobject.RescueCaseType.FOUND) {
+            throw new ConflictException("Only a found case can become a rescue case", "RESCUE_CASE_TYPE");
+        }
+        rescueCase.setCaseType(com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE);
+        if (priority != null) {
+            rescueCase.setPriority(priority);
+        }
+        rescueCase.setUpdatedAt(LocalDateTime.now());
+        return rescueCaseRepository.save(rescueCase);
+    }
+
+    /** A lost case and a found one met: the open ones close as REUNITED, a rescue only records the link. */
+    public RescueCase recordReunion(UUID caseId, UUID matchedCaseId) {
+        RescueCase rescueCase = findById(caseId);
+        rescueCase.setMatchedCaseId(matchedCaseId);
+        if (rescueCase.typeOrRescue() != com.uit.petrescueapi.domain.valueobject.RescueCaseType.RESCUE) {
+            requireOpen(rescueCase);
+            rescueCase.setStatus(RescueCaseStatus.CLOSED);
+            rescueCase.setResolution("REUNITED");
+            rescueCase.setResolvedAt(LocalDateTime.now());
+        }
+        rescueCase.setUpdatedAt(LocalDateTime.now());
+        return rescueCaseRepository.save(rescueCase);
     }
 
 

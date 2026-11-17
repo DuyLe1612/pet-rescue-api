@@ -58,8 +58,18 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
         log.debug("Query: find rescue case by id {}", caseId);
         RescueCaseResponseDto dto = queryDataPort.findById(caseId, viewerId);
-        if (!accessControl.canViewCaseContact(dto.isViewerIsReporter(), dto.getOrganizationId(), dto.isViewerHasActiveClaim(), viewerId)) {
+        boolean insider = accessControl.canViewCaseContact(dto.isViewerIsReporter(), dto.getOrganizationId(), dto.isViewerHasActiveClaim(), viewerId);
+        if (!insider) {
             dto.setContactPhone(null);
+        }
+        if (dto.getLocationBlurMeters() != null) {
+            if (insider) {
+                dto.setLocationBlurMeters(null);     // the exact point, for the people working on it
+            } else {
+                dto.setLatitude(dto.getBlurredLatitude());
+                dto.setLongitude(dto.getBlurredLongitude());
+                dto.setLocationText(null);
+            }
         }
         return dto;
     }
@@ -107,15 +117,15 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
     @Override
     public List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng, double maxLat, double maxLng,
-                                                           List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
+                                                           List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
         log.debug("Query: find map markers with filters - bounds ({},{}) to ({},{}), status={}, priority={}, species={}",
                 minLat, minLng, maxLat, maxLng, status, priority, species);
-        return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species);
+        return queryDataPort.findMarkersWithFilters(minLat, minLng, maxLat, maxLng, status, priority, species, types);
     }
 
-    public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species) {
+    public List<RescueMapMarkerDto> findMapMarkers(List<RescueCaseStatus> status, List<RescuePriority> priority, String species, List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
         log.debug("Query: find global map markers (no bbox), status={}, priority={}, species={}", status, priority, species);
-        return queryDataPort.findMapMarkers(status, priority, species);
+        return queryDataPort.findMapMarkers(status, priority, species, types);
     }
 
     @Override

@@ -22,6 +22,8 @@ public interface RescueCaseSummaryProjection {
     String getFirstImageUrl();
     /** Only the nearby query selects it. */
     Double getDistance();
+    String getCaseType();
+    Integer getLocationBlurMeters();
     Double getLatitude();
     Double getLongitude();
     String getWardName();

@@ -51,7 +51,8 @@ public class PetDomainService {
             PetStatus.AVAILABLE, Set.of(PetStatus.FOSTERING, PetStatus.ADOPTED, PetStatus.LOST, PetStatus.DECEASED),
             PetStatus.FOSTERING, Set.of(PetStatus.AVAILABLE, PetStatus.ADOPTED, PetStatus.LOST, PetStatus.DECEASED),
             PetStatus.ADOPTED, Set.of(PetStatus.AVAILABLE, PetStatus.FOSTERING, PetStatus.LOST, PetStatus.DECEASED),
-            PetStatus.LOST, Set.of(PetStatus.AVAILABLE, PetStatus.FOSTERING, PetStatus.DECEASED),
+            // an adopted pet that got lost goes back to its owner as ADOPTED
+            PetStatus.LOST, Set.of(PetStatus.AVAILABLE, PetStatus.FOSTERING, PetStatus.ADOPTED, PetStatus.DECEASED),
             PetStatus.DECEASED, Set.of()
     );
 

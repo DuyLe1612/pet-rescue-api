@@ -20,6 +20,22 @@ import java.util.UUID;
 public class RescueCaseResponseDto {
     private UUID caseId;
     private String caseCode;
+    @Schema(example = "RESCUE", allowableValues = {"RESCUE", "LOST", "FOUND"})
+    private String caseType;
+    @Schema(description = "FOUND only", allowableValues = {"ON_STREET", "AT_HOME", "AT_ORGANIZATION"})
+    private String holdingStatus;
+    private LocalDateTime lastSeenAt;
+    private String distinctiveMarks;
+    @Schema(description = "How the case ended, e.g. REUNITED")
+    private String resolution;
+    @Schema(description = "The lost or found case this one was matched with")
+    private UUID matchedCaseId;
+    @Schema(description = "Set when latitude and longitude are moved by up to this many metres to protect someone's home")
+    private Integer locationBlurMeters;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Double blurredLatitude;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Double blurredLongitude;
     private String reporterUsername;
     private String species;
     private String color;
