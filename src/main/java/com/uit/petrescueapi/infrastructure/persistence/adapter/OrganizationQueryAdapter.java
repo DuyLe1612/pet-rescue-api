@@ -166,6 +166,10 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .status(p.getStatus())
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
+                .organizationCode(p.getOrganizationCode())
+                .phone(p.getPhone())
+                .imageUrl(p.getImageUrl())
+                .streetAddress(p.getStreetAddress())
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .build();

@@ -22,6 +22,8 @@ public class RescueQueueItemDto {
     private RescuePriority priority;
     private String status;
     private String description;
+    private String locationText;
+    private String firstImageUrl;
     private String provinceName;
     private String wardName;
     private Double latitude;

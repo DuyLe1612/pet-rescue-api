@@ -21,6 +21,12 @@ public interface RescueCaseQueryPort {
     Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
     Page<RescueCaseSummaryResponseDto> findWithinBoundingBox(double minLat, double minLng, double maxLat, double maxLng, com.uit.petrescueapi.application.dto.rescue.RescueCaseFilter filter, Pageable pageable);
 
+    /**
+     * Open cases reported near a point in the last hours, nearest first, so someone about to
+     * report can see the animal may already be known. Advisory only: it never blocks a report.
+     */
+    List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, String species, Double radiusMeters, Integer hours);
+
     // ── Map marker queries (optimized for fast map rendering) ──
     List<RescueMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng);
     List<RescueMapMarkerDto> findMarkersWithFilters(double minLat, double minLng,

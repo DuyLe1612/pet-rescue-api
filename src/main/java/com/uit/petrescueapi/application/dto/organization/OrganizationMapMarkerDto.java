@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * DTO for organization map markers.
- * Optimized: excludes unused fields (organizationCode, phone, imageUrl).
+ * Carries what a marker popup shows, so opening one needs no second request.
  */
 @Data
 @Builder
@@ -21,6 +21,10 @@ public class OrganizationMapMarkerDto {
     private String status;
     private Double latitude;
     private Double longitude;
+    private String organizationCode;
+    private String phone;
+    private String imageUrl;
+    private String streetAddress;
     private String wardName;
     private String provinceName;
 }

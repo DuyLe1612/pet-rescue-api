@@ -238,10 +238,8 @@ public class PetController {
                 status.stream().map(this::parsePetStatus).toList();
 
         if (Boolean.TRUE.equals(availableOnly)) {
-            return ResponseEntity.ok(ApiResponse.ok(
-                    PageResponse.from(petQueryPort.findAvailableWithFilters(
-                            species, breed, gender, organizationId, province, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
-                    ))));
+            // same query as the rest, so search keeps working
+            statusList = List.of(PetStatus.AVAILABLE);
         }
 
         return ResponseEntity.ok(ApiResponse.ok(

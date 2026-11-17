@@ -39,6 +39,13 @@ import java.util.UUID;
 @Slf4j
 public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
 
+    /** Estimates, not measured: a street corner, and long enough to cover a second passer-by the next day. */
+    private static final double DUPLICATE_RADIUS_METERS = 300;
+    private static final double DUPLICATE_MAX_RADIUS_METERS = 2000;
+    private static final int DUPLICATE_WINDOW_HOURS = 48;
+    private static final int DUPLICATE_MAX_WINDOW_HOURS = 168;
+    private static final int DUPLICATE_MAX_RESULTS = 5;
+
     private final RescueCaseQueryDataPort queryDataPort;
     private final RescueCaseDomainService caseDomainService;
     private final RescueClaimDomainService claimDomainService;
@@ -67,6 +74,15 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     public Page<RescueCaseSummaryResponseDto> findNearby(double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
         log.debug("Query: find rescue cases nearby ({}, {}) within {} meters", lat, lng, distanceMeters);
         return queryDataPort.findNearbySummaries(lat, lng, distanceMeters, orNone(filter), pageable);
+    }
+
+    @Override
+    public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(double lat, double lng, String species, Double radiusMeters, Integer hours) {
+        double radius = radiusMeters == null ? DUPLICATE_RADIUS_METERS : Math.clamp(radiusMeters, 1, DUPLICATE_MAX_RADIUS_METERS);
+        int window = hours == null ? DUPLICATE_WINDOW_HOURS : Math.clamp(hours, 1, DUPLICATE_MAX_WINDOW_HOURS);
+        String wanted = species == null || species.isBlank() ? null : species.trim();
+        log.debug("Query: possible duplicate rescue cases near ({}, {}) within {} m, {} h", lat, lng, radius, window);
+        return queryDataPort.findPossibleDuplicates(lat, lng, radius, wanted, window, DUPLICATE_MAX_RESULTS);
     }
 
     @Override

@@ -12,6 +12,7 @@ public interface OrganizationMapMarkerProjection {
     Double getLongitude();
     String getPhone();
     String getImageUrl();
+    String getStreetAddress();
     String getWardName();
     String getProvinceName();
 }

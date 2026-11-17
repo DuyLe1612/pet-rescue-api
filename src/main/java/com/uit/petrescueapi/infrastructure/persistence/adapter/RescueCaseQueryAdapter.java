@@ -11,6 +11,7 @@ import com.uit.petrescueapi.infrastructure.persistence.projection.*;
 import com.uit.petrescueapi.infrastructure.persistence.repository.RescueCaseQueryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,9 +50,20 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     public Page<RescueCaseSummaryResponseDto> findNearbySummaries(
             double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
 
+        // the query orders by distance itself
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), unsorted)
                 .map(this::toSummaryDto);
+    }
+
+    @Override
+    public List<RescueCaseSummaryResponseDto> findPossibleDuplicates(
+            double lat, double lng, double distanceMeters, String species, int hours, int maxResults) {
+
+        return queryRepo.findPossibleDuplicates(lng, lat, distanceMeters, species, hours, maxResults).stream()
+                .map(this::toSummaryDto)
+                .toList();
     }
 
     @Override
@@ -210,6 +222,11 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .reportedAt(p.getReportedAt())
                 .locationText(p.getLocationText())
                 .distanceMeters(p.getDistance())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
+                .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .firstImageUrl(p.getFirstImageUrl() == null ? null : cloudStoragePort.buildUrl(p.getFirstImageUrl()))
                 .build();
     }
@@ -239,7 +256,9 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
                 .petId(p.getPetId())
+                .petName(p.getPetName())
                 .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .activeClaimCount(p.getActiveClaimCount() == null ? 0 : p.getActiveClaimCount().intValue())
                 .viewerIsReporter(viewerId != null && viewerId.equals(p.getReportedBy()))
@@ -263,6 +282,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .priority(p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority()))
                 .status(p.getStatus())
                 .description(p.getDescription())
+                .locationText(p.getLocationText())
+                .firstImageUrl(p.getFirstImageUrl() == null ? null : cloudStoragePort.buildUrl(p.getFirstImageUrl()))
                 .provinceName(p.getProvinceName())
                 .wardName(p.getWardName())
                 .latitude(p.getLatitude())
@@ -338,6 +359,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                         ? RescueCaseStatus.valueOf(p.getStatus())
                         : null)
                 .species(p.getSpecies())
+                .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .reportedAt(p.getReportedAt())
                 .build();
     }

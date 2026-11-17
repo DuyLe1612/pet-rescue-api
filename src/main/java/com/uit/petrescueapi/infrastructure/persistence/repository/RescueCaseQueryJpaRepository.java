@@ -35,6 +35,17 @@ import java.util.UUID;
 @Repository
 public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJpaEntity, UUID> {
 
+    /** What a list row adds to the columns each list query already selects. */
+    String SUMMARY_EXTRAS = """
+               ,
+               ST_Y(rc.location) AS latitude,
+               ST_X(rc.location) AS longitude,
+               rc.ward_name     AS wardName,
+               rc.province_name AS provinceName,
+               rc.needs_help    AS needsHelp,
+               CASE rc.priority WHEN 'CRITICAL' THEN 4 WHEN 'HIGH' THEN 3 WHEN 'NORMAL' THEN 2 WHEN 'LOW' THEN 1 ELSE 0 END AS priority_rank
+        """;
+
     // ── Summary (list views) ────────────────────
 
     @Query(value = """
@@ -54,6 +65,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
              ORDER BY mf.created_at ASC
              LIMIT 1
            ) AS firstImageUrl
+    """ + SUMMARY_EXTRAS + """
       FROM rescue_cases rc
       LEFT JOIN users u ON rc.reported_by = u.user_id
       WHERE rc.is_deleted = false
@@ -112,7 +124,9 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                u.username       AS reporterUsername,
                rc.reported_by   AS reportedBy,
                rc.organization_id AS organizationId,
+               o.name           AS organizationName,
                rc.pet_id        AS petId,
+               p.name           AS petName,
                rc.color         AS color,
                rc.description   AS description,
                ST_Y(rc.location) AS locationLat,
@@ -129,6 +143,8 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                comp.status      AS completionStatus
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
+        LEFT JOIN organizations o ON o.organization_id = rc.organization_id
+        LEFT JOIN pets p ON p.pet_id = rc.pet_id
         LEFT JOIN rescue_case_completions comp
                ON comp.case_id = rc.case_id AND comp.status <> 'REJECTED' AND comp.is_deleted = false
         WHERE rc.is_deleted = false AND rc.case_id = :id
@@ -158,6 +174,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  LIMIT 1
                ) AS firstImageUrl,
                ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+    """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
@@ -168,7 +185,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
           AND (CAST(:province AS VARCHAR) IS NULL OR rc.province_code = CAST(:province AS VARCHAR)
                OR LOWER(rc.province_name) = LOWER(CAST(:province AS VARCHAR)))
           AND (CAST(:reporterId AS uuid) IS NULL OR rc.reported_by = CAST(:reporterId AS uuid))
-        ORDER BY distance
+        ORDER BY distance, rc.reported_at DESC
     """,
             countQuery = """
                         SELECT COUNT(rc.case_id)
@@ -196,6 +213,50 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
             @Param("reporterId") UUID reporterId,
             Pageable pageable);
 
+    // ── Possible duplicates of a report about to be filed ──
+
+    /**
+     * Open cases reported recently near a point. A case with no species still matches, because
+     * the earlier reporter may not have known what the animal was.
+     */
+    @Query(value = """
+        SELECT rc.case_id AS caseId,
+               rc.case_code AS caseCode,
+               rc.species AS species,
+               rc.priority AS priority,
+               rc.status AS status,
+               (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
+               rc.location_text AS locationText,
+               u.username AS reporterUsername,
+               (
+                 SELECT mf.public_id
+                 FROM rescue_media rm
+                 JOIN media_files mf ON mf.media_id = rm.media_id
+                 WHERE rm.case_id = rc.case_id
+                 ORDER BY mf.created_at ASC
+                 LIMIT 1
+               ) AS firstImageUrl,
+               ST_Distance(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) AS distance
+    """ + SUMMARY_EXTRAS + """
+        FROM rescue_cases rc
+        LEFT JOIN users u ON rc.reported_by = u.user_id
+        WHERE rc.is_deleted = false
+          AND rc.status IN ('REPORTED', 'IN_PROGRESS')
+          AND rc.reported_at >= now() - make_interval(hours => :hours)
+          AND ST_DWithin(rc.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :distanceMeters)
+          AND (CAST(:species AS VARCHAR) IS NULL OR rc.species IS NULL
+               OR LOWER(rc.species) = LOWER(CAST(:species AS VARCHAR)))
+        ORDER BY distance, rc.reported_at DESC
+        LIMIT :maxResults
+    """, nativeQuery = true)
+    List<RescueCaseSummaryProjection> findPossibleDuplicates(
+            @Param("lng") double lng,
+            @Param("lat") double lat,
+            @Param("distanceMeters") double distanceMeters,
+            @Param("species") String species,
+            @Param("hours") int hours,
+            @Param("maxResults") int maxResults);
+
     // ── Within bounding box (PostGIS spatial query) ──
 
     @Query(value = """
@@ -215,6 +276,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                  ORDER BY mf.created_at ASC
                  LIMIT 1
                ) AS firstImageUrl
+    """ + SUMMARY_EXTRAS + """
         FROM rescue_cases rc
         LEFT JOIN users u ON rc.reported_by = u.user_id
         WHERE rc.is_deleted = false
@@ -271,6 +333,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
+               rc.needs_help AS needsHelp,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt
         FROM rescue_cases rc
         WHERE rc.is_deleted = false
@@ -298,6 +361,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
+               rc.needs_help AS needsHelp,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt
         FROM rescue_cases rc
         WHERE rc.is_deleted = false
@@ -334,6 +398,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.priority AS priority,
                rc.status AS status,
                rc.species AS species,
+               rc.needs_help AS needsHelp,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt
         FROM rescue_cases rc
         WHERE rc.is_deleted = false
@@ -497,6 +562,9 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rc.priority AS priority,
         rc.status AS status,
         rc.description AS description,
+        rc.location_text AS locationText,
+        (SELECT mf.public_id FROM rescue_media rm JOIN media_files mf ON mf.media_id = rm.media_id
+          WHERE rm.case_id = rc.case_id ORDER BY mf.created_at ASC LIMIT 1) AS firstImageUrl,
         rc.province_name AS provinceName,
         rc.ward_name AS wardName,
         ST_Y(rc.location) AS latitude,

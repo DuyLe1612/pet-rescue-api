@@ -40,6 +40,9 @@ public class RescueMapMarkerDto {
     @Schema(description = "Animal species", example = "Dog")
     private String species;
     
+    @Schema(description = "The people on the case asked for more help")
+    private boolean needsHelp;
+
     @Schema(description = "When the case was reported")
     private LocalDateTime reportedAt;
 }

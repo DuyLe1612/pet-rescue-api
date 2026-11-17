@@ -3,7 +3,6 @@ package com.uit.petrescueapi.presentation.controller;
 import com.uit.petrescueapi.application.dto.adoption.*;
 import com.uit.petrescueapi.application.port.command.AdoptionCommandPort;
 import com.uit.petrescueapi.application.port.query.AdoptionQueryPort;
-import com.uit.petrescueapi.domain.repository.ReclaimLogRepository;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.AdoptionWebMapper;
@@ -30,7 +29,11 @@ public class AdoptionController {
     private final AdoptionCommandPort commandPort;
     private final AdoptionQueryPort queryPort;
     private final AdoptionWebMapper mapper;
-    private final ReclaimLogRepository reclaimLogRepository;
+
+    /** Accepted sortBy → column of the reclaim log query. */
+    private static final java.util.Map<String, String> RECLAIM_SORT_COLUMNS = java.util.Map.of(
+            "reclaimedAt", "reclaimed_at",
+            "createdAt", "created_at");
 
     @PostMapping
     @Operation(summary = "Submit an adoption application")
@@ -167,13 +170,9 @@ public class AdoptionController {
             @RequestParam(defaultValue = "reclaimedAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder,
             Authentication authentication) {
-        queryPort.requireReclaimLogAccess(organizationId, UUID.fromString(authentication.getName()));
-        var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder);
-        var logs = (organizationId == null
-                ? reclaimLogRepository.findAll(pageable)
-                : reclaimLogRepository.findByOrganizationId(organizationId, pageable))
-                .map(this::toDto);
-        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(logs)));
+        var pageable = PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, RECLAIM_SORT_COLUMNS);
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
+                queryPort.findReclaimLogs(organizationId, pageable, UUID.fromString(authentication.getName())))));
     }
 
     private ReclaimLogResponseDto toDto(com.uit.petrescueapi.domain.entity.ReclaimLog log) {

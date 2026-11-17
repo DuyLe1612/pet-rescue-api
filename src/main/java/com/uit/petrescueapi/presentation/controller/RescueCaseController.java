@@ -12,6 +12,7 @@ import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.PetWebMapper;
 import com.uit.petrescueapi.presentation.mapper.RescueCaseWebMapper;
+import com.uit.petrescueapi.presentation.support.GeoParams;
 import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -26,6 +27,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -34,6 +36,15 @@ import java.util.UUID;
 @Slf4j
 @io.swagger.v3.oas.annotations.tags.Tag(name = "Rescue Cases", description = "Rescue case management")
 public class RescueCaseController {
+
+    /** Accepted sortBy → column or alias of the list queries. */
+    private static final Map<String, String> SORT_COLUMNS = Map.of(
+            "reportedAt", "reported_at",
+            "createdAt", "created_at",
+            "caseCode", "case_code",
+            "status", "status",
+            "species", "species",
+            "priority", "priority_rank");
 
     private final RescueCaseCommandPort commandPort;
     private final RescueCaseQueryPort queryPort;
@@ -160,12 +171,30 @@ public class RescueCaseController {
                 petMapper.toDto(commandPort.keepPet(id, request, UUID.fromString(authentication.getName())))));
     }
 
+    @GetMapping("/possible-duplicates")
+    @Operation(summary = "Open cases near a point that may be the same animal",
+            description = "Call before filing a report. Returns at most 5 cases still REPORTED or IN_PROGRESS, " +
+                    "reported within the last hours (default 48, max 168) and within radius metres (default 300, max 2000), " +
+                    "nearest first. species is optional; cases with no species recorded always match. " +
+                    "Advisory only: the caller may still file a new report.")
+    public ResponseEntity<ApiResponse<List<RescueCaseSummaryResponseDto>>> possibleDuplicates(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(required = false) String species,
+            @RequestParam(required = false) Double radius,
+            @RequestParam(required = false) Integer hours) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findPossibleDuplicates(lat, lng, species, radius, hours)));
+    }
+
     @GetMapping
     @Operation(summary = "List all rescue cases (paginated, with optional filters)",
             description = "Unified endpoint for listing rescue cases. status, priority, species and province (code or name) " +
                     "apply to every mode. Supports geo filtering with lat/lng/distance for nearby results " +
                     "or minLat/minLng/maxLat/maxLng for bounding box results. Use lat=X&lng=Y&distance=Z for nearby. " +
-                    "Use minLat=X&minLng=Y&maxLat=Z&maxLng=W for bounding box.")
+                    "Use minLat=X&minLng=Y&maxLat=Z&maxLng=W for bounding box. An incomplete area is a 400. " +
+                    "search applies to the plain list only. " +
+                    "sortBy: reportedAt, createdAt, caseCode, status, species, priority (desc = most urgent first). " +
+                    "Nearby results are always nearest first.")
     public ResponseEntity<ApiResponse<PageResponse<RescueCaseSummaryResponseDto>>> getAll(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
@@ -185,23 +214,26 @@ public class RescueCaseController {
             @RequestParam(required = false) Double maxLng) {
 
         RescueCaseFilter filter = new RescueCaseFilter(status, priority, species, province);
+        boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
+        boolean hasPoint = GeoParams.hasPoint(lat, lng, distance);
 
         // Geo filter: bounding box
-        if (minLat != null && minLng != null && maxLat != null && maxLng != null) {
+        if (hasBbox) {
             return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findWithinBoundingBox(minLat, minLng, maxLat, maxLng, filter,
+                        PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, SORT_COLUMNS)))));
         }
 
-        // Geo filter: nearby
-        if (lat != null && lng != null) {
+        // Geo filter: nearby, always nearest first
+        if (hasPoint) {
             double dist = distance != null ? distance : 5000;
             return ResponseEntity.ok(ApiResponse.ok(
-                PageResponse.from(queryPort.findNearby(lat, lng, dist, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+                PageResponse.from(queryPort.findNearby(lat, lng, dist, filter, PageRequest.of(page, pageSize)))));
         }
 
         // Standard list
         return ResponseEntity.ok(ApiResponse.ok(
-            PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)))));
+            PageResponse.from(queryPort.findAll(search, filter, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, SORT_COLUMNS)))));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -222,7 +254,7 @@ public class RescueCaseController {
             @RequestParam(required = false) String species) {
 
         List<RescueMapMarkerDto> markers;
-        boolean hasBbox = minLat != null && minLng != null && maxLat != null && maxLng != null;
+        boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
 
         if (hasBbox) {
             if ((status == null || status.isEmpty()) && (priority == null || priority.isEmpty()) && species == null) {
