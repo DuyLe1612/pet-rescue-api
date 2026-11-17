@@ -51,6 +51,26 @@ public class AdminController {
     private final UserReputationJpaRepository userReputationJpaRepo;
     private final com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCommunityQueryPort;
 
+    private final com.uit.petrescueapi.application.port.query.EvaluationMetricsQueryPort evaluationMetrics;
+
+    @GetMapping("/matching/metrics")
+    @Operation(summary = "Matching numbers for the evaluation",
+            description = "Per match level: submitted, decided, approved (percent) and follow-up outcomes. Warnings: how many "
+                    + "applications had one, and how many of those were approved. Trait coverage of AVAILABLE pets. "
+                    + "Rates are percentages, null while the denominator is zero. Demo data is counted too.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.application.dto.admin.EvaluationMetricsDto.Matching>> matchingMetrics() {
+        return ResponseEntity.ok(ApiResponse.ok(evaluationMetrics.matching()));
+    }
+
+    @GetMapping("/rescue-cases/metrics")
+    @Operation(summary = "Rescue numbers for the evaluation",
+            description = "Median minutes from report to first claim by priority, with and without AI triage; the AI's urgency "
+                    + "against the case priority (higher, lower, missed CRITICAL); lost and found suggestions and reunions; "
+                    + "open cases the community flagged. Demo data is counted too.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.application.dto.admin.EvaluationMetricsDto.Rescue>> rescueMetrics() {
+        return ResponseEntity.ok(ApiResponse.ok(evaluationMetrics.rescue()));
+    }
+
     @GetMapping("/rescue-cases/flagged")
     @Operation(summary = "Open rescue cases the community flagged",
             description = "Most flagged first, with counts by reason (false report, already handled, duplicate).")

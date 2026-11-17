@@ -2166,7 +2166,78 @@ class QueryBehaviorIntegrationTest {
         call(post("/api/v1/rescue-cases/" + foundId + "/claim"), person(), "{\"safetyAcknowledged\":true}").andExpect(status().isOk());
     }
 
+    // ── Evaluation numbers (phase 5) ────────────────
+
+    @Test
+    void matchingNumbersCountApprovalAndWarningsPerLevel() throws Exception {
+        UUID admin = admin();
+        String before = adminGet("/api/v1/admin/matching/metrics", admin);
+
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID warned = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "APPROVED");
+        UUID plain = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "REJECTED");
+        UUID waiting = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET match_level = 'NOT_SUITABLE', match_score = 40, match_warnings = 'BUILDING_FORBIDS_PETS', warnings_acknowledged = TRUE WHERE application_id = ?", warned);
+        jdbc.update("UPDATE adoption_applications SET match_level = 'NOT_SUITABLE', match_score = 70 WHERE application_id IN (?, ?)", plain, waiting);
+
+        String after = adminGet("/api/v1/admin/matching/metrics", admin);
+        String level = "$.data.byLevel[?(@.level=='NOT_SUITABLE')]";
+        assertThat(metric(after, level + ".submitted") - metric(before, level + ".submitted")).isEqualTo(3);
+        assertThat(metric(after, level + ".decided") - metric(before, level + ".decided")).isEqualTo(2);
+        assertThat(metric(after, level + ".approved") - metric(before, level + ".approved")).isEqualTo(1);
+        assertThat(num(after, "$.data.warnings.withWarnings") - num(before, "$.data.warnings.withWarnings")).isEqualTo(1);
+        assertThat(num(after, "$.data.warnings.approvedWithWarnings") - num(before, "$.data.warnings.approvedWithWarnings")).isEqualTo(1);
+        assertThat(JsonPath.<Object>read(after, "$.data.traitCoverage.availablePets")).isNotNull();
+
+        call(get("/api/v1/admin/matching/metrics"), person()).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rescueNumbersCompareTheAiWithThePriorityAndCountReunions() throws Exception {
+        UUID admin = admin();
+        String before = adminGet("/api/v1/admin/rescue-cases/metrics", admin);
+
+        UUID reporter = person();
+        UUID critical = caseAt(reporter, "Dog", "CRITICAL", "IN_PROGRESS");
+        jdbc.update("""
+                INSERT INTO rescue_case_triage (case_id, status, attempts, ai_urgency, analyzed_at)
+                VALUES (?, 'ANALYZED', 1, 'HIGH', NOW())
+                """, critical);
+        jdbc.update("""
+                INSERT INTO rescue_case_claims (claim_id, case_id, user_id, status, claimed_at)
+                SELECT ?, case_id, ?, 'ACTIVE', reported_at + INTERVAL '30 minutes' FROM rescue_cases WHERE case_id = ?
+                """, UUID.randomUUID(), person(), critical);
+
+        UUID lost = caseAt(person(), "Dog", "NORMAL", "CLOSED");
+        UUID found = caseAt(person(), "Dog", "NORMAL", "CLOSED");
+        jdbc.update("UPDATE rescue_cases SET case_type = 'LOST', resolution = 'REUNITED', resolved_at = reported_at + INTERVAL '6 hours' WHERE case_id = ?", lost);
+        jdbc.update("UPDATE rescue_cases SET case_type = 'FOUND', holding_status = 'AT_HOME' WHERE case_id = ?", found);
+        jdbc.update("INSERT INTO case_match_suggestions (suggestion_id, lost_case_id, other_case_id, distance_m, score, reasons, status) VALUES (?, ?, ?, 300, 80, 'x', 'CONFIRMED')",
+                UUID.randomUUID(), lost, found);
+
+        String after = adminGet("/api/v1/admin/rescue-cases/metrics", admin);
+        assertThat(num(after, "$.data.triage.analyzed") - num(before, "$.data.triage.analyzed")).isEqualTo(1);
+        assertThat(num(after, "$.data.triage.aiLower") - num(before, "$.data.triage.aiLower")).isEqualTo(1);
+        assertThat(num(after, "$.data.triage.criticalMissed") - num(before, "$.data.triage.criticalMissed")).isEqualTo(1);
+        String bucket = "$.data.timeToFirstClaim[?(@.priority=='CRITICAL' && @.triaged==true)]";
+        assertThat(metric(after, bucket + ".claimed") - metric(before, bucket + ".claimed")).isEqualTo(1);
+        assertThat(num(after, "$.data.lostAndFound.confirmed") - num(before, "$.data.lostAndFound.confirmed")).isEqualTo(1);
+        assertThat(num(after, "$.data.lostAndFound.reunitedLostCases") - num(before, "$.data.lostAndFound.reunitedLostCases")).isEqualTo(1);
+        assertThat(JsonPath.<Object>read(after, "$.data.lostAndFound.medianHoursToReunion")).isNotNull();
+
+        call(get("/api/v1/admin/rescue-cases/metrics"), person()).andExpect(status().isForbidden());
+    }
+
     // ── Helpers ─────────────────────────────────────
+
+    private static long num(String json, String path) {
+        return JsonPath.<Number>read(json, path).longValue();
+    }
+
+    private String adminGet(String url, UUID admin) throws Exception {
+        return mvc.perform(get(url).with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
 
     private static String daysAgo(int days) {
         return java.time.Instant.now().minus(java.time.Duration.ofDays(days)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();

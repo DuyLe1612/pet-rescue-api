@@ -89,6 +89,7 @@ class SecurityRulesWebTest {
     @MockitoBean UserWebMapper userMapper;
     @MockitoBean com.uit.petrescueapi.application.port.command.RescueCaseCommunityPort rescueCaseCommunityPort;
     @MockitoBean com.uit.petrescueapi.application.port.command.LostAndFoundPort lostAndFoundPort;
+    @MockitoBean com.uit.petrescueapi.application.port.query.EvaluationMetricsQueryPort evaluationMetricsQueryPort;
     @MockitoBean com.uit.petrescueapi.application.port.query.RescueCaseCommunityQueryPort rescueCaseCommunityQueryPort;
     @MockitoBean com.uit.petrescueapi.application.port.query.FirstAidQueryPort firstAidQueryPort;
 
