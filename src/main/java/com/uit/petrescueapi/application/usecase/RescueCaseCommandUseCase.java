@@ -71,6 +71,9 @@ public class RescueCaseCommandUseCase implements RescueCaseCommandPort {
 
         attachCaseMedia(caseId, cmd.getMediaIds());
 
+        // After the photos are attached, so the triage sees them. Nothing here waits for the AI.
+        events.publishEvent(new com.uit.petrescueapi.domain.event.RescueCaseReportedEvent(caseId));
+
         return created;
     }
 

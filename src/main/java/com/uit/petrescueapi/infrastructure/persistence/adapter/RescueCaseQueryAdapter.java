@@ -271,7 +271,23 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .needsHelp(p.getNeedsHelp())
                 .awaitingHandover(p.getAwaitingHandover())
                 .activeClaimCount(p.getActiveClaimCount())
+                .effectivePriority(effective(p))
+                .aiUrgency(p.getAiUrgency() == null ? null : RescuePriority.valueOf(p.getAiUrgency()))
+                .aiSummary(p.getAiSummary())
+                .triageStatus(p.getTriageStatus())
+                .missingFields(p.getMissingFields() == null || p.getMissingFields().isBlank()
+                        ? List.of() : List.of(p.getMissingFields().split(",")))
                 .build());
+    }
+
+    /** The same rule the SQL sorts by, in one place for the domain test: the model only raises. */
+    private static RescuePriority effective(RescueQueueItemProjection p) {
+        RescuePriority reporter = p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority());
+        RescuePriority ai = p.getAiUrgency() == null ? null : RescuePriority.valueOf(p.getAiUrgency());
+        return com.uit.petrescueapi.domain.entity.RescueCaseTriage.effectivePriority(reporter,
+                com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()
+                        .status(ai == null ? null : com.uit.petrescueapi.domain.valueobject.TriageStatus.ANALYZED)
+                        .aiUrgency(ai).build());
     }
 
     private Page<RescueCaseCompletionResponseDto> withImages(Page<RescueCaseCompletionProjection> page) {

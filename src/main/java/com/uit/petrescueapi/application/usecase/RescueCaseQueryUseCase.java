@@ -46,6 +46,7 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
     private final UserDomainService userDomainService;
     private final OrganizationMemberRepository memberRepository;
     private final AccessControlDomainService accessControl;
+    private final com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triageRepository;
     @Override
     public RescueCaseResponseDto findById(UUID caseId, UUID viewerId) {
         log.debug("Query: find rescue case by id {}", caseId);
@@ -136,6 +137,15 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
             dto.setUsername(userDomainService.findById(claim.getUserId()).getUsername());
             return dto;
         }).toList();
+    }
+
+    @Override
+    public com.uit.petrescueapi.application.dto.rescue.RescueTriageResponseDto findTriage(UUID caseId, UUID requesterId) {
+        var rescueCase = caseDomainService.findById(caseId);
+        accessControl.requireCaseHandler(rescueCase, requesterId);
+        return triageRepository.findByCaseId(caseId)
+                .map(t -> com.uit.petrescueapi.application.dto.rescue.RescueTriageResponseDto.from(t, rescueCase.getPriority()))
+                .orElseGet(() -> com.uit.petrescueapi.application.dto.rescue.RescueTriageResponseDto.notStarted(caseId, rescueCase.getPriority()));
     }
 
     @Override
