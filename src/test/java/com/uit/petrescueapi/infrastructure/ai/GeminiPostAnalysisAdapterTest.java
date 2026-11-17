@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
@@ -140,22 +141,30 @@ class GeminiPostAnalysisAdapterTest {
     void routerPicksTheProviderFromTheModelName() {
         ClaudePostAnalysisAdapter claude = mock(ClaudePostAnalysisAdapter.class);
         GeminiPostAnalysisAdapter gemini = mock(GeminiPostAnalysisAdapter.class);
-        PostAnalysisModelRouter router = new PostAnalysisModelRouter(claude, gemini);
+        OpenRouterPostAnalysisAdapter openRouter = mock(OpenRouterPostAnalysisAdapter.class);
+        PostAnalysisModelRouter router = new PostAnalysisModelRouter(claude, gemini, openRouter);
 
         router.analyze("x", catalog, MODEL);
 
         verify(gemini).analyze(any(), any(), any());
-        verifyNoInteractions(claude);
+        verifyNoInteractions(claude, openRouter);
 
         router.analyze("x", catalog, "claude-haiku-5-5");
 
         verify(claude).analyze(any(), any(), any());
+        verifyNoInteractions(openRouter);
+
+        // a vendor name that looks like another provider still goes to OpenRouter
+        router.analyze("x", catalog, "openrouter/google/gemini-2.5-flash");
+
+        verify(openRouter).analyze(any(), any(), any());
+        verifyNoMoreInteractions(gemini, claude);
     }
 
     @Test
     void springBuildsTheProvidersWithoutAnyApiKeyAndPrefersTheRouter() {
         new ApplicationContextRunner()
-                .withUserConfiguration(ClaudePostAnalysisAdapter.class, GeminiPostAnalysisAdapter.class, PostAnalysisModelRouter.class)
+                .withUserConfiguration(ClaudePostAnalysisAdapter.class, GeminiPostAnalysisAdapter.class, OpenRouterPostAnalysisAdapter.class, PostAnalysisModelRouter.class)
                 .withPropertyValues("app.ai.post-analysis.enabled=true")
                 .run(ctx -> {
                     assertThat(ctx).hasNotFailed();
@@ -166,7 +175,7 @@ class GeminiPostAnalysisAdapterTest {
     @Test
     void noProviderExistsWhenAiIsDisabled() {
         new ApplicationContextRunner()
-                .withUserConfiguration(ClaudePostAnalysisAdapter.class, GeminiPostAnalysisAdapter.class, PostAnalysisModelRouter.class)
+                .withUserConfiguration(ClaudePostAnalysisAdapter.class, GeminiPostAnalysisAdapter.class, OpenRouterPostAnalysisAdapter.class, PostAnalysisModelRouter.class)
                 .run(ctx -> assertThat(ctx).doesNotHaveBean(PostAnalysisPort.class));
     }
 }
