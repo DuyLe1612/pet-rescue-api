@@ -3,6 +3,7 @@ package com.uit.petrescueapi.application.usecase;
 import com.uit.petrescueapi.application.dto.post.CreatePostRequestDto;
 import com.uit.petrescueapi.application.dto.post.UpdatePostRequestDto;
 import com.uit.petrescueapi.application.port.command.PostCommandPort;
+import com.uit.petrescueapi.application.support.CanonicalText;
 import com.uit.petrescueapi.domain.entity.Post;
 import com.uit.petrescueapi.domain.service.PostDomainService;
 import lombok.RequiredArgsConstructor;
@@ -38,7 +39,7 @@ public class PostCommandUseCase implements PostCommandPort {
                 .content(cmd.getContent())
                 .rescueCaseId(cmd.getRescueCaseId())
                 .mediaIds(cmd.getMediaIds())
-                .tagCodes(cmd.getTagCodes())
+                .tagCodes(CanonicalText.slugs(cmd.getTagCodes()))
                 .build();
         Post created = domainService.create(post);
         // DA2: queue the new post for AI analysis (handled after commit, off the request thread)
@@ -56,7 +57,7 @@ public class PostCommandUseCase implements PostCommandPort {
                 .content(cmd.getContent())
                 .mediaIds(cmd.getMediaIds())
                 .tagIds(null)
-                .tagCodes(cmd.getTagCodes())
+                .tagCodes(CanonicalText.slugs(cmd.getTagCodes()))
                 .rescueCaseId(cmd.getRescueCaseId())
                 .build();
         Post updated = domainService.update(postId, patch);

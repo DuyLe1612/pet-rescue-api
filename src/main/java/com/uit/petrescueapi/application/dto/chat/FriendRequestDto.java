@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.chat;
 
+import com.uit.petrescueapi.domain.valueobject.FriendRequestStatus;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import lombok.Builder;
 import lombok.Data;
 
@@ -21,6 +23,7 @@ public class FriendRequestDto {
     @NotNull
     private UUID addresseeId;
     @NotBlank
+    @CanonicalEnum(FriendRequestStatus.class)
     private String status;
     private LocalDateTime createdAt;
 }

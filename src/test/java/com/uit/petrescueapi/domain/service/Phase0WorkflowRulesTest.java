@@ -42,7 +42,8 @@ class Phase0WorkflowRulesTest {
         return new RescueCaseCommandUseCase(domain, access, mock(RescueClaimDomainService.class),
                 mock(com.uit.petrescueapi.application.port.command.PetCommandPort.class), mock(PetDomainService.class),
                 mock(MediaQueryPort.class), mock(org.springframework.context.ApplicationEventPublisher.class),
-                mock(RescueCaseMediaRepository.class), mock(RescueCompletionMediaRepository.class));
+                mock(RescueCaseMediaRepository.class), mock(RescueCompletionMediaRepository.class),
+                mock(com.uit.petrescueapi.application.service.SpeciesResolver.class));
     }
 
     private UUID completionForCaseIn(RescueCaseStatus status) {

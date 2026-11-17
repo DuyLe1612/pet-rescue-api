@@ -26,6 +26,8 @@ public class JacksonConfig {
         mapper.registerModule(new SimpleModule("utc-local-date-time")
                 .addSerializer(java.time.LocalDateTime.class, new UtcLocalDateTimeSerializer())
                 .addDeserializer(java.time.LocalDateTime.class, new FlexibleLocalDateTimeDeserializer()));
+        // "male", "Đực" and "MALE" all read as Gender.MALE; see EnumAliases
+        mapper.registerModule(new CanonicalEnumModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
