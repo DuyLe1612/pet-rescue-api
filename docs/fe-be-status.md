@@ -1,223 +1,205 @@
 # Đối chiếu hiện trạng FE với BE
 
-Tài liệu này theo dõi hai việc:
+Tài liệu này chỉ ghi **những gì còn mở**:
 
-- Những lỗi đã tìm thấy trên FE (API, giao diện, trải nghiệm) và trạng thái hiện tại của từng lỗi.
-- Những tính năng BE đã làm xong mà FE chưa có màn hình.
+- Lỗi và vấn đề giao diện FE chưa sửa.
+- Phân tích UI/UX của khu quản trị: những chỗ cần thiết kế lại, chưa sửa được ngay.
+- Những API BE đã làm mà FE chưa dùng.
 
-Lần cập nhật nào cũng sửa thẳng vào bảng, không viết thêm phần mới ở cuối.
+Mục nào sửa xong thì xoá khỏi tài liệu. Lịch sử các mục đã sửa nằm trong PR của FE (#13, #14, #15) và git log của file này.
 
 | | |
 |---|---|
-| **Cập nhật** | 17/11/2026 |
-| **FE** | `paw-home-ui`: `origin/main` (`98846aa`) và nhánh sửa `fix/ux-quick-wins` (3 commit, chưa merge) |
-| **BE** | `pet-rescue-api`: `origin/master` (`4c0a0fc`) |
-| **Môi trường thử** | FE chạy `localhost:3100` gọi API staging `pet-rescue-api-0uhx.onrender.com` (có dữ liệu demo). Bản deploy `paw-home-ui.vercel.app` dùng làm mốc "trước khi sửa". |
+| **Cập nhật** | 18/11/2026 |
+| **FE** | `paw-home-ui`: `main` + PR #15 `fix/admin-ux-api-sync` |
+| **BE** | `pet-rescue-api`: `master` (`26031c1`, migration tới V35) |
+| **Môi trường thử** | FE `localhost:3100` gọi BE `localhost:8081` chạy từ `master`, có dữ liệu demo ở `scripts/demo-data` |
 | **Tài khoản** | `demo.admin`, `demo.owner1`, `demo.user1` (mật khẩu ở `scripts/demo-data/README.md`) |
-
-**Cách đọc cột Trạng thái:**
-
-| Trạng thái | Nghĩa |
-|---|---|
-| **Đã sửa** | Đã có trên `main` của FE (hoặc `master` của BE) |
-| **Sửa ở nhánh** | Đã sửa trên `fix/ux-quick-wins`, đã chạy thử ở local, chờ merge |
-| **Một phần** | Đã sửa một phần, phần còn lại ghi ở mục 5 |
-| **Chưa sửa** | Còn nguyên |
-| **Cần kiểm chứng** | Chưa chắc là lỗi; cần thao tác ghi thật hoặc người khác xem lại |
 
 ---
 
 ## 1. Tóm tắt
 
-- **Lỗi API cũ (đợt 03/11):** 16 mục. 14 mục đã sửa, M6 cần kiểm chứng, S1 chưa sửa vì cần quyết định thiết kế.
-- **Lỗi UI/UX (đợt 17/11):** 15 mục.
-  - 4 mục đã sửa ở nhánh và chạy thử ở local: U1 nút nhận nuôi, U2 bản đồ, U3 lối vào cho chủ tổ chức, U15 khung bản đồ trang chủ.
-  - 8 mục sửa một phần.
-  - 3 mục chưa sửa: U8 chữ, U11 di động, U13 nội dung giả.
-- **Độ phủ API:** BE có **161** endpoint, FE gọi **105**.
-  - 56 endpoint còn lại gom thành 12 nhóm tính năng (mục 3).
-  - Nặng nhất là **quy trình nhận ca cứu hộ** và **thông báo**. Đây là phần lõi của Giai đoạn 1 mà người dùng web chưa làm được.
+- **Khu quản trị đã sạch lỗi hiển thị cơ bản** (PR #15). Kết quả quét 11 trang admin:
+  - Không còn UUID và enum thô trên màn hình.
+  - Tiêu đề trang cùng một kiểu, phân trang tiếng Việt.
+  - KPI thú cưng lấy tổng số từ API.
+- **Vấn đề còn lại là về luồng thao tác (CTA):**
+  - Màn nhận nuôi hiện mỗi đơn hai lần.
+  - Bước tiếp theo của đơn đã duyệt bị giấu trong hộp thoại.
+  - "Việc cần xử lý" không dẫn tới đúng việc.
+  - Mỗi bảng có một kiểu hành động khác nhau.
+  - Khu quản trị có hai kiểu thẻ KPI và màu trạng thái lệch nhau giữa biểu đồ và nhãn.
+  - Chi tiết ở mục 2.
+- **BE còn thiếu dữ liệu cho UI:** đơn nhận nuôi và danh sách người dùng chỉ có `username`, không có họ tên. Thú cưng chưa lọc được theo sức khoẻ. Chi tiết ở mục 4.
+- **Độ phủ API:** BE có **188** endpoint, FE gọi **105**. Phần lớn chỗ thiếu là quy trình nhận và xử lý ca cứu hộ, thông báo, theo dõi sau nhận nuôi và matching (mục 5).
 
 ---
 
-## 2. Bảng trạng thái
+## 2. Khu quản trị: phân tích UI/UX
 
-### 2.1 Lỗi chặn luồng
+Ảnh chụp ngày 18/11 ở 1440px, tài khoản `demo.admin`, dữ liệu demo.
 
-| ID | Vấn đề | Trạng thái | Ghi chú |
-|---|---|---|---|
-| B1 | `/nhan-nuoi` hiện 0 thú | **Đã sửa** | Hiện 57 bé |
-| B2 | Không tạo được thú (sai route, gửi tên loài thay vì `speciesId`) | **Đã sửa** | FE gọi `POST /pets` và lấy loài từ `/pets/taxonomy` (đọc code) |
-| B3 | Không tạo được trung tâm (thiếu mã tỉnh/phường) | **Đã sửa** | Form có ô chọn tỉnh, phường từ `/locations` (đọc code) |
-| B4 | Ca cứu trợ từ admin mất ảnh và số điện thoại | **Đã sửa** | Không còn đoạn ghi đè `imageUrls: []` (đọc code) |
-| B5 | Form sửa trung tâm trống | **Đã sửa** | Form `reset()` theo dữ liệu chi tiết |
-| B6 | Khách không thấy banner (401) | **Đã sửa** | BE thêm `/banners/active` vào `permitAll` |
-| U1 | Nút "Nhận nuôi" luôn bị khoá: FE so `UNOWNED`, BE trả `AVAILABLE` | **Sửa ở nhánh** | FE dùng đúng enum BE ở mọi nơi. Khách bấm thì được mời đăng nhập |
-| U2 | Bản đồ không có nền ("API KEY REQUIRED" của Carto) | **Một phần** | Đã đổi sang tile OSM. Còn thiếu gom cụm marker và chú giải màu |
-| U3 | Chủ tổ chức đăng nhập xong về trang chủ, không có lối vào quản lý | **Sửa ở nhánh** | Chuyển thẳng tới `/dashboard`, thêm mục "Quản lý trung tâm" ở menu, màn đầu có lối tắt |
-
-### 2.2 Dữ liệu và API
-
-| ID | Vấn đề | Trạng thái | Ghi chú |
-|---|---|---|---|
-| M1 | FE gửi `size`, BE đọc `pageSize` | **Đã sửa** | |
-| M2 | Dashboard admin là dữ liệu mẫu | **Đã sửa** | Gọi 5 API `/admin/dashboard/*` |
-| M3 | Nút "Thêm/Sửa người dùng" rỗng, link `/quan-ly-tin-tuc` và `/web/notifications` 404 | **Đã sửa** | |
-| M4 | Gọi `rescue-cases/map/bounding-box` (404) | **Đã sửa** | Dùng `/rescue-cases/map/markers` |
-| M5 | Bảng trung tâm hiện UUID và cột trống | **Đã sửa** | |
-| M6 | `provinceCode` trùng `wardCode` khi chọn vị trí trên bản đồ | **Cần kiểm chứng** | Phải gửi một ca thật trên môi trường test mới biết |
-| M7 | Thiếu tham số bắt buộc trả 500 | **Đã sửa** | BE có handler `MissingServletRequestParameterException` |
-| M8 | Endpoint cũ còn trong cấu hình FE | **Đã sửa** | |
-| D1 | Form bài đăng bắt gõ tay Media ID, Case ID, Tag | **Đã sửa** | |
-| U16 | KPI ở `/quan-ly-thu-cung` chỉ đếm thú trên trang hiện tại (hiện 7 thay vì 57) | **Chưa sửa** | Xem mục 5 |
-| S1 | Token lưu trong `localStorage` | **Chưa sửa** | Cần quyết định có chuyển `refreshToken` sang cookie `HttpOnly` không |
-
-### 2.3 Giao diện và trải nghiệm
-
-| ID | Vấn đề | Nguyên tắc | Trạng thái |
-|---|---|---|---|
-| U4 | Enum thô (`DOG`, `UNDER_TREATMENT`, `HIGH`, `PENDING`), nhãn khác nhau giữa các màn | H2, H4 | **Một phần**: thú cưng, bản đồ, việc cần xử lý đã dịch |
-| U5 | Chữ template, ghi chú dev, tiếng Anh lọt ra giao diện | H2, H8 | **Một phần**: `/nhan-nuoi`, thẻ thú, lỗi đăng nhập đã sửa. Còn `/ho-so-cua-toi` |
-| U6 | Hero không có CTA, KPI không phân cấp, breadcrumb sai, icon sidebar trùng | Phân cấp thị giác, H1 | **Một phần**: còn tiêu đề "Đơn chờ xét duyệt" lệch nội dung |
-| U7 | Quá nhiều màu nhấn, nhãn nhỏ tương phản 1.4–2.9:1 | 60-30-10, WCAG 1.4.3 | **Một phần**: badge thẻ thú đã đạt 4.5:1. Còn trang chủ và bảng màu chung |
-| U8 | 12 cỡ chữ, thân bài 13px, số kiểu old-style | Typography | **Chưa sửa** |
-| U9 | Thẻ thú vỡ dòng, bảng tràn ngang, thẻ duyệt đơn giấu tên thú | Proximity, H6 | **Một phần**: thẻ thú, bảng thú đã sửa. Còn thẻ duyệt đơn, thẻ hoàn tất ca |
-| U10 | Form báo ca bắt ảnh, nút khoá không nói lý do; lỗi đăng nhập | H5, H9 | **Một phần**: đăng nhập đã sửa. Còn form báo ca |
-| U11 | Bản đồ không dùng được trên điện thoại, hero dài hơn một màn | Responsive, Fitts | **Chưa sửa** |
-| U12 | `lang="en"`, nút icon không có tên, không có skip link | WCAG 3.1.1, 4.1.2, 2.4.1 | **Một phần**: `lang="vi"` và `aria-label` đã có. Còn skip link, focus ring |
-| U13 | Số liệu viết cứng, trang ủng hộ giả, ảnh demo sai loài | Độ tin cậy | **Chưa sửa** |
-| U14 | `/terms`, `/privacy` 404; "Cài đặt" trùng trang hồ sơ; sidebar template | H3, H4 | **Một phần**: chỉ còn `/terms`, `/privacy` |
-| U15 | Khung bản đồ trang chủ là ô đen (iframe `google.com/maps` bị chặn) | H1 | **Sửa ở nhánh**: nhúng OSM |
-
-Ảnh sau khi sửa, chụp ở local:
-
-| Thẻ thú cưng | Bảng quản trị thú cưng | Màn đầu của chủ tổ chức |
+| Tổng quan | Nhận nuôi | Cứu trợ |
 |---|---|---|
-| ![](assets/fe-be-status/local-adopt-cards.jpg) | ![](assets/fe-be-status/local-admin-pets.jpg) | ![](assets/fe-be-status/local-owner-dashboard.jpg) |
+| ![](assets/fe-be-status/admin-dashboard.jpg) | ![](assets/fe-be-status/admin-adoptions.jpg) | ![](assets/fe-be-status/admin-rescue.jpg) |
+
+### A1. Màn nhận nuôi: mỗi đơn hiện hai lần, bước tiếp theo bị giấu
+
+**Mức: cao.** Heuristic: H4 nhất quán, H6 nhận ra thay vì nhớ, H8 tối giản.
+
+- Phần trên là lưới thẻ "Đơn đang xử lý", phần dưới là bảng "Tất cả đơn nhận nuôi". Một đơn chờ duyệt xuất hiện ở cả hai chỗ, và chỗ nào cũng có nút duyệt và nút từ chối. Người duyệt phải tự hỏi hai chỗ này khác nhau ở đâu.
+- Thẻ đơn "Đã duyệt, chờ đón" vẫn hiện nút duyệt và nút từ chối, chỉ bị làm mờ. Việc cần làm tiếp theo là xác nhận người nhận đã đón thú. Việc này chỉ có trong hộp thoại "Xem chi tiết".
+- Trong bảng, mọi dòng không còn chờ duyệt vẫn hiện hai icon ✓ ✗ bị khoá. Cột thao tác thành nhiễu, khó thấy dòng nào cần xử lý.
+- Ảnh đại diện trên thẻ là chữ cái đầu của username ("D" của `demo.userX`) nên thẻ nào cũng giống nhau. Nên dùng ảnh thú: đó là thứ người duyệt nhận ra nhanh nhất.
+
+**Đề xuất (cần review trước khi làm):**
+
+- Bỏ lưới thẻ, chỉ giữ một bảng có tab: Chờ duyệt / Chờ đón / Đã xong / Tất cả.
+- Mỗi dòng chỉ hiện **một** nút chính, đúng với trạng thái của đơn:
+  - Chờ duyệt: "Duyệt" kèm menu "Từ chối".
+  - Chờ đón: "Xác nhận đã đón".
+  - Trạng thái khác: không có nút.
+- Cột đầu là ảnh và tên thú, cột thứ hai là người nộp (họ tên, cần BE bổ sung ở mục 4).
+
+### A2. Hành động trên bảng mỗi trang một kiểu
+
+**Mức: trung bình.** Heuristic: H4 nhất quán, Jakob's law.
+
+| Trang | Mở chi tiết | Hành động |
+|---|---|---|
+| Thú cưng | Bấm cả dòng | Không có trên dòng, phải vào trang chi tiết |
+| Trung tâm, người dùng, bài đăng | Menu ⋮ → "Xem chi tiết" | Menu ⋮ |
+| Nhận nuôi | Nút "Xem chi tiết" hoặc menu ⋮ | Icon ✓ ✗ ngay trên dòng và trên thẻ |
+| Cứu trợ | Bấm thẻ ở cột phải | Trong hộp thoại |
+
+**Đề xuất quy tắc chung:**
+
+- Bấm vào dòng thì mở chi tiết, cho mọi bảng.
+- Chỉ trang có hàng chờ (nhận nuôi, duyệt trung tâm, duyệt hoàn tất ca) mới có nút chính ngay trên dòng.
+- Thao tác phá huỷ (xoá, từ chối) để trong menu ⋮ và luôn hỏi xác nhận.
+
+### A3. "Việc cần xử lý" không dẫn tới đúng việc
+
+**Mức: trung bình.** Heuristic: H7 linh hoạt và hiệu quả.
+
+Ở dashboard, mục "Đơn nhận nuôi Mỡ" hay "Duyệt tổ chức Nhà Mèo Thủ Đức" chỉ dẫn về trang danh sách gốc. Trong code, `AdminDashboard.tsx` cắt `actionUrl` lấy đoạn đầu. Người dùng phải tự tìm lại đơn hoặc tổ chức đó.
+
+**Đề xuất:** mở thẳng đúng đối tượng, ví dụ `/quan-ly-nhan-nuoi?open=<id>`. Trang đích đọc tham số này để mở hộp thoại chi tiết.
+
+### A4. Hai kiểu thẻ KPI, màu trạng thái lệch nhau
+
+**Mức: trung bình.** Heuristic: H4 nhất quán. Liên quan U7, U8 ở mục 3.
+
+- **Thẻ KPI có hai kiểu:**
+  - Dashboard: nhãn nhỏ ở trên, số lớn, dòng so sánh tháng trước.
+  - `/quan-ly-thu-cung`: icon màu bên trái, nhãn **chữ hoa** 11px. Chữ hoa làm tiếng Việt có dấu khó đọc.
+  - Nên dùng một component cho cả hai.
+- **Màu trạng thái không thống nhất:**
+  - Biểu đồ "Đơn nhận nuôi theo tháng": *Chờ duyệt* màu xanh dương, *Hoàn tất* màu vàng cam.
+  - Nhãn trong bảng thì ngược lại: chờ duyệt màu vàng, đã đón màu xanh lá.
+  - Nên cho biểu đồ dùng cùng bảng màu với `lib/adoption-display.ts`.
+- **Mã đơn trong bảng nhận nuôi dùng font monospace** (`A-D0003`), trong khi mã ca, mã người dùng và mã trung tâm dùng font thường với `tabular-nums`. Nên chọn một kiểu.
+
+### A5. Màn cứu trợ: bản đồ và danh sách không khớp nhau
+
+**Mức: trung bình.** Heuristic: H1 hiện trạng thái hệ thống.
+
+- **Bản đồ và danh sách không khớp:**
+  - Bản đồ mở ở mức cả nước và chỉ thấy vài marker.
+  - Danh sách bên phải đề "Ca cứu trợ trong vùng" nhưng ghi 80 mục, tức là toàn bộ ca, không theo vùng đang xem.
+  - Nên lọc danh sách theo khung bản đồ, hoặc đổi tiêu đề thành "Tất cả ca".
+  - Nên thêm gom cụm marker và chú giải màu (đỏ: khẩn cấp, cam: cao, xanh: trung tâm).
+- **Thẻ "Yêu cầu hoàn thành cần phê duyệt" thiếu thông tin để duyệt nhanh:**
+  - Đã có mã ca và người gửi, nhưng ghi chú bị cắt sau khoảng 20 ký tự và không có ảnh.
+  - Người duyệt luôn phải mở hộp thoại so sánh.
+  - Nên hiện ảnh xác minh đầu tiên.
+- **Admin chưa nhận ca, gán ca hay xem ai đang nhận ca được.** BE đã có các API này (G1, G2, G4 ở mục 5). Đây là thay đổi lớn, cần thiết kế luồng trước.
+
+### A6. Những điểm nhỏ còn lại
+
+- **`/quan-ly-bai-viet`:** route trùng với `/quan-ly-bai-dang`, cùng một trang nhưng breadcrumb ghi "Trang quản lý". Nên chuyển hướng sang `/quan-ly-bai-dang` hoặc xoá route.
+- **`/organization/members`:** admin mở trang này thì bị đẩy về trang chủ public, không có thông báo. Nên hiện "Trang này dành cho chủ trung tâm".
+- **Thẻ KPI "Cảnh báo sức khỏe" ở `/quan-ly-thu-cung`:** vẫn chỉ đếm trên trang hiện tại, vì `GET /pets` chưa lọc được theo `healthStatus` (mục 4).
+- **`/trang-ca-nhan` của admin chỉ để xem:** không sửa được thông tin, không đổi được mật khẩu. Người dùng phải sang trang public `/ho-so-cua-toi`, mà trang đó vẫn là template (U5).
 
 ---
 
-## 3. BE đã có, FE chưa có
+## 3. Các lỗi FE còn mở từ các đợt trước
 
-Danh sách sinh tự động bằng cách so 161 endpoint trong `presentation/controller` của `origin/master` với các đường dẫn xuất hiện trong mã FE. Các nhóm quan trọng đã được grep lại bằng tay.
+| ID | Vấn đề | Nguyên tắc | Ghi chú |
+|---|---|---|---|
+| U5 | `/ho-so-cua-toi` vẫn là form template shadcn tiếng Anh: "Settings", "Billing", "verified-1@example.com", "Update profile" | H2, H8 | Cần làm lại trang: thông tin cá nhân, đơn nhận nuôi của tôi, ca tôi báo |
+| U7 | Nhãn nhỏ tương phản thấp ở trang chủ: "BƯỚC 01–04" 10px (2.18–3.11:1), số sự kiện màu vàng (1.38:1). Chưa có bảng màu chung | WCAG 1.4.3, 60-30-10 | Đổi sang bậc `-700`; chốt token màu cho cả public và admin |
+| U8 | Site dùng 12 cỡ chữ (9–72px), thân bài trang public 13px | Typography | Chốt thang 12 / 14 / 16 / 20 / 24 / 32 / 48, thân bài ≥ 16px |
+| U10 | Form báo ca bắt buộc ảnh ("Ảnh ca cứu hộ *"), nút gửi bị khoá mà không nói lý do, ô "Loài" gõ tay | H5, H9 | Bỏ bắt buộc ảnh, thêm "Dùng vị trí của tôi", chọn loài từ `/pets/taxonomy`, báo lỗi tại từng ô |
+| U11 | Trên 375px: panel `/ban-do` che khoảng 90% bản đồ; ở `/nhan-nuoi` phải cuộn 2 màn mới thấy thú đầu tiên | Responsive, Fitts | Bottom sheet cho danh sách, nút báo ca nổi ở góc phải dưới; rút gọn hero |
+| U12 | Thiếu link "Bỏ qua tới nội dung", focus ring chưa theo màu thương hiệu | WCAG 2.4.1, 2.4.7 | |
+| U13 | Số liệu viết cứng: "1.240+ thú được cứu", "3 trạm tại Hà Nội" (`ung-ho/data.json`, `ve-chung-toi/data.json`). `/ung-ho` ghi "mã hoá SSL", MoMo/VNPay nhưng form không gửi đi đâu | Độ tin cậy | Lấy số từ API dashboard; gắn nhãn "đang phát triển" cho `/ung-ho` |
+| U14 | Footer trỏ tới `/terms` và `/privacy`, cả hai đều 404 | H3 | Thêm hai trang hoặc bỏ link |
+| M6 | `provinceCode` có thể trùng `wardCode` khi chọn vị trí trên bản đồ (thấy ngày 03/11) | | **Cần kiểm chứng**: gửi một ca trên môi trường test rồi đối chiếu với `/locations/p` |
+| S1 | `accessToken` và `refreshToken` nằm trong `localStorage` (`lib/http.ts`) | Bảo mật | **Cần quyết định**: chuyển `refreshToken` sang cookie `HttpOnly; Secure; SameSite=Strict` |
+
+Ảnh trước khi sửa của các mục U10, U11 (chụp 17/11):
+
+| Form báo ca | Bản đồ trên điện thoại |
+|---|---|
+| ![](assets/fe-be-status/report-form-before.jpg) | ![](assets/fe-be-status/mobile-map-before.jpg) |
+
+---
+
+## 4. BE còn thiếu cho UI
+
+| # | Thiếu | Ảnh hưởng | Đề xuất |
+|---|---|---|---|
+| BE1 | `AdoptionSummaryResponseDto` chỉ có `applicantUsername` | Bảng và thẻ duyệt đơn hiện `demo.user10` thay vì họ tên | Thêm `applicantFullName` (và ảnh đại diện nếu có) |
+| BE2 | `UserSummaryResponseDto` không có `fullName` | Bảng người dùng và các ô chọn người chỉ hiện username | Thêm `fullName` |
+| BE3 | `GET /pets` bỏ qua `healthStatus` (gửi `healthStatus=UNDER_TREATMENT` vẫn trả 60/60) | KPI "Cảnh báo sức khỏe" chỉ đếm được trên trang hiện tại | Thêm bộ lọc `healthStatus`, hoặc một API đếm thú theo trạng thái và sức khoẻ |
+| BE4 | `POST /pets`, `PUT /pets/{id}`, `PATCH /pets/{id}/status` giờ chỉ trả `id` | FE chưa lỗi vì chỉ làm mới cache, nhưng `services/pet/pet.ts` vẫn khai báo kiểu trả về là `Pet` | Sửa kiểu ở FE thành `{ id: string }` để không ai dùng nhầm sau này |
+
+---
+
+## 5. BE đã có, FE chưa dùng
+
+Danh sách sinh bằng script: so 188 endpoint trong `presentation/controller` của `master` với các đường dẫn trong mã FE (PR #15). Các nhóm quan trọng đã grep lại bằng tay.
 
 | # | Tính năng | Endpoint BE chưa dùng | Ai cần | Ưu tiên |
 |---|---|---|---|---|
-| G1 | **Nhận ca và xử lý ca cứu hộ**: nhận ca, gia hạn, trả ca, xem người nhận, tiếp nhận về trạm, giữ thú sau cứu | `POST /rescue-cases/{id}/claim`, `.../claim/extend`, `.../claim/release`, `GET .../claims`, `POST .../intake`, `POST .../keep-pet` | Người dùng, tổ chức | **Cao**: lõi Giai đoạn 1. FE mới đọc được "ca tôi đang nhận" (`/users/me/rescue-claims`) |
-| G2 | **Duyệt báo cáo hoàn tất ca**: hàng chờ duyệt, người báo xác nhận, khiếu nại, từ chối | `GET /rescue-cases/completions/review-queue`, `GET .../completions/{id}`, `POST .../completions/{id}/confirm`, `.../dispute`, `.../reject` | Người báo ca, admin | **Cao** |
-| G3 | **Thông báo**: danh sách, số chưa đọc, đánh dấu đã đọc | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/{id}/read`, `PATCH /notifications/read-all` | Mọi người | **Cao**: BE đã bắn 7 loại thông báo cứu hộ nhưng web không có chuông |
-| G4 | **Hàng chờ ca của tổ chức** | `GET /organizations/me/rescue-queue` | Tổ chức | **Cao**: tổ chức chưa thấy ca gần mình để nhận |
-| G5 | **Gợi ý ca trùng khi báo** | `GET /rescue-cases/possible-duplicates` | Người báo ca | Trung bình |
-| G6 | **Thú của tôi** và **tìm người dùng** | `GET /users/me/pets`, `GET /users/search` | Người dùng | Trung bình |
-| G7 | **Matching**: hồ sơ người nhận nuôi, đặc điểm thú, điểm phù hợp | `GET/PUT /users/me/adopter-profile`, `GET/PUT /pets/{petId}/traits`, `GET /pets/{petId}/match` | Người dùng, tổ chức | Trung bình (Giai đoạn 2) |
-| G8 | **Thu hồi sau nhận nuôi** và đơn theo tổ chức | `POST /adoptions/{id}/reclaim`, `GET /adoptions/reclaims`, `GET /adoptions/organization/{orgId}` | Tổ chức | Trung bình |
-| G9 | **AI phân tích bài đăng** | `GET /posts/{id}/analysis`, `PATCH .../confirm`, `POST .../reject`, `POST .../retry`, `GET/PUT/DELETE /admin/ai/post-analysis/model`, `GET /admin/ai/post-analysis/metrics` | Admin | Trung bình |
-| G10 | **Chat và bạn bè** | 6 endpoint `/chats/conversations/*`, 5 endpoint `/friends/*` | Người dùng | Thấp, tuỳ phạm vi đồ án |
-| G11 | **Media nâng cao** và push | `POST /media/upload/signed`, `POST /media/register`, `POST /pets/{petId}/media/attach`, `POST /users/me/push-token` | Hệ thống | Thấp: FE đang dùng `upload/temp`; push dành cho app di động |
-| G12 | **Quản trị phụ** | `GET/DELETE /roles/{id}`, `DELETE /tags/{id}` | Admin | Thấp |
+| G1 | **Nhận ca và xử lý ca cứu hộ** | `POST /rescue-cases/{id}/claim`, `.../claim/extend`, `.../claim/release`, `GET .../claims`, `POST .../intake`, `POST .../keep-pet`, `GET .../triage`, `POST/GET .../updates` | Người dùng, tổ chức | **Cao**: lõi Giai đoạn 1. FE mới đọc được "ca tôi đang nhận" |
+| G2 | **Duyệt báo cáo hoàn tất ca** | `GET /rescue-cases/completions/review-queue`, `GET .../completions/{id}`, `POST .../completions/{id}/confirm`, `.../dispute`, `.../reject` | Người báo ca, admin | **Cao** |
+| G3 | **Thông báo** | `GET /notifications`, `GET /notifications/unread-count`, `PATCH /notifications/{id}/read`, `PATCH /notifications/read-all` | Mọi người | **Cao**: BE đã gửi thông báo cứu hộ nhưng web chưa có chuông |
+| G4 | **Hàng chờ ca của tổ chức** | `GET /organizations/me/rescue-queue` | Tổ chức | **Cao** |
+| G5 | **Thú đi lạc / nhặt được** (PR #22) | `POST /pets/{id}/report-lost`, `GET /rescue-cases/{id}/matches`, `POST .../matches/{suggestionId}/confirm`, `.../reject`, `POST .../convert-to-rescue` | Người dùng | Trung bình. FE đã có kiểu `caseType` và nhãn "Thú đi lạc / Nhặt được thú", chưa có màn báo lạc và ghép cặp |
+| G6 | **Báo cáo sai và kiểm duyệt ca** | `POST /rescue-cases/{id}/flags`, `DELETE .../flags/me`, `GET /admin/rescue-cases/flagged`, `GET /admin/rescue-cases/metrics`, `GET /admin/matching/metrics` | Người dùng, admin | Trung bình |
+| G7 | **Theo dõi sau nhận nuôi** | 11 endpoint của `FollowupController`: `/followups/respond`, `/adoptions/{id}/followups`, `.../support-request`, `.../return-request`, `.../outcome`, `/organizations/me/followup-alerts`, `/admin/followups/metrics` | Người nhận nuôi, tổ chức | Trung bình (Giai đoạn 2) |
+| G8 | **Matching** | `GET/PUT /users/me/adopter-profile`, `.../suggestion`, `GET/PUT /pets/{petId}/traits`, `GET /pets/{petId}/match` | Người dùng, tổ chức | Trung bình (Giai đoạn 2) |
+| G9 | **Thu hồi sau nhận nuôi** và đơn theo tổ chức | `POST /adoptions/{id}/reclaim`, `GET /adoptions/reclaims`, `GET /adoptions/organization/{orgId}` | Tổ chức | Trung bình |
+| G10 | **Gợi ý ca trùng, sơ cứu, thú của tôi, tìm người** | `GET /rescue-cases/possible-duplicates`, `GET /rescue-cases/first-aid`, `GET /users/me/pets`, `GET /users/search`, `PATCH /pets/{id}/visibility` | Người dùng | Trung bình |
+| G11 | **AI phân tích bài đăng** | 8 endpoint `/posts/{id}/analysis*`, `/admin/ai/post-analysis/*` | Admin | Thấp |
+| G12 | **Chat, bạn bè, media nâng cao, push, quản trị phụ** | 6 `/chats/*`, 5 `/friends/*`, `POST /media/upload/signed`, `/media/register`, `/pets/{petId}/media/attach`, `/users/me/push-token`, `GET/DELETE /roles/{id}`, `DELETE /tags/{id}` | Tuỳ phạm vi | Thấp |
 
-Không cần làm:
-
-- `/pets/species`, `/pets/species/{id}/breeds`: FE đã dùng `/pets/taxonomy` thay thế.
-- `/dev/create-account`: chỉ có ở profile `dev`.
-
-**BE đang làm, chưa merge vào `master`** (nhánh `feature/phase-2b-my-pets`):
-- `FollowupController`: theo dõi sau nhận nuôi.
-- Endpoint mới trong Matching, Pet, RescueCase, User.
-
-Khi các nhánh này merge thì chạy lại bảng này.
+Không cần làm: `/pets/species` và `/pets/species/{id}/breeds` (FE đã dùng `/pets/taxonomy`), `/dev/create-account` (chỉ có ở profile `dev`).
 
 ---
 
-## 4. Việc nên làm tiếp
+## 6. Thứ tự nên làm
 
-1. **Merge `fix/ux-quick-wins` (FE)** và deploy. Nhánh này mở lại luồng nhận nuôi (U1) và lối vào cho chủ tổ chức (U3).
-2. **G1 + G2 + G4: màn hình nhận và xử lý ca.** Gợi ý tối thiểu:
-   - Trên chi tiết ca, thêm nút "Nhận ca" và "Trả ca".
-   - Thêm trang "Ca tôi đang nhận" có nút gửi báo cáo hoàn tất.
-   - Thêm trang hàng chờ cho tổ chức.
-   - Thêm trang duyệt hoàn tất cho admin.
-3. **G3: chuông thông báo** ở header. Gọi `unread-count` mỗi 60 giây, mở danh sách thì gọi `/notifications`.
-4. **U16:** lấy số KPI từ `totalElements` của `GET /pets?status=AVAILABLE&pageSize=1`, thay vì đếm trên trang.
-5. **Design token (U7, U8):**
-   - Chốt bảng màu 60-30-10 và thang cỡ chữ.
-   - Thêm `tabular-nums` cho số liệu.
-   - Áp dụng cho cả trang public và trang quản trị.
-6. **Di động (U11):** trên `/ban-do`, đổi panel thành bottom sheet; rút gọn hero ở `/nhan-nuoi`.
-7. **Nội dung (U13, U14, U5):**
-   - Gắn nhãn "đang phát triển" cho `/ung-ho`.
-   - Lấy số ở trang chủ từ API dashboard.
-   - Làm lại `/ho-so-cua-toi`, thêm trang điều khoản và bảo mật.
-   - Ánh xạ ảnh demo theo loài trong `seed-postgres.sql`.
-
----
-
-## 5. Chi tiết các mục còn mở
-
-### U2. Bản đồ: gom cụm và chú giải
-
-Nền bản đồ đã hiện lại. Còn ba việc:
-- Marker chồng nhau khi zoom xa. Thêm `leaflet.markercluster`.
-- Không có chú giải cho marker đỏ, vàng, teal.
-- Ở trang `/quan-ly-cuu-tro` (`page.tsx:270`), thẻ ca vẫn lấy mã ca làm tiêu đề và hiện enum thô. Trang `/ban-do` đã đổi sang loài + địa chỉ + nhãn tiếng Việt, nên chép lại cách làm đó.
-
-### U4, U5. Nhãn và chữ còn sót
-
-- `/ho-so-cua-toi` vẫn là form template shadcn tiếng Anh: "Settings", "Billing", "verified-1@example.com", "Update profile".
-- Thẻ "Yêu cầu hoàn thành" ở `/quan-ly-cuu-tro` hiện mã ca bị cắt và icon người không kèm tên.
-- Nhãn trạng thái thú, sức khoẻ, giới tính, tuổi đã gom về `lib/pet-display.ts`. Nhãn tổ chức gom về `lib/organization-display.ts`. Nhãn ca cứu hộ đã có sẵn ở `lib/rescue-case-display.ts`. Màn hình mới nên dùng các module này, không tự viết `switch` riêng.
-
-### U6, U9. Hàng chờ duyệt đơn nhận nuôi
-
-- Tiêu đề ghi "Đơn chờ xét duyệt" nhưng danh sách có cả đơn đã duyệt. Tab ghi "Đợi xét duyệt", còn badge ghi "Chờ xét duyệt".
-- Tiêu đề thẻ bị cắt đúng chỗ tên thú, trong khi UUID đầy đủ tràn ra khỏi thẻ.
-- Hàng chờ là việc làm lặp lại, nên đổi sang bảng: Người nộp / Thú / Ngày / Trạng thái, có lọc theo trạng thái.
-
-### U7, U8. Màu và chữ
-
-| Vị trí | Tỉ lệ đo được | Cách sửa |
-|---|---|---|
-| "BƯỚC 01–04" ở trang chủ (10px) | 2.18–3.11 | Đổi sang bậc `-700` |
-| Số "2 Sự kiện" màu vàng | 1.38 | Dùng chữ đậm trên nền vàng nhạt |
-| Badge "Đã tiêm vaccine" | 2.36 → **5.5** | Đã sửa ở nhánh (`emerald-700`) |
-| Nhãn "SỨC KHỎE / TỔ CHỨC" (11px) | 2.63 → **7.24** | Đã sửa ở nhánh (`slate-600` trên `slate-50`, 14px, bỏ chữ hoa) |
-
-Về chữ: site dùng 12 cỡ (9–72px). Nên chốt thang 12 / 14 / 16 / 20 / 24 / 32 / 48. Thân bài trang public ≥ 16px. Tiếng Việt dùng `Intl.NumberFormat('vi-VN')` để ghi "1.240" thay vì "1,240".
-
-### U10. Form báo ca
-
-- Bỏ bắt buộc ảnh. Ca khẩn cấp có khi không chụp kịp.
-- Thêm nút "Dùng vị trí của tôi".
-- Đổi ô "Loài" sang ô chọn từ `/pets/taxonomy`.
-- Để nút "Tạo ca cứu hộ" luôn bấm được. Bấm xong thì đánh dấu lỗi ngay tại từng trường thiếu.
-
-### U11. Di động (375px)
-
-- `/ban-do`: panel danh sách che khoảng 90% bản đồ, nút "Tạo ca cứu hộ" bị đẩy ra mép. Nên dùng bottom sheet, nút báo ca ở góc phải dưới.
-- `/nhan-nuoi`: thú cưng đầu tiên chỉ hiện sau khoảng 2 màn cuộn.
-
-### U12. Truy cập còn thiếu
-
-- Thêm link "Bỏ qua tới nội dung" (WCAG 2.4.1).
-- Thêm `focus-visible:ring-2` theo màu thương hiệu (2.4.7).
-
-### U13. Nội dung làm giảm niềm tin
-
-- Trang chủ và "Về chúng tôi" ghi cứng "1,240+ thú được cứu, 3 trạm tại Hà Nội", trong khi dữ liệu có 8 tổ chức ở 3 thành phố.
-- `/ung-ho` ghi "An toàn 100% · mã hoá SSL", có danh sách nhà hảo tâm giả và MoMo/VNPay, nhưng form không gửi đi đâu.
-- Ảnh demo không khớp loài (tuần lộc gắn nhãn chó). Lỗi nằm ở bảng `demo_image` trong `scripts/demo-data/seed-postgres.sql`, không phải ở UI.
-
-### U16. KPI trang thú cưng
-
-`getKpis()` ở `app/(admin)/quan-ly-thu-cung/page.tsx` đếm trên mảng của trang hiện tại, tối đa 20 dòng. Nên lấy `totalElements` theo từng trạng thái, hoặc thêm API đếm theo trạng thái ở BE.
-
-### M6. Mã tỉnh trùng mã phường
-
-Lần chụp ngày 03/11 thấy payload có `provinceCode = wardCode = "72523"`. Code hiện tại lấy `provinceCode` từ kết quả reverse-geocode (`RescueCaseCreate.tsx:288`). Cần gửi một ca trên môi trường test rồi đối chiếu với `/locations/p`.
-
-### S1. Token trong `localStorage`
-
-`lib/http.ts` lưu `accessToken` và `refreshToken` trong `localStorage`. Nếu site dính XSS thì lộ cả hai. Phương án: BE đặt `refreshToken` trong cookie `HttpOnly; Secure; SameSite=Strict`, FE chỉ giữ `accessToken` trong bộ nhớ.
+1. **Review và merge FE PR #15.**
+2. **A1: gộp màn nhận nuôi thành một bảng**, mỗi dòng một nút theo trạng thái. Làm cùng BE1 để hiện họ tên người nộp.
+3. **G1 + G2 + G4 + A5: luồng xử lý ca.**
+   - Trên chi tiết ca: nút "Nhận ca" và "Trả ca".
+   - Trang "Ca tôi đang nhận" có nút gửi báo cáo hoàn tất.
+   - Trang hàng chờ cho tổ chức.
+   - Hàng chờ duyệt hoàn tất cho admin, có ảnh xác minh.
+4. **G3: chuông thông báo** ở header. Gọi `unread-count` mỗi 60 giây, khi mở danh sách thì gọi `/notifications`.
+5. **A2 + A3 + A4: quy tắc chung cho khu quản trị.**
+   - Bấm dòng mở chi tiết.
+   - Một component KPI dùng chung.
+   - Biểu đồ dùng bảng màu trạng thái chung.
+   - "Việc cần xử lý" mở đúng đối tượng.
+6. **U7, U8: design token** (màu 60-30-10, thang cỡ chữ) cho cả public và admin.
+7. **U5, U13, U14: nội dung.** Làm lại `/ho-so-cua-toi`, lấy số liệu thật, thêm trang điều khoản và bảo mật.
+8. **U10, U11:** form báo ca và giao diện di động.
 
 ---
 
@@ -225,42 +207,23 @@ Lần chụp ngày 03/11 thấy payload có `provinceCode = wardCode = "72523"`.
 
 ### A. Cách kiểm tra
 
-- **Lỗi API (03/11):** crawl bằng Playwright, chặn mọi request ghi trừ đăng nhập, đối chiếu payload với DTO của BE. Lần 17/11 kiểm lại bằng đọc code `origin/main`.
-- **UI/UX (17/11):**
-  - Đi qua web với 4 vai (khách, user, chủ tổ chức, admin) ở 1440px và 375px.
-  - Đo tương phản, vùng bấm, thứ tự focus bằng script.
-  - Chỉ một người đánh giá. NN/G lưu ý mức độ do một người chấm chưa đáng tin, nên để 2–3 người chấm lại.
-- **Kiểm thử local sau khi sửa:** chạy `pnpm dev` trên `fix/ux-quick-wins` gọi API staging.
-  - Khách: `/nhan-nuoi` hiện 57 bé, nhãn tiếng Việt. Nút "Nhận nuôi ngay" bật, bấm thì hiện yêu cầu đăng nhập.
-  - Khách: `/ban-do` tải tile OSM. Trang chủ có 2 CTA.
-  - Chủ tổ chức: đăng nhập xong chuyển tới `/dashboard`, thấy lối tắt; menu có "Quản lý trung tâm".
-  - Admin: KPI 30px, breadcrumb đúng tên trang, bảng thú không tràn ngang, nút duyệt/từ chối có `aria-label`.
-  - `tsc --noEmit` sạch. ESLint không có lỗi mới. 5 lỗi cũ có sẵn trên `main` ở `quan-ly-thu-cung/page.tsx` và `nhan-nuoi/page.tsx`.
-  - Không gửi đơn, không tạo ca, không duyệt đơn nào.
+- **Script quét trang admin:** `scripts/ux-audit/`. Script đăng nhập, mở từng trang, chụp ảnh và đếm:
+  - UUID và chữ IN_HOA kiểu enum trong vùng `main`;
+  - cỡ chữ H1/H2;
+  - vị trí nút.
+
+  Lần 18/11: 11 trang admin, 0 UUID, 0 enum thô.
+- **Độ phủ API:** script so endpoint trong controller BE với chuỗi đường dẫn trong mã FE. Các nhóm có ưu tiên cao đã kiểm lại bằng grep.
+- **Thao tác thật:** không gửi đơn, không duyệt hay tạo ca trong lần kiểm tra này. M6 vẫn cần một lần gửi thật.
+- Chỉ một người đánh giá. NN/G khuyên mức độ nghiêm trọng nên do 2–3 người chấm độc lập.
 
 ### B. Chuẩn đối chiếu
 
 | Chuẩn | Dùng cho |
 |---|---|
-| 10 heuristic của Nielsen (H1–H10), thang mức 0–4 | Khả dụng chung |
-| WCAG 2.2 AA: 1.4.3, 1.4.11, 2.4.1, 2.4.7, 2.5.8 (24×24px), 3.1.1, 3.3.1, 4.1.2 | Truy cập |
-| Laws of UX: Jakob, Hick, Fitts, Proximity, Similarity, Von Restorff | Bố cục |
+| 10 heuristic của Nielsen (H1–H10) | Khả dụng chung |
+| WCAG 2.2 AA: 1.4.3, 2.4.1, 2.4.7, 3.3.1 | Truy cập |
+| Laws of UX: Jakob, Hick, Fitts, Proximity | Bố cục, hành động |
 | Phân cấp thị giác, 60-30-10, thang cỡ chữ, tabular figures | Màu và chữ |
-| Material 3 (48dp) / Apple HIG (44pt) | Vùng chạm |
 
-Nguồn: [WCAG 2.2](https://www.w3.org/TR/WCAG22/) · [SC 2.5.8](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html) · [NN/G Severity Ratings](https://www.nngroup.com/articles/how-to-rate-the-severity-of-usability-problems/) · [NN/G 10 Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) · [Laws of UX](https://lawsofux.com/)
-
-### C. Ảnh trước khi sửa (bản deploy, 17/11)
-
-| | |
-|---|---|
-| Trang chủ: hero không CTA, khung bản đồ đen | ![](assets/ux-2026-11-17/home.jpg) |
-| Thẻ thú: enum thô, vỡ dòng | ![](assets/ux-2026-11-17/adopt-cards.jpg) |
-| Chi tiết thú: nút nhận nuôi bị khoá | ![](assets/ux-2026-11-17/pet-detail.jpg) |
-| Bản đồ: thiếu API key Carto | ![](assets/ux-2026-11-17/map.jpg) |
-| Bản đồ trên điện thoại | ![](assets/ux-2026-11-17/mobile-map.jpg) |
-| Form báo ca | ![](assets/ux-2026-11-17/report-form.jpg) |
-| Dashboard admin | ![](assets/ux-2026-11-17/admin-dashboard.jpg) |
-| Bảng thú cưng tràn ngang | ![](assets/ux-2026-11-17/admin-pets.jpg) |
-| Thẻ duyệt đơn | ![](assets/ux-2026-11-17/admin-adoptions.jpg) |
-| Dashboard chủ tổ chức trống | ![](assets/ux-2026-11-17/owner-dashboard.jpg) |
+Nguồn: [WCAG 2.2](https://www.w3.org/TR/WCAG22/) · [NN/G 10 Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) · [NN/G Severity Ratings](https://www.nngroup.com/articles/how-to-rate-the-severity-of-usability-problems/) · [Laws of UX](https://lawsofux.com/)

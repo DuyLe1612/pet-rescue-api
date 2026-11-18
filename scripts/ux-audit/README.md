@@ -12,6 +12,7 @@ browser_run_code_unsafe { filename: "scripts/ux-audit/smoke-guest.js" }
 | `login-owner.js` | Lỗi khi để trống form, đăng nhập bằng chủ tổ chức, trang được chuyển tới, breadcrumb, màn tổng quan. Muốn thử vai khác thì chép file rồi đổi `EMAIL` |
 | `contrast-audit.js` | Đo tương phản theo WCAG 1.4.3 trên trang đang mở, đọc được màu `lab()` và `oklch()` |
 | `page-audit.js` | Đo tổng hợp trên trang đang mở: tương phản, vùng bấm < 24px, heading, ô nhập thiếu label, font, cỡ chữ |
+| `admin-audit.js` | Đăng nhập admin, mở 11 trang quản trị, chụp ảnh vào `.ux-tmp/admin/` và đếm UUID, enum thô, cỡ H1/H2, vị trí nút trên mỗi trang. Đặt `globalThis.__ACCOUNT` để thử vai khác |
 | `_lib.js` | URL gốc và tài khoản demo, để tham khảo |
 
 ## Chạy
