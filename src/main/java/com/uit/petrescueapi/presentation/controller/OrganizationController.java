@@ -12,6 +12,7 @@ import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import com.uit.petrescueapi.presentation.dto.PageResponse;
 import com.uit.petrescueapi.presentation.mapper.OrganizationWebMapper;
+import com.uit.petrescueapi.presentation.support.GeoParams;
 import com.uit.petrescueapi.presentation.support.PageableRequestFactory;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +38,14 @@ import java.util.UUID;
 public class OrganizationController {
 
     private static final Set<String> ORG_ASSIGNABLE_ROLES = Set.of("STAFF", "VET","MEMBER");
+
+    /** Accepted sortBy → column of the bounding-box query. */
+    private static final java.util.Map<String, String> BOUNDING_BOX_SORT_COLUMNS = java.util.Map.of(
+            "createdAt", "created_at",
+            "name", "name",
+            "type", "type",
+            "status", "status",
+            "provinceName", "province_name");
 
     private final OrganizationCommandPort commandPort;
     private final OrganizationQueryPort queryPort;
@@ -232,23 +241,25 @@ public class OrganizationController {
     }
 
     @GetMapping("/map/markers")
-    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed.")
+    @Operation(summary = "Get organization markers for map", description = "Returns up to 500 organization markers. Optional bounding box will constrain results; if no bbox provided fallback to global feed. "
+                    + "province is a province code or name. Use type=VET_CENTER&province=79 to list vets of one province.")
     public ResponseEntity<ApiResponse<List<OrganizationMapMarkerDto>>> getMapMarkers(
             @RequestParam(required = false) Double minLat,
             @RequestParam(required = false) Double minLng,
             @RequestParam(required = false) Double maxLat,
             @RequestParam(required = false) Double maxLng,
             @RequestParam(required = false) List<String> status,
-            @RequestParam(required = false) List<String> type) {
+            @RequestParam(required = false) List<String> type,
+            @RequestParam(required = false) String province) {
 
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
-        boolean hasBbox = minLat != null && minLng != null && maxLat != null && maxLng != null;
+        boolean hasBbox = GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
 
         if (hasBbox) {
-            return ResponseEntity.ok(ApiResponse.ok(queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, type)));
+            return ResponseEntity.ok(ApiResponse.ok(queryPort.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statuses, type, province)));
         }
 
-        return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type)));
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findMapMarkers(statuses, type, province)));
     }
 
     @GetMapping("/map/bounding-box")
@@ -265,8 +276,10 @@ public class OrganizationController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortOrder) {
         List<OrganizationStatus> statuses = status == null ? null : status.stream().map(this::parseOrganizationStatus).toList();
+        GeoParams.hasBoundingBox(minLat, minLng, maxLat, maxLng);
         return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(
-            queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder))
+            queryPort.findWithinBoundingBoxSummaries(minLat, minLng, maxLat, maxLng, statuses, search,
+                    PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder, BOUNDING_BOX_SORT_COLUMNS))
         )));
     }
 

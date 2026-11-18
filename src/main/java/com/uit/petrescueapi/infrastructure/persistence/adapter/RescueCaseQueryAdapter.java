@@ -11,6 +11,7 @@ import com.uit.petrescueapi.infrastructure.persistence.projection.*;
 import com.uit.petrescueapi.infrastructure.persistence.repository.RescueCaseQueryJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +37,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     @Override
     public Page<RescueCaseSummaryResponseDto> findAllSummaries(String search, RescueCaseFilter filter, Pageable pageable) {
         return queryRepo.findAllSummaries(search, allStatuses(filter), statusNames(filter), allPriorities(filter),
-                        priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -49,8 +50,10 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     public Page<RescueCaseSummaryResponseDto> findNearbySummaries(
             double lat, double lng, double distanceMeters, RescueCaseFilter filter, Pageable pageable) {
 
+        // the query orders by distance itself
+        Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
         return queryRepo.findNearby(lng, lat, distanceMeters, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        allPriorities(filter), priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), unsorted)
                 .map(this::toSummaryDto);
     }
 
@@ -68,7 +71,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double minLat, double minLng, double maxLat, double maxLng, RescueCaseFilter filter, Pageable pageable) {
 
         return queryRepo.findWithinBoundingBox(minLng, minLat, maxLng, maxLat, allStatuses(filter), statusNames(filter),
-                        allPriorities(filter), priorityNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
+                        allPriorities(filter), priorityNames(filter), allTypes(filter), typeNames(filter), filter.species(), filter.province(), filter.reporterId(), pageable)
                 .map(this::toSummaryDto);
     }
 
@@ -124,14 +127,15 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
             double maxLat, double maxLng,
             List<RescueCaseStatus> status,
             List<RescuePriority> priority,
-            String species) {
+            String species,
+            List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
 
         List<String> statusNames = normalizeStatuses(status);
         List<String> priorityNames = normalizePriorities(priority);
 
         return queryRepo.findMarkersWithFilters(
                         minLng, minLat, maxLng, maxLat,
-                        statusNames, priorityNames, species)
+                        statusNames, priorityNames, markerTypes(types), species)
                 .stream()
                 .map(this::toMarkerDto)
                 .toList();
@@ -141,11 +145,13 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
     public List<RescueMapMarkerDto> findMapMarkers(
             List<RescueCaseStatus> status,
             List<RescuePriority> priority,
-            String species) {
+            String species,
+            List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
 
         return queryRepo.findMapMarkers(
                         normalizeStatuses(status),
                         normalizePriorities(priority),
+                        markerTypes(types),
                         species)
                 .stream()
                 .map(this::toMarkerDto)
@@ -176,6 +182,20 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
 
     private static List<String> statusNames(RescueCaseFilter filter) {
         return allStatuses(filter) ? NO_VALUES : filter.statuses().stream().map(Enum::name).toList();
+    }
+
+    private static boolean allTypes(RescueCaseFilter filter) {
+        return filter.types() == null || filter.types().isEmpty();
+    }
+
+    private static List<String> typeNames(RescueCaseFilter filter) {
+        return allTypes(filter) ? NO_VALUES : filter.types().stream().map(Enum::name).toList();
+    }
+
+    /** The map shows all three layers unless asked for some. */
+    private static List<String> markerTypes(List<com.uit.petrescueapi.domain.valueobject.RescueCaseType> types) {
+        return (types == null || types.isEmpty() ? java.util.Arrays.asList(com.uit.petrescueapi.domain.valueobject.RescueCaseType.values()) : types)
+                .stream().map(Enum::name).toList();
     }
 
     private static boolean allPriorities(RescueCaseFilter filter) {
@@ -219,6 +239,13 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .reportedAt(p.getReportedAt())
                 .locationText(p.getLocationText())
                 .distanceMeters(p.getDistance())
+                .caseType(p.getCaseType())
+                .locationBlurMeters(p.getLocationBlurMeters())
+                .latitude(p.getLatitude())
+                .longitude(p.getLongitude())
+                .wardName(p.getWardName())
+                .provinceName(p.getProvinceName())
+                .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .firstImageUrl(p.getFirstImageUrl() == null ? null : cloudStoragePort.buildUrl(p.getFirstImageUrl()))
                 .build();
     }
@@ -248,11 +275,24 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .organizationId(p.getOrganizationId())
+                .organizationName(p.getOrganizationName())
                 .petId(p.getPetId())
+                .petName(p.getPetName())
+                .caseType(p.getCaseType())
+                .holdingStatus(p.getHoldingStatus())
+                .lastSeenAt(p.getLastSeenAt())
+                .distinctiveMarks(p.getDistinctiveMarks())
+                .resolution(p.getResolution())
+                .matchedCaseId(p.getMatchedCaseId())
+                .locationBlurMeters(p.getLocationBlurMeters())
+                .blurredLatitude(p.getBlurredLat())
+                .blurredLongitude(p.getBlurredLng())
                 .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
                 .activeClaimCount(p.getActiveClaimCount() == null ? 0 : p.getActiveClaimCount().intValue())
                 .viewerIsReporter(viewerId != null && viewerId.equals(p.getReportedBy()))
                 .viewerHasActiveClaim(Boolean.TRUE.equals(p.getViewerHasActiveClaim()))
+                .flagCount(p.getFlagCount() == null ? 0 : p.getFlagCount().intValue())
+                .viewerHasFlagged(Boolean.TRUE.equals(p.getViewerHasFlagged()))
                 .completionId(p.getCompletionId())
                 .completionStatus(p.getCompletionStatus())
                 .build();
@@ -272,6 +312,8 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .priority(p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority()))
                 .status(p.getStatus())
                 .description(p.getDescription())
+                .locationText(p.getLocationText())
+                .firstImageUrl(p.getFirstImageUrl() == null ? null : cloudStoragePort.buildUrl(p.getFirstImageUrl()))
                 .provinceName(p.getProvinceName())
                 .wardName(p.getWardName())
                 .latitude(p.getLatitude())
@@ -280,7 +322,23 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                 .needsHelp(p.getNeedsHelp())
                 .awaitingHandover(p.getAwaitingHandover())
                 .activeClaimCount(p.getActiveClaimCount())
+                .effectivePriority(effective(p))
+                .aiUrgency(p.getAiUrgency() == null ? null : RescuePriority.valueOf(p.getAiUrgency()))
+                .aiSummary(p.getAiSummary())
+                .triageStatus(p.getTriageStatus())
+                .missingFields(p.getMissingFields() == null || p.getMissingFields().isBlank()
+                        ? List.of() : List.of(p.getMissingFields().split(",")))
                 .build());
+    }
+
+    /** The same rule the SQL sorts by, in one place for the domain test: the model only raises. */
+    private static RescuePriority effective(RescueQueueItemProjection p) {
+        RescuePriority reporter = p.getPriority() == null ? null : RescuePriority.valueOf(p.getPriority());
+        RescuePriority ai = p.getAiUrgency() == null ? null : RescuePriority.valueOf(p.getAiUrgency());
+        return com.uit.petrescueapi.domain.entity.RescueCaseTriage.effectivePriority(reporter,
+                com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()
+                        .status(ai == null ? null : com.uit.petrescueapi.domain.valueobject.TriageStatus.ANALYZED)
+                        .aiUrgency(ai).build());
     }
 
     private Page<RescueCaseCompletionResponseDto> withImages(Page<RescueCaseCompletionProjection> page) {
@@ -331,6 +389,10 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                         ? RescueCaseStatus.valueOf(p.getStatus())
                         : null)
                 .species(p.getSpecies())
+                .needsHelp(Boolean.TRUE.equals(p.getNeedsHelp()))
+                .caseType(p.getCaseType())
+                .holdingStatus(p.getHoldingStatus())
+                .locationBlurMeters(p.getLocationBlurMeters())
                 .reportedAt(p.getReportedAt())
                 .build();
     }

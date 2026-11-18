@@ -6,13 +6,15 @@
 
 BEGIN;
 
-CREATE TEMP TABLE gone_users ON COMMIT DROP AS SELECT user_id FROM users WHERE user_code LIKE 'DMU%';
-CREATE TEMP TABLE gone_orgs  ON COMMIT DROP AS SELECT organization_id FROM organizations WHERE organization_code LIKE 'DMO%';
-CREATE TEMP TABLE gone_pets  ON COMMIT DROP AS SELECT pet_id FROM pets WHERE pet_code LIKE 'DMP%';
-CREATE TEMP TABLE gone_cases ON COMMIT DROP AS SELECT case_id FROM rescue_cases WHERE case_code LIKE 'DMC%';
+-- Codes of this script's data: U-D.../O-D.../P-D.../R-D.../A-D..., and DM... from its first version.
+CREATE TEMP TABLE gone_users ON COMMIT DROP AS SELECT user_id FROM users WHERE user_code LIKE 'U-D%' OR user_code LIKE 'DMU%';
+CREATE TEMP TABLE gone_orgs  ON COMMIT DROP AS
+    SELECT organization_id FROM organizations WHERE organization_code LIKE 'O-D%' OR organization_code LIKE 'DMO%';
+CREATE TEMP TABLE gone_pets  ON COMMIT DROP AS SELECT pet_id FROM pets WHERE pet_code LIKE 'P-D%' OR pet_code LIKE 'DMP%';
+CREATE TEMP TABLE gone_cases ON COMMIT DROP AS SELECT case_id FROM rescue_cases WHERE case_code LIKE 'R-D%' OR case_code LIKE 'DMC%';
 CREATE TEMP TABLE gone_apps  ON COMMIT DROP AS
     SELECT application_id FROM adoption_applications
-    WHERE adoption_code LIKE 'DMA%'
+    WHERE adoption_code LIKE 'A-D%' OR adoption_code LIKE 'DMA%'
        OR pet_id IN (SELECT pet_id FROM gone_pets)
        OR applicant_id IN (SELECT user_id FROM gone_users)
        OR organization_id IN (SELECT organization_id FROM gone_orgs);

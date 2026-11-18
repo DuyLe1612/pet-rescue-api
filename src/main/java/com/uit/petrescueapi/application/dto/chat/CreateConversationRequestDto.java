@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.chat;
 
+import com.uit.petrescueapi.domain.valueobject.ConversationType;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -11,6 +13,7 @@ import java.util.UUID;
 public class CreateConversationRequestDto {
     @NotBlank
     @Size(max = 50)
+    @CanonicalEnum(ConversationType.class)
     private String type;
     @NotNull
     private UUID participantId;

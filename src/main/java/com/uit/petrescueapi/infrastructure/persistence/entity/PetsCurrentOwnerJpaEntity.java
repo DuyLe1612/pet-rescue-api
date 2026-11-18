@@ -33,4 +33,11 @@ public class PetsCurrentOwnerJpaEntity {
 
     @Column(name = "caretaker_user_id")
     private UUID caretakerUserId;
+
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(name = "acquisition_type", length = 20)
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
+
+    @Column(name = "adoption_application_id")
+    private UUID adoptionApplicationId;
 }

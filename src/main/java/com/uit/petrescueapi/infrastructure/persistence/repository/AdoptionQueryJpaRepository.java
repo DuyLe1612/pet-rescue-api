@@ -3,6 +3,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 import com.uit.petrescueapi.infrastructure.persistence.entity.AdoptionApplicationJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.AdoptionDetailProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.AdoptionSummaryProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.ReclaimLogProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -37,7 +38,10 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                 WHERE pm.petId = p.id
                 ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
                 LIMIT 1) AS petPrimaryImageUrl,
+               a.applicantId     AS applicantId,
                u.username        AS applicantUsername,
+               a.organizationId  AS organizationId,
+               o.name            AS organizationName,
                a.status          AS status,
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
@@ -51,6 +55,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
+         LEFT JOIN OrganizationJpaEntity o ON a.organizationId = o.organizationId
          WHERE a.deleted = false
             AND a.status IN :statuses
             AND (:search IS NULL OR :search = '' OR
@@ -118,7 +123,10 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                 WHERE pm.petId = p.id
                 ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
                 LIMIT 1) AS petPrimaryImageUrl,
+               a.applicantId     AS applicantId,
                u.username        AS applicantUsername,
+               a.organizationId  AS organizationId,
+               o.name            AS organizationName,
                a.status          AS status,
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
@@ -132,6 +140,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
+         LEFT JOIN OrganizationJpaEntity o ON a.organizationId = o.organizationId
          WHERE a.deleted = false
           AND a.applicantId = :applicantId
             AND a.status IN :statuses
@@ -157,7 +166,10 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
                 WHERE pm.petId = p.id
                 ORDER BY pm.primaryMedia DESC, pm.createdAt ASC
                 LIMIT 1) AS petPrimaryImageUrl,
+               a.applicantId     AS applicantId,
                u.username        AS applicantUsername,
+               a.organizationId  AS organizationId,
+               o.name            AS organizationName,
                a.status          AS status,
                a.experience      AS experience,
                a.liveCondition   AS liveCondition,
@@ -171,6 +183,7 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
          FROM AdoptionApplicationJpaEntity a
          LEFT JOIN PetJpaEntity p ON a.petId = p.id
          LEFT JOIN UserJpaEntity u ON a.applicantId = u.userId
+         LEFT JOIN OrganizationJpaEntity o ON a.organizationId = o.organizationId
          WHERE a.deleted = false
           AND a.organizationId = :organizationId
           AND (:petId IS NULL OR a.petId = :petId)
@@ -186,4 +199,39 @@ public interface AdoptionQueryJpaRepository extends JpaRepository<AdoptionApplic
             @Param("statuses") List<String> statuses,
             @Param("search") String search,
             Pageable pageable);
+
+    // ── Reclaim logs ────────────────────────────
+
+    /** A null organization means every organization. */
+    @Query(value = """
+        SELECT rl.reclaim_id       AS reclaimId,
+               rl.application_id   AS applicationId,
+               rl.pet_id           AS petId,
+               p.name              AS petName,
+               rl.organization_id  AS organizationId,
+               o.name              AS organizationName,
+               rl.user_id          AS userId,
+               u.username          AS username,
+               rl.reclaimed_by     AS reclaimedBy,
+               rb.username         AS reclaimedByUsername,
+               rl.reason           AS reason,
+               rl.proof_id         AS proofId,
+               rl.reputation_delta AS reputationDelta,
+               rl.reclaimed_at     AS reclaimedAt
+        FROM reclaim_logs rl
+        LEFT JOIN pets p ON p.pet_id = rl.pet_id
+        LEFT JOIN organizations o ON o.organization_id = rl.organization_id
+        LEFT JOIN users u ON u.user_id = rl.user_id
+        LEFT JOIN users rb ON rb.user_id = rl.reclaimed_by
+        WHERE rl.is_deleted = false
+          AND (CAST(:organizationId AS uuid) IS NULL OR rl.organization_id = CAST(:organizationId AS uuid))
+        """,
+            countQuery = """
+        SELECT COUNT(*)
+        FROM reclaim_logs rl
+        WHERE rl.is_deleted = false
+          AND (CAST(:organizationId AS uuid) IS NULL OR rl.organization_id = CAST(:organizationId AS uuid))
+        """,
+            nativeQuery = true)
+    Page<ReclaimLogProjection> findReclaimLogs(@Param("organizationId") UUID organizationId, Pageable pageable);
 }

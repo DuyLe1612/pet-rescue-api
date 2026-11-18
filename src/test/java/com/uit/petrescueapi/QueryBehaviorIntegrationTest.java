@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,6 +52,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -101,9 +104,12 @@ class QueryBehaviorIntegrationTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.uit.petrescueapi.application.port.command.FollowupCommandPort followupCommands;
+    @Autowired com.uit.petrescueapi.domain.service.FollowupDomainService followups;
     @Autowired EntityManagerFactory emf;
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
+    @Autowired com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triage;
     @MockitoBean CloudStoragePort cloud;
     /** There is no broker in this test, and every message it is given is refused. */
     @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
@@ -460,6 +466,427 @@ class QueryBehaviorIntegrationTest {
         assertThat(applicationStatus(alreadyRejected)).isEqualTo("REJECTED");
     }
 
+    @Test
+    void adoptingRecordsHowTheNewOwnerGotThePetAndWhichApplicationDidIt() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        var current = jdbc.queryForMap("SELECT owner_type, owner_id, acquisition_type, adoption_application_id FROM pets_current_owner WHERE pet_id = ?", petId);
+        assertThat(current.get("owner_type")).isEqualTo("USER");
+        assertThat(current.get("owner_id")).isEqualTo(adopter);
+        assertThat(current.get("acquisition_type")).isEqualTo("ADOPTED");
+        assertThat(current.get("adoption_application_id")).isEqualTo(application);
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ? AND to_time IS NULL", String.class, petId))
+                .isEqualTo("ADOPTED");
+    }
+
+    @Test
+    void completingAnAdoptionSchedulesFourMilestonesOnceAndCancelsOnlyTheOpenOnes() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, person(), shelter, "APPROVED");
+
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForList("SELECT milestone FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("DAY_2", "WEEK_2", "MONTH_3", "MONTH_6");
+        assertThat(jdbc.queryForObject("SELECT completed_at IS NOT NULL FROM adoption_applications WHERE application_id = ?", Boolean.class, application)).isTrue();
+        // due two days after completion, as configured
+        assertThat(jdbc.queryForObject("""
+                SELECT f.due_at = a.completed_at + INTERVAL '2 days'
+                FROM adoption_followups f JOIN adoption_applications a ON a.application_id = f.application_id
+                WHERE f.application_id = ? AND f.milestone = 'DAY_2'""", Boolean.class, application)).isTrue();
+
+        followups.scheduleFor(application, LocalDateTime.now());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM adoption_followups WHERE application_id = ?", Integer.class, application)).isEqualTo(4);
+
+        jdbc.update("UPDATE adoption_followups SET status = 'RESPONDED' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        followups.cancelOpen(application);
+        assertThat(jdbc.queryForList("SELECT status FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("RESPONDED", "CANCELLED", "CANCELLED", "CANCELLED");
+    }
+
+    // ── Follow-up after an adoption ─────────────────
+
+    /** An adoption completed just now; its milestones are made due by the tests that need them. */
+    private UUID adoptedApplication(UUID shelter, UUID adopter) throws Exception {
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "APPROVED");
+        call(patch("/api/v1/adoptions/" + application + "/complete"), member(shelter, "OWNER")).andExpect(status().isOk());
+        return application;
+    }
+
+    private void makeDue(UUID application, String milestone) {
+        jdbc.update("UPDATE adoption_followups SET due_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = ?", application, milestone);
+    }
+
+    private static final String ANSWERS_FINE = "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"NONE\"}";
+
+    @Test
+    void aDueMilestoneIsSentOnceAndItsLinkWorksOnceWithoutSigningIn() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        long reputationLogs = jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, adopter);
+
+        var sent = followupCommands.dispatchDue(20);
+        assertThat(sent).hasSize(1);
+        assertThat(sent.get(0).followup().milestone()).isEqualTo("DAY_2");
+        assertThat(followupCommands.dispatchDue(20)).as("a second pass sends nothing more").isEmpty();
+        // only the hash is stored: the token itself is never in the database
+        String token = sent.get(0).token();
+        assertThat(jdbc.queryForObject("SELECT token_hash FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application))
+                .isNotEqualTo(token).hasSize(64);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_DUE'", Integer.class, adopter)).isEqualTo(1);
+
+        mvc.perform(get("/api/v1/followups/respond?token=" + token)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.petName").value("Mực"))
+                .andExpect(jsonPath("$.data.milestone").value("DAY_2"))
+                .andExpect(jsonPath("$.data.questions", hasSize(5)));
+        mvc.perform(post("/api/v1/followups/respond").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"answers\":" + ANSWERS_FINE + "}")).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT status || '/' || severity FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application))
+                .isEqualTo("RESPONDED/GREEN");
+
+        // used, so it opens nothing and answers nothing; a made-up token is no different
+        mvc.perform(get("/api/v1/followups/respond?token=" + token)).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/followups/respond").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"answers\":" + ANSWERS_FINE + "}")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/followups/respond?token=not-a-real-token")).andExpect(status().isBadRequest());
+        // answering is not rewarded or punished
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, adopter)).isEqualTo(reputationLogs);
+    }
+
+    @Test
+    void anExpiredLinkOpensNothingAndWhenSeveralAreDueOnlyTheNewestIsAsked() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID application = adoptedApplication(shelter, person());
+        makeDue(application, "DAY_2");
+        jdbc.update("UPDATE adoption_followups SET due_at = now() - INTERVAL '1 day' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        makeDue(application, "WEEK_2");
+
+        var sent = followupCommands.dispatchDue(20);
+
+        assertThat(sent).extracting(d -> d.followup().milestone()).containsExactly("WEEK_2");
+        assertThat(jdbc.queryForObject("SELECT status FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", String.class, application)).isEqualTo("EXPIRED");
+
+        jdbc.update("UPDATE adoption_followups SET expires_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = 'WEEK_2'", application);
+        mvc.perform(get("/api/v1/followups/respond?token=" + sent.get(0).token())).andExpect(status().isBadRequest());
+        assertThat(followupCommands.expire()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT status FROM adoption_followups WHERE application_id = ? AND milestone = 'WEEK_2'", String.class, application)).isEqualTo("EXPIRED");
+    }
+
+    @Test
+    void aMilestoneNobodyAnsweredIsRemindedOnceAfterTwoDays() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        followupCommands.dispatchDue(20);
+
+        assertThat(followupCommands.remind()).as("too soon").isZero();
+        jdbc.update("UPDATE adoption_followups SET sent_at = now() - INTERVAL '3 days' WHERE application_id = ? AND milestone = 'DAY_2'", application);
+        assertThat(followupCommands.remind()).isEqualTo(1);
+        assertThat(followupCommands.remind()).as("only once").isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_REMINDER'", Integer.class, adopter)).isEqualTo(1);
+    }
+
+    @Test
+    void theAdopterAnswersSignedInAndOnlyTheAdopterTheOrganizationAndAdminsReadTheTimeline() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        makeDue(application, "DAY_2");
+        followupCommands.dispatchDue(20);
+        UUID followup = jdbc.queryForObject("SELECT followup_id FROM adoption_followups WHERE application_id = ? AND milestone = 'DAY_2'", UUID.class, application);
+
+        call(post("/api/v1/followups/" + followup + "/answers"), person(), ANSWERS_FINE).andExpect(status().isNotFound());
+        call(post("/api/v1/followups/" + followup + "/answers"), adopter,
+                "{\"stillHasPet\":true,\"wellbeing\":\"WORRIED\",\"fear\":\"SOME\",\"incident\":\"NONE\",\"support\":\"NONE\",\"note\":\"Bé hơi sợ\"}")
+                .andExpect(status().isOk());
+
+        String url = "/api/v1/adoptions/" + application + "/followups";
+        call(get(url), adopter).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(4)))
+                .andExpect(jsonPath("$.data[0].milestone").value("DAY_2"))
+                .andExpect(jsonPath("$.data[0].severity").value("YELLOW"))
+                .andExpect(jsonPath("$.data[0].answers.note").value("Bé hơi sợ"));
+        call(get(url), member(shelter, "STAFF")).andExpect(status().isOk());
+        call(get(url), admin()).andExpect(status().isOk());
+        // another organization's staff, and a bystander, read nothing
+        call(get(url), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER")).andExpect(status().isForbidden());
+        call(get(url), person()).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+    }
+
+    /** Sends the milestone and answers it through the signed-in endpoint; returns the follow-up id. */
+    private UUID answered(UUID application, UUID adopter, String milestone, String answers) throws Exception {
+        makeDue(application, milestone);
+        followupCommands.dispatchDue(20);
+        UUID followup = jdbc.queryForObject("SELECT followup_id FROM adoption_followups WHERE application_id = ? AND milestone = ?", UUID.class, application, milestone);
+        call(post("/api/v1/followups/" + followup + "/answers"), adopter, answers).andExpect(status().isOk());
+        return followup;
+    }
+
+    @Test
+    void worryingAnswersBecomeWorkForTheOrganizationAndOnlyRedOnesNotifyStaffAtOnce() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+
+        answered(application, adopter, "DAY_2", ANSWERS_FINE);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM followup_alerts WHERE application_id = ?", Integer.class, application)).as("green makes no work").isZero();
+
+        answered(application, adopter, "WEEK_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"WORRIED\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).as("yellow waits in the queue").isZero();
+
+        answered(application, adopter, "MONTH_3",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"NONE\",\"incident\":\"NONE\",\"support\":\"CONSIDERING_RETURN\"}");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).isEqualTo(1);
+
+        // red on top, with every reason; the queue is the organization's own
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].severity").value("RED"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("CONSIDERING_RETURN"))
+                .andExpect(jsonPath("$.data[0].petName").value("Mực"))
+                .andExpect(jsonPath("$.data[1].severity").value("YELLOW"));
+        call(get("/api/v1/organizations/me/followup-alerts?status=RESOLVED"), staff).andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "STAFF"))
+                .andExpect(jsonPath("$.data", hasSize(0)));
+        call(get("/api/v1/organizations/me/followup-alerts"), adopter).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/organizations/me/followup-alerts")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void anUnansweredFirstQuestionAsksTheOrganizationToCallButALaterOneDoesNot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        for (String milestone : List.of("DAY_2", "WEEK_2")) {
+            makeDue(application, milestone);
+            followupCommands.dispatchDue(20);
+            jdbc.update("UPDATE adoption_followups SET status = 'SENT', expires_at = now() - INTERVAL '1 minute' WHERE application_id = ? AND milestone = ?", application, milestone);
+        }
+
+        assertThat(followupCommands.expire()).isEqualTo(2);
+
+        assertThat(jdbc.queryForList("SELECT severity || ':' || reason_codes FROM followup_alerts WHERE application_id = ?", String.class, application))
+                .containsExactly("YELLOW:NO_RESPONSE");
+    }
+
+    @Test
+    void staffTakeAndCloseAnAlertAndAnotherOrganizationCannot() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        answered(application, adopter, "DAY_2",
+                "{\"stillHasPet\":true,\"wellbeing\":\"NORMAL\",\"fear\":\"MUCH\",\"incident\":\"NONE\",\"support\":\"NONE\"}");
+        UUID alert = jdbc.queryForObject("SELECT alert_id FROM followup_alerts WHERE application_id = ?", UUID.class, application);
+        String url = "/api/v1/followup-alerts/" + alert;
+
+        call(patch(url), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER"), "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), adopter, "{\"status\":\"IN_PROGRESS\"}").andExpect(status().isForbidden());
+        call(patch(url), staff, "{\"status\":\"DONE\"}").andExpect(status().isBadRequest());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\"}").andExpect(status().isBadRequest());
+
+        call(patch(url), staff, "{\"status\":\"IN_PROGRESS\",\"note\":\"Đã gọi, hẹn chiều nay\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.data.assignedTo").value(staff.toString()))
+                .andExpect(jsonPath("$.data.firstActionAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.resolvedAt").doesNotExist());
+        call(patch(url), staff, "{\"status\":\"RESOLVED\",\"resolution\":\"ADVISED\"}").andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.resolution").value("ADVISED"))
+                .andExpect(jsonPath("$.data.note").value("Đã gọi, hẹn chiều nay"))
+                .andExpect(jsonPath("$.data.resolvedAt").isNotEmpty());
+    }
+
+    private long reputationLogCount(UUID user) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM reputation_logs WHERE user_id = ?", Long.class, user);
+    }
+
+    @Test
+    void anAdopterWhoCannotKeepThePetAsksToReturnItAndTheOrganizationBringsItBackWithoutCostingReputation() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        UUID petId = jdbc.queryForObject("SELECT pet_id FROM adoption_applications WHERE application_id = ?", UUID.class, application);
+        long reputationBefore = reputationLogCount(adopter);
+        String ask = "/api/v1/adoptions/" + application + "/return-request";
+
+        call(post(ask), person(), "{\"reasonCode\":\"HOUSING_MOVING\"}").andExpect(status().isNotFound());
+        call(post(ask), adopter, "{\"reasonCode\":\"NOPE\"}").andExpect(status().isBadRequest());
+        call(post(ask), adopter, "{\"reasonCode\":\"HOUSING_MOVING\",\"note\":\"Chuyển nhà ra nước ngoài\"}").andExpect(status().isOk());
+        call(post(ask), adopter, "{\"reasonCode\":\"HOUSING_MOVING\"}").andExpect(status().isOk());
+
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].severity").value("RED"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("RETURN_REQUESTED"))
+                .andExpect(jsonPath("$.data[0].reasons[1]").value("HOUSING_MOVING"))
+                .andExpect(jsonPath("$.data[0].note").value("Chuyển nhà ra nước ngoài"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).isEqualTo(1);
+
+        String outcome = "/api/v1/adoptions/" + application + "/outcome";
+        String returned = "{\"outcomeType\":\"RETURNED_BY_ADOPTER\",\"reasonCode\":\"HOUSING_MOVING\"}";
+        call(post(outcome), adopter, returned).andExpect(status().isForbidden());
+        call(post(outcome), member(organizationCreatedAt(LocalDateTime.now(), "ACTIVE"), "OWNER"), returned).andExpect(status().isForbidden());
+        call(post(outcome), staff, "{\"outcomeType\":\"SOLD\"}").andExpect(status().isBadRequest());
+        call(post(outcome), staff, returned).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.outcomeType").value("RETURNED_BY_ADOPTER"))
+                .andExpect(jsonPath("$.data.daysSinceCompleted").value(0));
+
+        var owner = jdbc.queryForMap("SELECT owner_type, owner_id, acquisition_type FROM pets_current_owner WHERE pet_id = ?", petId);
+        assertThat(owner.get("owner_type")).isEqualTo("ORGANIZATION");
+        assertThat(owner.get("owner_id")).isEqualTo(shelter);
+        assertThat(owner.get("acquisition_type")).isEqualTo("ORG_INTAKE");
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("FOSTERING");
+        assertThat(jdbc.queryForObject("SELECT initiated_by FROM adoption_outcomes WHERE application_id = ?", UUID.class, application)).isEqualTo(adopter);
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT status FROM followup_alerts WHERE application_id = ?", String.class, application)).isEqualTo("RESOLVED");
+        assertThat(reputationLogCount(adopter)).as("giving a pet back costs nothing").isEqualTo(reputationBefore + 0);
+
+        // it ended: nothing more to record, ask or send
+        call(post(outcome), staff, returned).andExpect(status().isConflict());
+        call(post(ask), adopter, "{\"reasonCode\":\"OTHER\"}").andExpect(status().isConflict());
+        assertThat(followupCommands.dispatchDue(20)).isEmpty();
+    }
+
+    @Test
+    void aSupportRequestIsYellowWorkOnceAndTurningFollowUpOffStopsTheQuestions() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        String support = "/api/v1/adoptions/" + application + "/support-request";
+
+        call(post(support), adopter, "{\"note\":\"Bé không chịu ăn\"}").andExpect(status().isOk());
+        call(post(support), adopter, "{}").andExpect(status().isOk());
+        call(get("/api/v1/organizations/me/followup-alerts"), staff).andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].severity").value("YELLOW"))
+                .andExpect(jsonPath("$.data[0].reasons[0]").value("SUPPORT_REQUESTED"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND type = 'FOLLOWUP_ALERT'", Integer.class, staff)).as("yellow does not page").isZero();
+
+        String preference = "/api/v1/adoptions/" + application + "/followup-preference";
+        call(patch(preference), person(), "{\"enabled\":false}").andExpect(status().isNotFound());
+        call(patch(preference), adopter, "{\"enabled\":false}").andExpect(status().isOk());
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        makeDue(application, "DAY_2");
+        assertThat(followupCommands.dispatchDue(20)).isEmpty();
+
+        call(patch(preference), adopter, "{\"enabled\":true}").andExpect(status().isOk());
+        // WEEK_2, MONTH_3 and MONTH_6 are still ahead; DAY_2 was already due, so it stays cancelled
+        assertThat(jdbc.queryForList("SELECT milestone || ':' || status FROM adoption_followups WHERE application_id = ? ORDER BY due_at", String.class, application))
+                .containsExactly("DAY_2:CANCELLED", "WEEK_2:SCHEDULED", "MONTH_3:SCHEDULED", "MONTH_6:SCHEDULED");
+    }
+
+    @Test
+    void reclaimingForAViolationIsRecordedAsAnOutcomeAndStillCostsReputation() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID application = adoptedApplication(shelter, adopter);
+        UUID proof = tempMedia(owner);
+        when(cloud.moveToPermament(anyString(), any(), any())).thenReturn("pet-rescue/reclaims/proof");
+
+        call(post("/api/v1/adoptions/" + application + "/reclaim"), owner,
+                "{\"reason\":\"Bị bỏ đói nhiều ngày liền\",\"proofId\":\"" + proof + "\"}").andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("SELECT outcome_type FROM adoption_outcomes WHERE application_id = ?", String.class, application)).isEqualTo("RECLAIMED");
+        assertThat(jdbc.queryForList("SELECT DISTINCT status FROM adoption_followups WHERE application_id = ?", String.class, application)).containsExactly("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(delta), 0) FROM reputation_logs WHERE user_id = ? AND reason = 'PET_RECLAIMED'", Integer.class, adopter)).isEqualTo(-300);
+    }
+
+    @Test
+    void theAdopterProfileFormIsPrefilledFromThePetsThePersonKeepsAlive() throws Exception {
+        UUID me = person();
+        String url = "/api/v1/users/me/adopter-profile/suggestion";
+        call(get(url), me).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasDog").value(false))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(0)));
+
+        UUID dog = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Dog'), status = 'ADOPTED' WHERE pet_id = ?", dog);
+        UUID deadCat = pet("USER", me, null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat'), status = 'DECEASED' WHERE pet_id = ?", deadCat);
+        UUID someoneElsesCat = pet("USER", person(), null);
+        jdbc.update("UPDATE pets SET species_id = (SELECT species_id FROM pet_species WHERE name = 'Cat') WHERE pet_id = ?", someoneElsesCat);
+
+        call(get(url), me).andExpect(jsonPath("$.data.hasDog").value(true))
+                .andExpect(jsonPath("$.data.hasCat").value(false))
+                .andExpect(jsonPath("$.data.basedOnPetIds", hasSize(1)))
+                .andExpect(jsonPath("$.data.basedOnPetIds[0]").value(dog.toString()));
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+    }
+
+    private long metric(String json, String path) {
+        List<Number> found = JsonPath.read(json, path);
+        return found.isEmpty() ? 0 : found.get(0).longValue();
+    }
+
+    @Test
+    void followUpNumbersCountNotAnsweringOnItsOwnAndAreForAdminsOnly() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "STAFF");
+        String url = "/api/v1/admin/followups/metrics";
+        call(get(url), staff).andExpect(status().isForbidden());
+        mvc.perform(get(url)).andExpect(status().isUnauthorized());
+        String before = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        UUID answeringAdopter = person();
+        UUID answering = adoptedApplication(shelter, answeringAdopter);
+        answered(answering, answeringAdopter, "DAY_2", ANSWERS_FINE);
+        UUID silent = adoptedApplication(shelter, person());
+        makeDue(silent, "DAY_2");
+        followupCommands.dispatchDue(20);
+        UUID leaving = adoptedApplication(shelter, person());
+        call(post("/api/v1/adoptions/" + leaving + "/outcome"), staff, "{\"outcomeType\":\"RETURNED_BY_ADOPTER\",\"reasonCode\":\"TIME\"}").andExpect(status().isOk());
+
+        String after = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN"))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String day2 = "$.data.milestones[?(@.milestone=='DAY_2')].";
+        assertThat(metric(after, day2 + "asked") - metric(before, day2 + "asked")).isEqualTo(2);
+        assertThat(metric(after, day2 + "responded") - metric(before, day2 + "responded")).isEqualTo(1);
+        assertThat(metric(after, day2 + "unanswered") - metric(before, day2 + "unanswered")).as("silence is its own number").isEqualTo(1);
+        assertThat(metric(after, day2 + "stillHasPet") - metric(before, day2 + "stillHasPet")).isEqualTo(1);
+        String returned = "$.data.outcomes[?(@.outcomeType=='RETURNED_BY_ADOPTER' && @.reasonCode=='TIME')].count";
+        assertThat(metric(after, returned) - metric(before, returned)).isEqualTo(1);
+    }
+
+    @Test
+    void aPetAPersonRegistersIsSelfRegisteredAndOneAnOrganizationCreatesIsOrgIntake() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID person = person();
+        String body = "{\"name\":\"Bơ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}";
+
+        String created = call(post("/api/v1/pets"), person, body).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID mine = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pet_ownerships WHERE pet_id = ?", String.class, mine)).isEqualTo("SELF_REGISTERED");
+        assertThat(jdbc.queryForObject("SELECT adoption_application_id FROM pets_current_owner WHERE pet_id = ?", UUID.class, mine)).isNull();
+
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID staff = member(shelter, "OWNER");
+        String orgBody = "{\"name\":\"Mướp\",\"speciesId\":\"" + species + "\",\"gender\":\"FEMALE\",\"shelterId\":\"" + shelter + "\"}";
+        String org = call(post("/api/v1/pets"), staff, orgBody).andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        UUID theirs = UUID.fromString(JsonPath.read(org, "$.data.petId"));
+        assertThat(jdbc.queryForObject("SELECT acquisition_type FROM pets_current_owner WHERE pet_id = ?", String.class, theirs)).isEqualTo("ORG_INTAKE");
+    }
+
     // ── External calls ──────────────────────────────
 
     @Test
@@ -557,6 +984,204 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data.size").value(100));
     }
 
+    // ── Filters, sorting and names ──────────────────
+
+    private static final List<String> CASE_LISTS = List.of(
+            "/api/v1/rescue-cases?pageSize=100",
+            "/api/v1/rescue-cases?pageSize=100&lat=10.5&lng=106.7&distance=5000",
+            "/api/v1/rescue-cases?pageSize=100&minLat=10&minLng=106&maxLat=11&maxLng=107");
+
+    @Test
+    void everyCaseListAppliesStatusPriorityAndSpecies() throws Exception {
+        UUID reporter = person();
+        String openDog = caseAt(reporter, "Dog", "HIGH", "REPORTED").toString();
+        String closedDog = caseAt(reporter, "Dog", "HIGH", "CLOSED").toString();
+        String openCat = caseAt(reporter, "Cat", "LOW", "REPORTED").toString();
+
+        for (String url : CASE_LISTS) {
+            mvc.perform(get(url + "&status=REPORTED&status=IN_PROGRESS")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openDog)))
+                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openCat)))
+                    .andExpect(jsonPath("$.data.content[*].caseId", not(hasItem(closedDog))));
+            mvc.perform(get(url + "&species=cat")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openCat)))
+                    .andExpect(jsonPath("$.data.content[*].caseId", not(hasItem(openDog))));
+            mvc.perform(get(url + "&priority=LOW")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(openCat)))
+                    .andExpect(jsonPath("$.data.content[*].caseId", not(hasItem(openDog))));
+            // no status asked for: every status, as before
+            mvc.perform(get(url + "&species=Dog&priority=HIGH")).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[*].caseId", hasItem(closedDog)));
+        }
+    }
+
+    @Test
+    void everyCaseListRowCanBeDrawnOnAMap() throws Exception {
+        String species = newSpecies();
+        UUID caseId = caseAt(person(), species, "HIGH", "REPORTED");
+        jdbc.update("UPDATE rescue_cases SET needs_help = TRUE WHERE case_id = ?", caseId);
+
+        for (String url : CASE_LISTS) {
+            String body = mvc.perform(get(url + "&species=" + species)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            String row = "$.data.content[?(@.caseId=='" + caseId + "')]";
+            assertThat(JsonPath.<List<Double>>read(body, row + ".latitude")).containsExactly(10.5);
+            assertThat(JsonPath.<List<Double>>read(body, row + ".longitude")).containsExactly(106.7);
+            assertThat(JsonPath.<List<String>>read(body, row + ".wardName")).containsExactly("Phường 1");
+            assertThat(JsonPath.<List<String>>read(body, row + ".provinceName")).containsExactly("Hồ Chí Minh");
+            assertThat(JsonPath.<List<Boolean>>read(body, row + ".needsHelp")).containsExactly(true);
+        }
+        mvc.perform(get("/api/v1/rescue-cases/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107"))
+                .andExpect(jsonPath("$.data[?(@.caseId=='" + caseId + "')].needsHelp", hasItem(true)));
+    }
+
+    @Test
+    void anIncompleteOrImpossibleAreaIsRefusedInsteadOfIgnored() throws Exception {
+        for (String url : List.of(
+                "/api/v1/rescue-cases?minLat=10&minLng=106",
+                "/api/v1/rescue-cases?minLat=11&minLng=106&maxLat=10&maxLng=107",
+                "/api/v1/rescue-cases?lat=10.5",
+                "/api/v1/rescue-cases?lat=95&lng=106.7",
+                "/api/v1/rescue-cases?lat=10.5&lng=106.7&distance=-1",
+                "/api/v1/rescue-cases/map/markers?minLat=10&minLng=106&maxLat=11",
+                "/api/v1/organizations/map/markers?maxLng=107",
+                "/api/v1/organizations/map/bounding-box?minLat=11&minLng=106&maxLat=10&maxLng=107")) {
+            mvc.perform(get(url)).andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void anUnknownSortColumnIsRefusedAndAKnownOneWorks() throws Exception {
+        UUID admin = admin();
+        mvc.perform(get("/api/v1/rescue-cases?sortBy=nope")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/rescue-cases?minLat=10&minLng=106&maxLat=11&maxLng=107&sortBy=nope")).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/organizations/map/bounding-box?minLat=10&minLng=106&maxLat=11&maxLng=107&sortBy=nope"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/adoptions/reclaims?sortBy=nope").with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(get("/api/v1/rescue-cases?sortBy=caseCode&sortOrder=asc")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/rescue-cases?minLat=10&minLng=106&maxLat=11&maxLng=107&sortBy=createdAt")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/organizations/map/bounding-box?minLat=10&minLng=106&maxLat=11&maxLng=107&sortBy=name&sortOrder=asc"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void prioritySortPutsTheMostUrgentFirst() throws Exception {
+        UUID reporter = person();
+        String species = newSpecies();
+        String low = caseAt(reporter, species, "LOW", "REPORTED").toString();
+        String critical = caseAt(reporter, species, "CRITICAL", "REPORTED").toString();
+        String normal = caseAt(reporter, species, "NORMAL", "REPORTED").toString();
+        String high = caseAt(reporter, species, "HIGH", "REPORTED").toString();
+
+        String body = mvc.perform(get("/api/v1/rescue-cases?sortBy=priority&sortOrder=desc&species=" + species))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(JsonPath.<List<String>>read(body, "$.data.content[*].caseId")).containsExactly(critical, high, normal, low);
+    }
+
+    @Test
+    void caseDetailNamesTheOrganizationAndThePet() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID caseId = report(person());
+        jdbc.update("UPDATE rescue_cases SET organization_id = ?, pet_id = ? WHERE case_id = ?", shelter, petId, caseId);
+
+        mvc.perform(get("/api/v1/rescue-cases/" + caseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.organizationName").value("Org " + shelter))
+                .andExpect(jsonPath("$.data.petName").value("Mực"));
+    }
+
+    @Test
+    void reclaimLogNamesThePetTheOrganizationAndThePeople() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID adopter = person();
+        UUID petId = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(petId, adopter, shelter, "COMPLETED");
+        UUID reclaim = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO reclaim_logs (reclaim_id, application_id, pet_id, organization_id, user_id, reclaimed_by, reason, proof_id, reputation_delta)
+                VALUES (?, ?, ?, ?, ?, ?, 'Bỏ bê', ?, -300)
+                """, reclaim, application, petId, shelter, adopter, owner, permanentMedia(owner));
+
+        for (String url : List.of("/api/v1/adoptions/reclaims?pageSize=100", "/api/v1/adoptions/reclaims?pageSize=100&organizationId=" + shelter)) {
+            String body = mvc.perform(get(url).with(user(admin().toString()).roles("ADMIN")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            String row = "$.data.content[?(@.reclaimId=='" + reclaim + "')]";
+            assertThat(JsonPath.<List<String>>read(body, row + ".petName")).containsExactly("Mực");
+            assertThat(JsonPath.<List<String>>read(body, row + ".organizationName")).containsExactly("Org " + shelter);
+            assertThat(JsonPath.<List<String>>read(body, row + ".username")).singleElement().asString().startsWith("u-");
+            assertThat(JsonPath.<List<String>>read(body, row + ".reclaimedByUsername")).singleElement().asString().startsWith("u-");
+            assertThat(JsonPath.<List<String>>read(body, row + ".reason")).containsExactly("Bỏ bê");
+            assertThat(JsonPath.<List<String>>read(body, row + ".reclaimedAt")).singleElement().isNotNull();
+        }
+    }
+
+    @Test
+    void applicationListNamesTheOrganization() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID applicant = person();
+        UUID application = application(pet("ORGANIZATION", shelter, shelter), applicant, shelter, "PENDING");
+
+        String body = call(get("/api/v1/adoptions/user/" + applicant + "?pageSize=100"), applicant)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        String row = "$.data.content[?(@.applicationId=='" + application + "')]";
+        assertThat(JsonPath.<List<String>>read(body, row + ".organizationId")).containsExactly(shelter.toString());
+        assertThat(JsonPath.<List<String>>read(body, row + ".organizationName")).containsExactly("Org " + shelter);
+        assertThat(JsonPath.<List<String>>read(body, row + ".applicantId")).containsExactly(applicant.toString());
+    }
+
+    @Test
+    void organizationMarkerCarriesWhatAPopupShows() throws Exception {
+        UUID org = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("""
+                UPDATE organizations SET phone = '0288888888', image_url = 'https://i.test/a.png', street_address = '1 Lê Lợi',
+                       location = ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326) WHERE organization_id = ?
+                """, org);
+
+        for (String url : List.of("/api/v1/organizations/map/markers",
+                "/api/v1/organizations/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107")) {
+            String body = mvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            String row = "$.data[?(@.organizationId=='" + org + "')]";
+            assertThat(JsonPath.<List<String>>read(body, row + ".phone")).containsExactly("0288888888");
+            assertThat(JsonPath.<List<String>>read(body, row + ".imageUrl")).containsExactly("https://i.test/a.png");
+            assertThat(JsonPath.<List<String>>read(body, row + ".streetAddress")).containsExactly("1 Lê Lợi");
+            assertThat(JsonPath.<List<String>>read(body, row + ".organizationCode")).containsExactly(org.toString().substring(0, 12));
+        }
+    }
+
+    @Test
+    void availablePetsCanBeSearchedByName() throws Exception {
+        UUID owner = person();
+        String name = "Pet" + UUID.randomUUID().toString().substring(0, 8);
+        String wanted = pet("USER", owner, null).toString();
+        String other = pet("USER", owner, null).toString();
+        jdbc.update("UPDATE pets SET name = ? WHERE pet_id = ?", name, UUID.fromString(wanted));
+
+        mvc.perform(get("/api/v1/pets?availableOnly=true&pageSize=100&search=" + name)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[*].petId", hasItem(wanted)))
+                .andExpect(jsonPath("$.data.content[*].petId", not(hasItem(other))));
+    }
+
+    @Test
+    void rescueQueueRowSaysWhereAndShowsAPicture() throws Exception {
+        UUID reporter = person();
+        UUID caseId = caseAt(reporter, "Dog", "CRITICAL", "REPORTED");
+        jdbc.update("UPDATE rescue_cases SET needs_help = TRUE, reported_at = NOW() - INTERVAL '10 years' WHERE case_id = ?", caseId);
+        linkCaseImage(caseId, reporter);
+
+        String body = call(get("/api/v1/organizations/me/rescue-queue?pageSize=100"), admin())
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        String row = "$.data.content[?(@.caseId=='" + caseId + "')]";
+        assertThat(JsonPath.<List<String>>read(body, row + ".locationText")).containsExactly("Cầu Thị Nghè");
+        assertThat(JsonPath.<List<String>>read(body, row + ".firstImageUrl")).singleElement().asString().startsWith("https://cdn.test/");
+    }
+
     @Test
     void sizeIsAcceptedAsAnAliasOfPageSize() throws Exception {
         mvc.perform(get("/api/v1/rescue-cases?size=3"))
@@ -571,7 +1196,7 @@ class QueryBehaviorIntegrationTest {
     @Test
     void caseListAppliesStatusPrioritySpeciesAndProvince() throws Exception {
         UUID reporter = person();
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         UUID match = filterCase(reporter, species, "CRITICAL", "REPORTED", "79", "Hồ Chí Minh");
         UUID otherStatus = filterCase(reporter, species, "CRITICAL", "CLOSED", "79", "Hồ Chí Minh");
         UUID otherPriority = filterCase(reporter, species, "LOW", "REPORTED", "79", "Hồ Chí Minh");
@@ -592,7 +1217,7 @@ class QueryBehaviorIntegrationTest {
     @Test
     void nearbyAndBoundingBoxListsApplyTheSameFilters() throws Exception {
         UUID reporter = person();
-        String species = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        String species = newSpecies();
         UUID open = filterCase(reporter, species, "HIGH", "REPORTED", "79", "Hồ Chí Minh");
         filterCase(reporter, species, "HIGH", "CLOSED", "79", "Hồ Chí Minh");
 
@@ -640,6 +1265,65 @@ class QueryBehaviorIntegrationTest {
         pet("USER", person(), null);
 
         assertThat(petIds(call(get("/api/v1/users/me/pets"), me))).containsExactly(mine);
+    }
+
+    @Test
+    void myPetsShowHowIGotEachOneAndWhereAnAdoptedOneCameFrom() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID owner = member(shelter, "OWNER");
+        UUID me = person();
+        UUID mine = pet("USER", me, null);
+        jdbc.update("UPDATE pets_current_owner SET acquisition_type = 'SELF_REGISTERED' WHERE pet_id = ?", mine);
+        UUID adopted = pet("ORGANIZATION", shelter, shelter);
+        UUID application = application(adopted, me, shelter, "APPROVED");
+        call(patch("/api/v1/adoptions/" + application + "/complete"), owner).andExpect(status().isOk());
+
+        String all = call(get("/api/v1/users/me/pets"), me).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + mine + "')].acquisitionType")).containsExactly("SELF_REGISTERED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].acquisitionType")).containsExactly("ADOPTED");
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].adoptionApplicationId")).containsExactly(application.toString());
+        assertThat(JsonPath.<List<String>>read(all, "$.data.content[?(@.petId=='" + adopted + "')].sourceOrganization.organizationId")).containsExactly(shelter.toString());
+        assertThat(JsonPath.<List<Object>>read(all, "$.data.content[?(@.petId=='" + mine + "')].sourceOrganization")).isEmpty();
+
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=ADOPTED"), me))).containsExactly(adopted);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?type=SELF_REGISTERED"), me))).containsExactly(mine);
+        assertThat(petIds(call(get("/api/v1/users/me/pets?sortBy=name&sortOrder=asc"), me))).containsExactlyInAnyOrder(mine, adopted);
+        call(get("/api/v1/users/me/pets?type=NOPE"), me).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void aPetAPersonRegistersIsPrivateUntilTheyShowIt() throws Exception {
+        UUID species = jdbc.queryForObject("SELECT species_id FROM pet_species LIMIT 1", UUID.class);
+        UUID owner = person();
+        UUID stranger = person();
+        String created = call(post("/api/v1/pets"), owner, "{\"name\":\"Cỏ\",\"speciesId\":\"" + species + "\",\"gender\":\"MALE\"}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(JsonPath.read(created, "$.data.petId"));
+        String url = "/api/v1/pets/" + id;
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID orgPet = pet("ORGANIZATION", shelter, shelter);
+
+        call(get(url), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.data.acquisitionType").value("SELF_REGISTERED"));
+        call(get(url), admin()).andExpect(status().isOk());
+        call(get(url), stranger).andExpect(status().isNotFound());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(orgPet).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/pets?pageSize=100"), stranger))).doesNotContain(id);
+        assertThat(petIds(call(get("/api/v1/users/me/pets"), owner))).containsExactly(id);
+
+        // only whoever manages the pet decides who can see it
+        call(patch(url + "/visibility?visibility=PUBLIC"), stranger).andExpect(status().isForbidden());
+        mvc.perform(patch(url + "/visibility?visibility=PUBLIC")).andExpect(status().isUnauthorized());
+        call(patch(url + "/visibility?visibility=PUBLIC"), owner).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+
+        mvc.perform(get(url)).andExpect(status().isOk()).andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
+        assertThat(petIds(mvc.perform(get("/api/v1/pets?pageSize=100")))).contains(id);
+
+        call(patch(url + "/visibility?visibility=PRIVATE"), owner).andExpect(status().isOk());
+        mvc.perform(get(url)).andExpect(status().isNotFound());
     }
 
     @Test
@@ -863,6 +1547,108 @@ class QueryBehaviorIntegrationTest {
         assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 1).mapToLong(m -> m.getPending()).sum()).isEqualTo(1);
         assertThat(trend.getItems().stream().filter(m -> m.getMonth() == 2).mapToLong(m -> m.getPending()).sum())
                 .as(months).isEqualTo(1);
+    }
+
+    // ── AI triage store ─────────────────────────────
+
+    private UUID triageCase(String caseStatus, String reportedAgo) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, species, priority, status, reported_by, reported_at, created_at)
+                VALUES (?, ?, 'Dog', 'NORMAL', ?, ?, NOW() - CAST(? AS INTERVAL), NOW())
+                """, id, id.toString().substring(0, 12), caseStatus, person(), reportedAgo);
+        return id;
+    }
+
+    @Test
+    void oneWorkerTakesATriageAtATimeAndItStopsAfterTheLastAttempt() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        LocalDateTime stale = LocalDateTime.now().minusMinutes(5);
+
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        assertThat(triage.claim(caseId, 3, stale)).as("held by a live worker").isFalse();
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(com.uit.petrescueapi.domain.valueobject.TriageStatus.PENDING);
+            assertThat(t.getAttempts()).isEqualTo(1);
+        });
+
+        // a failure releases the claim, and each new claim is one more attempt
+        triage.markFailed(caseId, "api error 429", "{\"cat", 120L);
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(com.uit.petrescueapi.domain.valueobject.TriageStatus.FAILED);
+            assertThat(t.getFailure()).isEqualTo("api error 429");
+            assertThat(t.getRawOutput()).isEqualTo("{\"cat");
+        });
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        triage.markFailed(caseId, "api error 429", null, 80L);
+        assertThat(triage.claim(caseId, 3, stale)).isTrue();
+        triage.markFailed(caseId, "api error 429", null, 80L);
+
+        assertThat(triage.claim(caseId, 3, stale)).as("out of attempts").isFalse();
+        assertThat(triage.findByCaseId(caseId)).get().extracting(t -> t.getAttempts()).isEqualTo(3);
+    }
+
+    @Test
+    void aClaimLeftByADeadWorkerCanBeTakenOver() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isTrue();
+
+        jdbc.update("UPDATE rescue_case_triage SET claimed_at = NOW() - INTERVAL '10 minutes' WHERE case_id = ?", caseId);
+
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isTrue();
+        assertThat(triage.findByCaseId(caseId)).get().extracting(t -> t.getAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void aFinishedTriageKeepsWhatWasFoundAndIsNeverClaimedAgain() {
+        UUID caseId = triageCase("REPORTED", "10 minutes");
+        triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5));
+
+        triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder()
+                .caseId(caseId).model("openrouter/openai/gpt-oss-120b").promptVersion(1)
+                .aiUrgency(com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL).needsRescue(true)
+                .conditionSummary("Bleeding from the hind leg").species("Dog").district("Quận 7").province("TP. Hồ Chí Minh")
+                .missingFields(List.of("PHOTO", "DESCRIPTION")).rawOutput("{\"category\":\"RESCUE\"}")
+                .latencyMs(2100L).inputTokens(940L).outputTokens(480L).build());
+
+        assertThat(triage.findByCaseId(caseId)).get().satisfies(t -> {
+            assertThat(t.isAnalyzed()).isTrue();
+            assertThat(t.getAiUrgency()).isEqualTo(com.uit.petrescueapi.domain.valueobject.RescuePriority.CRITICAL);
+            assertThat(t.getConditionSummary()).isEqualTo("Bleeding from the hind leg");
+            assertThat(t.getSpecies()).isEqualTo("Dog");
+            assertThat(t.getMissingFields()).containsExactly("PHOTO", "DESCRIPTION");
+            assertThat(t.getRawOutput()).isEqualTo("{\"category\":\"RESCUE\"}");
+            assertThat(t.getAnalyzedAt()).isNotNull();
+            assertThat(t.getFailure()).isNull();
+        });
+        assertThat(triage.claim(caseId, 3, LocalDateTime.now().minusMinutes(5))).isFalse();
+    }
+
+    @Test
+    void theRetryPassFindsOnlyOpenRecentCasesThatStillNeedATriage() {
+        UUID lostEvent = triageCase("REPORTED", "10 minutes");          // no row at all
+        UUID tooNew = triageCase("REPORTED", "10 seconds");             // its own event is still on the way
+        UUID failedOnce = triageCase("IN_PROGRESS", "10 minutes");
+        UUID outOfAttempts = triageCase("REPORTED", "10 minutes");
+        UUID analysed = triageCase("REPORTED", "10 minutes");
+        UUID closed = triageCase("CLOSED", "10 minutes");
+        UUID tooOld = triageCase("REPORTED", "3 days");
+
+        triage.claim(failedOnce, 3, LocalDateTime.now().minusMinutes(5));
+        triage.markFailed(failedOnce, "api error 502", null, 50L);
+        for (int i = 0; i < 3; i++) {
+            triage.claim(outOfAttempts, 3, LocalDateTime.now().minusMinutes(5));
+            triage.markFailed(outOfAttempts, "api error 502", null, 50L);
+        }
+        triage.claim(analysed, 3, LocalDateTime.now().minusMinutes(5));
+        triage.markAnalyzed(com.uit.petrescueapi.domain.entity.RescueCaseTriage.builder().caseId(analysed).build());
+        jdbc.update("UPDATE rescue_case_triage SET updated_at = NOW() - INTERVAL '10 minutes' WHERE case_id IN (?, ?, ?)",
+                failedOnce, outOfAttempts, analysed);
+
+        List<UUID> found = triage.findRetryable(3, LocalDateTime.now().minusMinutes(1), LocalDateTime.now().minusDays(1), 1000);
+
+        assertThat(found).contains(lostEvent, failedOnce)
+                .doesNotContain(tooNew, outOfAttempts, analysed, closed, tooOld);
     }
 
     // ── Adoption notifications ──────────────────────
@@ -1094,7 +1880,390 @@ class QueryBehaviorIntegrationTest {
                 "$.data.applicationId");
     }
 
+    // ── Case progress updates, community flags, first aid ──
+
+    @Test
+    void theClaimerPostsProgressAndTheReporterHearsAboutIt() throws Exception {
+        UUID reporter = person();
+        UUID claimer = person();
+        UUID caseId = report(reporter);
+        call(post("/api/v1/rescue-cases/" + caseId + "/claim"), claimer, "{\"safetyAcknowledged\":true}").andExpect(status().isOk());
+        UUID photo = permanentMedia(claimer);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), claimer,
+                "{\"note\":\"Đã tới nơi, bé đang ở gầm cầu\",\"mediaIds\":[\"" + photo + "\"]}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.note").value("Đã tới nơi, bé đang ở gầm cầu"))
+                .andExpect(jsonPath("$.data.imageUrls[0]", startsWith("https://cdn.test/")));
+
+        assertThat(notificationTypes(reporter)).contains("RESCUE_CASE_UPDATED");
+        assertThat(notificationTypes(claimer)).doesNotContain("RESCUE_CASE_UPDATED");
+
+        // anyone can follow the case
+        mvc.perform(get("/api/v1/rescue-cases/" + caseId + "/updates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].note").value("Đã tới nơi, bé đang ở gầm cầu"))
+                .andExpect(jsonPath("$.data.content[0].authorId").value(claimer.toString()))
+                .andExpect(jsonPath("$.data.content[0].authorUsername", startsWith("u-")))
+                .andExpect(jsonPath("$.data.content[0].imageUrls[0]", startsWith("https://cdn.test/")));
+    }
+
+    @Test
+    void onlyPeopleWorkingOnTheCasePostProgress() throws Exception {
+        UUID reporter = person();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), person(), "{\"note\":\"Tôi đi ngang qua\"}")
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/rescue-cases/" + caseId + "/updates")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\" \"}")
+                .andExpect(status().isBadRequest());
+        // someone else's photo
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter,
+                "{\"note\":\"Ảnh mới\",\"mediaIds\":[\"" + permanentMedia(person()) + "\"]}")
+                .andExpect(status().isForbidden());
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\"Bé vẫn còn ở đây\"}")
+                .andExpect(status().isCreated());
+        call(patch("/api/v1/rescue-cases/" + caseId + "/status"), reporter, "{\"status\":\"CLOSED\",\"reason\":\"Đã xong\"}")
+                .andExpect(status().isOk());
+        call(post("/api/v1/rescue-cases/" + caseId + "/updates"), reporter, "{\"note\":\"Thêm nữa\"}")
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void threeFlagsAlertTheReporterAndAdminsOnceButNeverCloseTheCase() throws Exception {
+        UUID reporter = person();
+        UUID admin = admin();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), reporter, "{\"reason\":\"FALSE_REPORT\"}")
+                .andExpect(status().isForbidden());
+
+        UUID first = person();
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), first, "{\"reason\":\"ALREADY_HANDLED\",\"note\":\"Sáng nay có người đón\"}")
+                .andExpect(status().isOk());
+        // flagging again changes the reason instead of counting twice
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), first, "{\"reason\":\"FALSE_REPORT\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(1));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"ALREADY_HANDLED\"}").andExpect(status().isOk());
+        assertThat(notificationTypes(reporter)).doesNotContain("RESCUE_CASE_FLAGGED");
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"DUPLICATE\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(3));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), person(), "{\"reason\":\"DUPLICATE\"}").andExpect(status().isOk());
+
+        assertThat(notificationTypes(reporter)).containsOnlyOnce("RESCUE_CASE_FLAGGED");
+        assertThat(notificationTypes(admin)).containsOnlyOnce("RESCUE_CASE_FLAGGED");
+        assertThat(jdbc.queryForObject("SELECT status FROM rescue_cases WHERE case_id = ?", String.class, caseId)).isEqualTo("REPORTED");
+
+        call(get("/api/v1/rescue-cases/" + caseId), first)
+                .andExpect(jsonPath("$.data.flagCount").value(4))
+                .andExpect(jsonPath("$.data.viewerHasFlagged").value(true));
+
+        String flagged = mvc.perform(get("/api/v1/admin/rescue-cases/flagged?pageSize=100").with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String row = "$.data.content[?(@.caseId=='" + caseId + "')]";
+        assertThat(JsonPath.<List<Number>>read(flagged, row + ".flagCount")).singleElement().satisfies(n -> assertThat(n.intValue()).isEqualTo(4));
+        assertThat(JsonPath.<List<Number>>read(flagged, row + ".duplicateCount")).singleElement().satisfies(n -> assertThat(n.intValue()).isEqualTo(2));
+        call(get("/api/v1/admin/rescue-cases/flagged"), reporter).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aFlagCanBeWithdrawnAndOnlyOpenCasesTakeFlags() throws Exception {
+        UUID reporter = person();
+        UUID flagger = person();
+        UUID caseId = report(reporter);
+
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"FALSE_REPORT\"}").andExpect(status().isOk());
+        call(delete("/api/v1/rescue-cases/" + caseId + "/flags/me"), flagger)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.flagCount").value(0));
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"NOT_A_REASON\"}").andExpect(status().isBadRequest());
+
+        call(patch("/api/v1/rescue-cases/" + caseId + "/status"), reporter, "{\"status\":\"CLOSED\",\"reason\":\"Đã xong\"}").andExpect(status().isOk());
+        call(post("/api/v1/rescue-cases/" + caseId + "/flags"), flagger, "{\"reason\":\"FALSE_REPORT\"}").andExpect(status().isConflict());
+    }
+
+    @Test
+    void firstAidGuidesArePublicAndWarnWhatNotToDo() throws Exception {
+        String body = mvc.perform(get("/api/v1/rescue-cases/first-aid"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        List<String> codes = JsonPath.read(body, "$.data.guides[*].code");
+        assertThat(codes).contains("BLEEDING", "POISONING", "HEATSTROKE", "NEWBORN_ALONE");
+        assertThat(JsonPath.<List<List<String>>>read(body, "$.data.guides[*].steps")).allSatisfy(steps -> assertThat(steps).isNotEmpty());
+        assertThat(JsonPath.<List<List<String>>>read(body, "$.data.guides[*].doNot")).allSatisfy(steps -> assertThat(steps).isNotEmpty());
+        assertThat(JsonPath.<String>read(body, "$.data.disclaimer")).contains("bác sĩ thú y");
+    }
+
+    @Test
+    void theOrganizationMapFindsVetsInOneProvince() throws Exception {
+        UUID hcmVet = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID hanoiVet = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID hcmShelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET type = 'VET_CENTER', province_code = '79', province_name = 'Hồ Chí Minh', location = ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326) WHERE organization_id = ?", hcmVet);
+        jdbc.update("UPDATE organizations SET type = 'VET_CENTER', province_code = '01', province_name = 'Hà Nội', location = ST_SetSRID(ST_MakePoint(105.8, 21.0), 4326) WHERE organization_id = ?", hanoiVet);
+        jdbc.update("UPDATE organizations SET province_code = '79', province_name = 'Hồ Chí Minh', location = ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326) WHERE organization_id = ?", hcmShelter);
+
+        for (String province : List.of("79", "hồ chí minh")) {
+            mvc.perform(get("/api/v1/organizations/map/markers?type=VET_CENTER&province=" + province))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[*].organizationId", hasItem(hcmVet.toString())))
+                    .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hanoiVet.toString()))))
+                    .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hcmShelter.toString()))));
+        }
+        mvc.perform(get("/api/v1/organizations/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107&province=01"))
+                .andExpect(jsonPath("$.data[*].organizationId", not(hasItem(hcmVet.toString()))));
+    }
+
+    // ── Lost and found (phase 4) ────────────────────
+
+    @Test
+    void anOwnerReportsALostPetAFinderReportsItAndTheOwnerReunitesBothCases() throws Exception {
+        UUID owner = person();
+        UUID finder = person();
+        UUID petId = pet("USER", owner, null);
+        jdbc.update("UPDATE pets SET status = 'ADOPTED', color = 'vàng' WHERE pet_id = ?", petId);
+        String species = petSpecies(petId);
+
+        String lost = call(post("/api/v1/pets/" + petId + "/report-lost"), owner, """
+                {"latitude":10.5,"longitude":106.7,"locationText":"Chợ Bà Chiểu","provinceCode":"79","provinceName":"Hồ Chí Minh",
+                 "lastSeenAt":"%s","distinctiveMarks":"vòng cổ đỏ, cụt đuôi","contactPhone":"0900000001"}
+                """.formatted(daysAgo(2))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.caseType").value("LOST"))
+                .andExpect(jsonPath("$.data.petId").value(petId.toString()))
+                .andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("LOST");
+        // a second report for the same pet while the first is open
+        call(post("/api/v1/pets/" + petId + "/report-lost"), owner, "{\"latitude\":10.5,\"longitude\":106.7}").andExpect(status().isConflict());
+        call(post("/api/v1/pets/" + petId + "/report-lost"), person(), "{\"latitude\":10.5,\"longitude\":106.7}").andExpect(status().isForbidden());
+
+        String found = call(post("/api/v1/rescue-cases"), finder, """
+                {"caseType":"FOUND","holdingStatus":"AT_HOME","species":"%s","color":"Vàng",
+                 "description":"Chó nhỏ đeo vòng cổ đỏ, đuôi cụt","latitude":10.503,"longitude":106.702,"provinceCode":"79"}
+                """.formatted(species)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID foundId = UUID.fromString(JsonPath.read(found, "$.data.caseId"));
+
+        assertThat(notificationTypes(owner)).contains("RESCUE_MATCH_SUGGESTED");
+        String matches = call(get("/api/v1/rescue-cases/" + lostId + "/matches"), owner)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String row = "$.data[?(@.otherCase.caseId=='" + foundId + "')]";
+        assertThat(JsonPath.<List<String>>read(matches, row + ".status")).containsExactly("PENDING");
+        assertThat(JsonPath.<List<Number>>read(matches, row + ".score")).singleElement().satisfies(s -> assertThat(s.intValue()).isGreaterThan(50));
+        assertThat(JsonPath.<List<List<String>>>read(matches, row + ".reasons")).singleElement()
+                .satisfies(reasons -> assertThat(String.join(" ", reasons)).contains("Cùng loài").contains("vòng").contains("vàng"));
+        // the finder sees the same pair from their side; a stranger sees nothing
+        call(get("/api/v1/rescue-cases/" + foundId + "/matches"), finder)
+                .andExpect(jsonPath("$.data[*].otherCase.caseId", hasItem(lostId.toString())));
+        call(get("/api/v1/rescue-cases/" + lostId + "/matches"), person()).andExpect(status().isForbidden());
+
+        String suggestionId = JsonPath.<List<String>>read(matches, row + ".suggestionId").get(0);
+        // the suggestion belongs to the lost case, so the finder's case does not know it
+        call(post("/api/v1/rescue-cases/" + foundId + "/matches/" + suggestionId + "/confirm"), finder).andExpect(status().isNotFound());
+        call(post("/api/v1/rescue-cases/" + lostId + "/matches/" + suggestionId + "/confirm"), finder).andExpect(status().isForbidden());
+        call(post("/api/v1/rescue-cases/" + lostId + "/matches/" + suggestionId + "/confirm"), owner).andExpect(status().isOk());
+
+        for (UUID[] pair : List.of(new UUID[]{lostId, foundId}, new UUID[]{foundId, lostId})) {
+            call(get("/api/v1/rescue-cases/" + pair[0]), owner)
+                    .andExpect(jsonPath("$.data.status").value("CLOSED"))
+                    .andExpect(jsonPath("$.data.resolution").value("REUNITED"))
+                    .andExpect(jsonPath("$.data.matchedCaseId").value(pair[1].toString()));
+        }
+        assertThat(jdbc.queryForObject("SELECT status FROM pets WHERE pet_id = ?", String.class, petId)).isEqualTo("ADOPTED");
+        assertThat(notificationTypes(finder)).contains("RESCUE_MATCH_CONFIRMED");
+    }
+
+    @Test
+    void aFoundAnimalOfAnotherSpeciesFarAwayOrLongAfterIsNotSuggested() throws Exception {
+        UUID owner = person();
+        String lost = call(post("/api/v1/rescue-cases"), owner, """
+                {"caseType":"LOST","species":"Cat","color":"tam thể","latitude":21.03,"longitude":105.85,"lastSeenAt":"%s"}
+                """.formatted(daysAgo(2))).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+
+        UUID finder = person();
+        call(post("/api/v1/rescue-cases"), finder, "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Dog\",\"latitude\":21.03,\"longitude\":105.85}")
+                .andExpect(status().isCreated());
+        // a cat 3 km away is out of a cat's range
+        call(post("/api/v1/rescue-cases"), finder, "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Cat\",\"latitude\":21.057,\"longitude\":105.85}")
+                .andExpect(status().isCreated());
+
+        call(get("/api/v1/rescue-cases/" + lostId + "/matches"), owner).andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void lostCasesAndFoundAnimalsKeptAtHomeAreShownAboutWhereNotExactly() throws Exception {
+        UUID owner = person();
+        String lost = call(post("/api/v1/rescue-cases"), owner, """
+                {"caseType":"LOST","species":"Dog","latitude":10.51234,"longitude":106.71234,"locationText":"12 Nguyễn Trãi"}
+                """).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        UUID lostId = UUID.fromString(JsonPath.read(lost, "$.data.caseId"));
+        UUID onStreet = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), person(),
+                "{\"caseType\":\"FOUND\",\"holdingStatus\":\"ON_STREET\",\"species\":\"Dog\",\"latitude\":10.51234,\"longitude\":106.71234}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+
+        String detail = mvc.perform(get("/api/v1/rescue-cases/" + lostId)).andReturn().getResponse().getContentAsString();
+        assertBlurred(JsonPath.read(detail, "$.data.latitude"), JsonPath.read(detail, "$.data.longitude"));
+        assertThat(JsonPath.<Integer>read(detail, "$.data.locationBlurMeters")).isEqualTo(300);
+        assertThat(JsonPath.<Map<String, Object>>read(detail, "$.data")).doesNotContainKey("locationText");
+        call(get("/api/v1/rescue-cases/" + lostId), owner)
+                .andExpect(jsonPath("$.data.latitude").value(10.51234))
+                .andExpect(jsonPath("$.data.locationText").value("12 Nguyễn Trãi"));
+
+        String markers = mvc.perform(get("/api/v1/rescue-cases/map/markers?minLat=10&minLng=106&maxLat=11&maxLng=107&type=LOST&type=FOUND"))
+                .andReturn().getResponse().getContentAsString();
+        String lostRow = "$.data[?(@.caseId=='" + lostId + "')]";
+        assertBlurred(JsonPath.<List<Double>>read(markers, lostRow + ".latitude").get(0), JsonPath.<List<Double>>read(markers, lostRow + ".longitude").get(0));
+        assertThat(JsonPath.<List<String>>read(markers, lostRow + ".caseType")).containsExactly("LOST");
+        assertThat(JsonPath.<List<Double>>read(markers, "$.data[?(@.caseId=='" + onStreet + "')].latitude")).containsExactly(10.51234);
+
+        String list = mvc.perform(get("/api/v1/rescue-cases?type=LOST&pageSize=100&lat=10.5&lng=106.7&distance=5000"))
+                .andReturn().getResponse().getContentAsString();
+        String listRow = "$.data.content[?(@.caseId=='" + lostId + "')]";
+        assertBlurred(JsonPath.<List<Double>>read(list, listRow + ".latitude").get(0), JsonPath.<List<Double>>read(list, listRow + ".longitude").get(0));
+        assertThat(JsonPath.<List<String>>read(list, "$.data.content[*].caseType")).containsOnly("LOST");
+    }
+
+    @Test
+    void onlyRescueCasesAreClaimedOrCompletedAndFoundNeedsWhereTheAnimalIs() throws Exception {
+        UUID owner = person();
+        UUID lostId = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), owner,
+                "{\"caseType\":\"LOST\",\"species\":\"Dog\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+        UUID helper = person();
+
+        call(post("/api/v1/rescue-cases/" + lostId + "/claim"), helper, "{\"safetyAcknowledged\":true}").andExpect(status().isConflict());
+        call(post("/api/v1/rescue-cases/" + lostId + "/complete"), helper,
+                "{\"verificationImageIds\":[\"" + permanentMedia(helper) + "\"],\"confirmRescued\":true,\"outcome\":\"TEMP_HOLDING\"}")
+                .andExpect(status().isConflict());
+        call(post("/api/v1/rescue-cases"), helper, "{\"caseType\":\"FOUND\",\"species\":\"Dog\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isBadRequest());
+        // reporting a rescue case without a type still works as before
+        call(post("/api/v1/rescue-cases"), helper, "{\"species\":\"Dog\",\"priority\":\"HIGH\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.caseType").value("RESCUE"));
+    }
+
+    @Test
+    void aFinderTurnsAnInjuredFoundAnimalIntoARescueCase() throws Exception {
+        UUID finder = person();
+        UUID foundId = UUID.fromString(JsonPath.read(call(post("/api/v1/rescue-cases"), finder,
+                "{\"caseType\":\"FOUND\",\"holdingStatus\":\"AT_HOME\",\"species\":\"Cat\",\"latitude\":10.5,\"longitude\":106.7}")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "$.data.caseId"));
+
+        call(post("/api/v1/rescue-cases/" + foundId + "/convert-to-rescue"), person(), "{\"priority\":\"HIGH\"}").andExpect(status().isForbidden());
+        call(post("/api/v1/rescue-cases/" + foundId + "/convert-to-rescue"), finder, "{\"priority\":\"HIGH\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.caseType").value("RESCUE"))
+                .andExpect(jsonPath("$.data.priority").value("HIGH"));
+        // now it can be claimed like any rescue case
+        call(post("/api/v1/rescue-cases/" + foundId + "/claim"), person(), "{\"safetyAcknowledged\":true}").andExpect(status().isOk());
+    }
+
+    // ── Evaluation numbers (phase 5) ────────────────
+
+    @Test
+    void matchingNumbersCountApprovalAndWarningsPerLevel() throws Exception {
+        UUID admin = admin();
+        String before = adminGet("/api/v1/admin/matching/metrics", admin);
+
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID warned = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "APPROVED");
+        UUID plain = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "REJECTED");
+        UUID waiting = application(pet("ORGANIZATION", shelter, shelter), person(), shelter, "PENDING");
+        jdbc.update("UPDATE adoption_applications SET match_level = 'NOT_SUITABLE', match_score = 40, match_warnings = 'BUILDING_FORBIDS_PETS', warnings_acknowledged = TRUE WHERE application_id = ?", warned);
+        jdbc.update("UPDATE adoption_applications SET match_level = 'NOT_SUITABLE', match_score = 70 WHERE application_id IN (?, ?)", plain, waiting);
+
+        String after = adminGet("/api/v1/admin/matching/metrics", admin);
+        String level = "$.data.byLevel[?(@.level=='NOT_SUITABLE')]";
+        assertThat(metric(after, level + ".submitted") - metric(before, level + ".submitted")).isEqualTo(3);
+        assertThat(metric(after, level + ".decided") - metric(before, level + ".decided")).isEqualTo(2);
+        assertThat(metric(after, level + ".approved") - metric(before, level + ".approved")).isEqualTo(1);
+        assertThat(num(after, "$.data.warnings.withWarnings") - num(before, "$.data.warnings.withWarnings")).isEqualTo(1);
+        assertThat(num(after, "$.data.warnings.approvedWithWarnings") - num(before, "$.data.warnings.approvedWithWarnings")).isEqualTo(1);
+        assertThat(JsonPath.<Object>read(after, "$.data.traitCoverage.availablePets")).isNotNull();
+
+        call(get("/api/v1/admin/matching/metrics"), person()).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rescueNumbersCompareTheAiWithThePriorityAndCountReunions() throws Exception {
+        UUID admin = admin();
+        String before = adminGet("/api/v1/admin/rescue-cases/metrics", admin);
+
+        UUID reporter = person();
+        UUID critical = caseAt(reporter, "Dog", "CRITICAL", "IN_PROGRESS");
+        jdbc.update("""
+                INSERT INTO rescue_case_triage (case_id, status, attempts, ai_urgency, analyzed_at)
+                VALUES (?, 'ANALYZED', 1, 'HIGH', NOW())
+                """, critical);
+        jdbc.update("""
+                INSERT INTO rescue_case_claims (claim_id, case_id, user_id, status, claimed_at)
+                SELECT ?, case_id, ?, 'ACTIVE', reported_at + INTERVAL '30 minutes' FROM rescue_cases WHERE case_id = ?
+                """, UUID.randomUUID(), person(), critical);
+
+        UUID lost = caseAt(person(), "Dog", "NORMAL", "CLOSED");
+        UUID found = caseAt(person(), "Dog", "NORMAL", "CLOSED");
+        jdbc.update("UPDATE rescue_cases SET case_type = 'LOST', resolution = 'REUNITED', resolved_at = reported_at + INTERVAL '6 hours' WHERE case_id = ?", lost);
+        jdbc.update("UPDATE rescue_cases SET case_type = 'FOUND', holding_status = 'AT_HOME' WHERE case_id = ?", found);
+        jdbc.update("INSERT INTO case_match_suggestions (suggestion_id, lost_case_id, other_case_id, distance_m, score, reasons, status) VALUES (?, ?, ?, 300, 80, 'x', 'CONFIRMED')",
+                UUID.randomUUID(), lost, found);
+
+        String after = adminGet("/api/v1/admin/rescue-cases/metrics", admin);
+        assertThat(num(after, "$.data.triage.analyzed") - num(before, "$.data.triage.analyzed")).isEqualTo(1);
+        assertThat(num(after, "$.data.triage.aiLower") - num(before, "$.data.triage.aiLower")).isEqualTo(1);
+        assertThat(num(after, "$.data.triage.criticalMissed") - num(before, "$.data.triage.criticalMissed")).isEqualTo(1);
+        String bucket = "$.data.timeToFirstClaim[?(@.priority=='CRITICAL' && @.triaged==true)]";
+        assertThat(metric(after, bucket + ".claimed") - metric(before, bucket + ".claimed")).isEqualTo(1);
+        assertThat(num(after, "$.data.lostAndFound.confirmed") - num(before, "$.data.lostAndFound.confirmed")).isEqualTo(1);
+        assertThat(num(after, "$.data.lostAndFound.reunitedLostCases") - num(before, "$.data.lostAndFound.reunitedLostCases")).isEqualTo(1);
+        assertThat(JsonPath.<Object>read(after, "$.data.lostAndFound.medianHoursToReunion")).isNotNull();
+
+        call(get("/api/v1/admin/rescue-cases/metrics"), person()).andExpect(status().isForbidden());
+    }
+
     // ── Helpers ─────────────────────────────────────
+
+    private static long num(String json, String path) {
+        return JsonPath.<Number>read(json, path).longValue();
+    }
+
+    private String adminGet(String url, UUID admin) throws Exception {
+        return mvc.perform(get(url).with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    private static String daysAgo(int days) {
+        return java.time.Instant.now().minus(java.time.Duration.ofDays(days)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
+    }
+
+    private String petSpecies(UUID petId) {
+        return jdbc.queryForObject("SELECT ps.name FROM pets p JOIN pet_species ps ON ps.species_id = p.species_id WHERE p.pet_id = ?",
+                String.class, petId);
+    }
+
+    /** Moved, but by no more than about 300 m, from (10.51234, 106.71234). */
+    private static void assertBlurred(Number latitude, Number longitude) {
+        assertThat(latitude.doubleValue()).isNotEqualTo(10.51234).isCloseTo(10.51234, org.assertj.core.data.Offset.offset(0.003));
+        assertThat(longitude.doubleValue()).isNotEqualTo(106.71234).isCloseTo(106.71234, org.assertj.core.data.Offset.offset(0.003));
+    }
+
+    /** A case at (10.5, 106.7); its code is the first 12 characters of its id. */
+    private UUID caseAt(UUID reporter, String species, String priority, String caseStatus) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, species, priority, status, reported_by, reported_at, created_at,
+                                          location, location_text, ward_name, province_name)
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), ST_SetSRID(ST_MakePoint(106.7, 10.5), 4326), 'Cầu Thị Nghè', 'Phường 1', 'Hồ Chí Minh')
+                """, id, id.toString().substring(0, 12), species, priority, caseStatus, reporter);
+        return id;
+    }
 
     private List<String> notificationTypes(UUID userId) {
         return jdbc.queryForList("SELECT type FROM notifications WHERE user_id = ? ORDER BY created_at, type", String.class, userId);
@@ -1225,6 +2394,16 @@ class QueryBehaviorIntegrationTest {
                 VALUES (?, ?, 'SHELTER', '79', ?, ?, ?)
                 """, id, "Org " + id, organizationStatus, id.toString().substring(0, 12), Timestamp.valueOf(createdAt));
         return id;
+    }
+
+    /**
+     * A species only this test uses, so filters see only its own rows. It goes into the catalog
+     * first: a case's species must be a catalog name (V35).
+     */
+    private String newSpecies() {
+        String name = "Sp" + UUID.randomUUID().toString().substring(0, 8);
+        jdbc.update("INSERT INTO pet_species (species_id, name, name_vi) VALUES (?, ?, ?)", UUID.randomUUID(), name, name);
+        return name;
     }
 
     private void insertCase(UUID reporter, String caseStatus, LocalDateTime createdAt) {

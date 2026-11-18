@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.rescue;
 
+import com.uit.petrescueapi.domain.valueobject.RescueCaseStatus;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.*;
@@ -15,6 +17,7 @@ public class UpdateRescueCaseStatusRequestDto {
 
     @NotBlank
     @Pattern(regexp = "^(REPORTED|IN_PROGRESS|RESCUED|CLOSED)$")
+    @CanonicalEnum(RescueCaseStatus.class)
     private String status;  // REPORTED | IN_PROGRESS | RESCUED | CLOSED
 
     @jakarta.validation.constraints.Size(max = 1000)

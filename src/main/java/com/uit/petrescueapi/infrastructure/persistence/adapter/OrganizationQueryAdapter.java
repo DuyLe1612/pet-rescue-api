@@ -55,7 +55,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     }
 
     @Override
-    public List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types) {
+    public List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types, String province) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
                 ? MAP_DEFAULT_STATUSES
                 : statuses;
@@ -63,7 +63,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         List<String> normalizedTypes = (types == null || types.isEmpty())
             ? List.of("SHELTER", "VET_CENTER")
             : types;
-        return queryRepo.findMapMarkers(statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
+        return queryRepo.findMapMarkers(statusNames, normalizedTypes, blankToNull(province)).stream().map(this::toMarkerDto).toList();
     }
 
         @Override
@@ -77,7 +77,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         }
 
         @Override
-        public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types) {
+        public List<OrganizationMapMarkerDto> findMarkersInBounds(double minLat, double minLng, double maxLat, double maxLng, List<OrganizationStatus> statuses, List<String> types, String province) {
         List<OrganizationStatus> normalizedStatuses = (statuses == null || statuses.isEmpty())
             ? MAP_DEFAULT_STATUSES
             : statuses;
@@ -85,7 +85,7 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
         List<String> normalizedTypes = (types == null || types.isEmpty())
             ? List.of("SHELTER", "VET_CENTER")
             : types;
-        return queryRepo.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statusNames, normalizedTypes).stream().map(this::toMarkerDto).toList();
+        return queryRepo.findMarkersInBounds(minLat, minLng, maxLat, maxLng, statusNames, normalizedTypes, blankToNull(province)).stream().map(this::toMarkerDto).toList();
         }
 
         @Override
@@ -166,9 +166,17 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
                 .status(p.getStatus())
                 .latitude(p.getLatitude())
                 .longitude(p.getLongitude())
+                .organizationCode(p.getOrganizationCode())
+                .phone(p.getPhone())
+                .imageUrl(p.getImageUrl())
+                .streetAddress(p.getStreetAddress())
                 .wardName(p.getWardName())
                 .provinceName(p.getProvinceName())
                 .build();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private OrganizationRole toOrganizationRole(String role) {

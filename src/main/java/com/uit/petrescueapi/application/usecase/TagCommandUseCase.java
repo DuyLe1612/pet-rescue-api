@@ -2,6 +2,8 @@ package com.uit.petrescueapi.application.usecase;
 
 import com.uit.petrescueapi.application.dto.tag.CreateTagRequestDto;
 import com.uit.petrescueapi.application.port.command.TagCommandPort;
+import com.uit.petrescueapi.application.support.CanonicalText;
+import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.entity.Tag;
 import com.uit.petrescueapi.domain.service.TagDomainService;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +27,13 @@ public class TagCommandUseCase implements TagCommandPort {
     @Override
     public Tag create(CreateTagRequestDto cmd) {
         log.debug("Command: create tag with code '{}'", cmd.getCode());
+        // "Tìm chủ", "TIM_CHU" and "tim-chu" are one tag; the code is always the slug.
+        String code = CanonicalText.slug(cmd.getCode());
+        if (code == null) {
+            throw new BusinessException("Tag code must contain letters or digits", "TAG_CODE_INVALID");
+        }
         Tag tag = Tag.builder()
-                .code(cmd.getCode())
+                .code(code)
                 .name(cmd.getName())
                 .description(cmd.getDescription())
                 .build();

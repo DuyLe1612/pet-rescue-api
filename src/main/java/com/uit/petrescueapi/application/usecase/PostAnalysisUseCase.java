@@ -12,6 +12,7 @@ import com.uit.petrescueapi.application.port.out.PostAnalysisPort.Catalog;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort;
 import com.uit.petrescueapi.application.port.out.PostAnalysisStorePort.AnalysisTarget;
 import com.uit.petrescueapi.application.service.PostAnalysisValidator;
+import com.uit.petrescueapi.application.support.CanonicalText;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.valueobject.PostAnalysisStatus;
@@ -103,11 +104,12 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
 
         String species = null;
         if (request.species() != null && !request.species().isBlank()) {
-            species = values.speciesNames().stream().filter(n -> n.equalsIgnoreCase(request.species().trim())).findFirst()
+            String wanted = CanonicalText.key(request.species());
+            species = values.speciesNames().stream().filter(n -> wanted.equals(CanonicalText.key(n))).findFirst()
                     .orElseThrow(() -> new BusinessException("Unknown species: " + request.species(), "POST_ANALYSIS_SPECIES"));
         }
         List<String> tags = new ArrayList<>(new LinkedHashSet<>(Optional.ofNullable(request.tags()).orElse(List.of()).stream()
-                .filter(Objects::nonNull).map(t -> t.trim().toLowerCase(Locale.ROOT)).toList()));
+                .map(CanonicalText::slug).filter(Objects::nonNull).toList()));
         List<String> unknown = tags.stream().filter(t -> !values.tagCodes().contains(t)).toList();
         if (!unknown.isEmpty()) {
             throw new BusinessException("Unknown tags: " + unknown, "POST_ANALYSIS_TAGS");

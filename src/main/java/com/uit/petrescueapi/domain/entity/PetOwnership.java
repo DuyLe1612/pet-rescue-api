@@ -30,4 +30,7 @@ public class PetOwnership {
     public boolean isCurrent() {
         return toTime == null;
     }
+
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
+    private UUID adoptionApplicationId;
 }

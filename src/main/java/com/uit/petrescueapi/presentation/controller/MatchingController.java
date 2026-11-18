@@ -38,6 +38,14 @@ public class MatchingController {
         return ResponseEntity.ok(ApiResponse.ok(queryPort.getAdopterProfile(userId(authentication))));
     }
 
+    @GetMapping("/users/me/adopter-profile/suggestion")
+    @Operation(summary = "Dog and cat at home, from the pets I keep here",
+            description = "A suggestion for the form, not a saved value: the profile still holds whatever the user confirms.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.application.dto.matching.AdopterProfileSuggestionDto>> suggestProfile(
+            Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.suggestAdopterProfile(userId(authentication))));
+    }
+
     @PutMapping("/users/me/adopter-profile")
     @Operation(summary = "Create or replace my adopter profile",
             description = "consent must be true: organizations you apply to can read this profile.")

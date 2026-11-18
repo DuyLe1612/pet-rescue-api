@@ -40,6 +40,18 @@ public class RescueMapMarkerDto {
     @Schema(description = "Animal species", example = "Dog")
     private String species;
     
+    @Schema(description = "The people on the case asked for more help")
+    private boolean needsHelp;
+
+    @Schema(example = "RESCUE", allowableValues = {"RESCUE", "LOST", "FOUND"})
+    private String caseType;
+
+    @Schema(description = "FOUND only")
+    private String holdingStatus;
+
+    @Schema(description = "Set when the point is moved by up to this many metres; draw a circle instead of a pin")
+    private Integer locationBlurMeters;
+
     @Schema(description = "When the case was reported")
     private LocalDateTime reportedAt;
 }

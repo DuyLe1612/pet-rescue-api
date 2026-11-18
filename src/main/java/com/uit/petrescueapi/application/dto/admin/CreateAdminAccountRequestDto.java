@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.admin;
 
+import com.uit.petrescueapi.domain.valueobject.PersonGender;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,6 +37,7 @@ public class CreateAdminAccountRequestDto {
     private String avatarUrl;
     @com.uit.petrescueapi.validation.Phone
     private String phone;
+    @CanonicalEnum(PersonGender.class)
     private String gender;
     private String streetAddress;
     private String wardCode;

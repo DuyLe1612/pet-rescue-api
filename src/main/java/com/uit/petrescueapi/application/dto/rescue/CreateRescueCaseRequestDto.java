@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.dto.rescue;
 
+import com.uit.petrescueapi.domain.valueobject.PetSize;
+import com.uit.petrescueapi.application.support.CanonicalEnum;
 import com.uit.petrescueapi.domain.valueobject.RescuePriority;
 import lombok.*;
 import com.uit.petrescueapi.validation.Phone;
@@ -16,8 +18,18 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreateRescueCaseRequestDto {
+    @io.swagger.v3.oas.annotations.media.Schema(description = "RESCUE (default), LOST or FOUND. Cannot be changed by an update.")
+    private com.uit.petrescueapi.domain.valueobject.RescueCaseType caseType;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "Required for FOUND: ON_STREET, AT_HOME or AT_ORGANIZATION")
+    private com.uit.petrescueapi.domain.valueobject.HoldingStatus holdingStatus;
+    @io.swagger.v3.oas.annotations.media.Schema(description = "LOST: when the pet was last seen; not in the future")
+    private java.time.LocalDateTime lastSeenAt;
+    @jakarta.validation.constraints.Size(max = 500)
+    @io.swagger.v3.oas.annotations.media.Schema(example = "vòng cổ đỏ, cụt đuôi")
+    private String distinctiveMarks;
     private String species;
     private String color;
+    @CanonicalEnum(PetSize.class)
     private String size;
     private RescuePriority priority;
     private String description;

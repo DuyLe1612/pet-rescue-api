@@ -23,6 +23,8 @@ import java.util.UUID;
 public class PetResponseDto {
 
     private UUID petId;
+    private com.uit.petrescueapi.domain.valueobject.PetVisibility visibility;
+    private com.uit.petrescueapi.domain.valueobject.AcquisitionType acquisitionType;
     private String name;
     private UUID speciesId;
     private String species;

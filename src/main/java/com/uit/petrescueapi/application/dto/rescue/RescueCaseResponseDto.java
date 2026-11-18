@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Response DTO for rescue case.
- * Excludes petName, reportedBy, organizationName, size, resolvedAt and createdAt.
+ * Excludes reportedBy, size, resolvedAt and createdAt.
  */
 @Data
 @Builder
@@ -20,6 +20,22 @@ import java.util.UUID;
 public class RescueCaseResponseDto {
     private UUID caseId;
     private String caseCode;
+    @Schema(example = "RESCUE", allowableValues = {"RESCUE", "LOST", "FOUND"})
+    private String caseType;
+    @Schema(description = "FOUND only", allowableValues = {"ON_STREET", "AT_HOME", "AT_ORGANIZATION"})
+    private String holdingStatus;
+    private LocalDateTime lastSeenAt;
+    private String distinctiveMarks;
+    @Schema(description = "How the case ended, e.g. REUNITED")
+    private String resolution;
+    @Schema(description = "The lost or found case this one was matched with")
+    private UUID matchedCaseId;
+    @Schema(description = "Set when latitude and longitude are moved by up to this many metres to protect someone's home")
+    private Integer locationBlurMeters;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Double blurredLatitude;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Double blurredLongitude;
     private String reporterUsername;
     private String species;
     private String color;
@@ -38,11 +54,16 @@ public class RescueCaseResponseDto {
     @Schema(description = "Only for the reporter, people with an active claim, the handling organization and admins")
     private String contactPhone;
     private UUID organizationId;
+    private String organizationName;
     private UUID petId;
+    private String petName;
     private boolean needsHelp;
     private int activeClaimCount;
     private boolean viewerIsReporter;
     private boolean viewerHasActiveClaim;
+    @Schema(description = "People who flagged the case as false, handled or a duplicate")
+    private int flagCount;
+    private boolean viewerHasFlagged;
     private UUID completionId;
     private String completionStatus;
 

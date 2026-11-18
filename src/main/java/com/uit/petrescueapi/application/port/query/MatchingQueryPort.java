@@ -17,6 +17,9 @@ public interface MatchingQueryPort {
 
     AdopterProfileDto getAdopterProfile(UUID userId);
 
+    /** Dog and cat at home, read from the pets the user owns (alive and not lost). */
+    com.uit.petrescueapi.application.dto.matching.AdopterProfileSuggestionDto suggestAdopterProfile(UUID userId);
+
     /** An empty record when nobody described the pet yet. */
     PetTraitsDto getPetTraits(UUID petId);
 
