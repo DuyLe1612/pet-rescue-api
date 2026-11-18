@@ -2,7 +2,7 @@
 
 - **Nhánh đối chiếu:** `fix/query-performance` tại `90a05ba`. Nhánh này đã gộp `fix/phase-0-authorization`, `feature/phase-1-rescue-claims` và `fix/fe-api-audit`.
 - **Plan đối chiếu:** `agent/02-plan.md` (cập nhật 03/11/2026).
-- **Frontend đối chiếu:** `docs/fe-api-audit-2026-11-03.md`.
+- **Frontend đối chiếu:** `docs/fe-be-status.md`.
 - **Cách làm:** đi theo từng bước của hai vai trên API thật của backend (157 endpoint, 24 controller), ghi lại bước nào chạy được, bước nào hụt. Không gọi lên server, chỉ đọc code và DTO.
 
 ## Kết luận ngắn

@@ -1,7 +1,7 @@
 # PawHome (Pet Rescue) — Mô tả dự án, SRS rút gọn và đề xuất tính năng
 
 - **Ngày:** 16/11/2026
-- **Căn cứ:** `README.md`, `agent/01-scope-da2.md`, `agent/02-plan.md`, `docs/ux-walkthrough-2026-11-11.md`, `docs/fe-api-audit-2026-11-03.md`, danh sách controller và migration V1–V27.
+- **Căn cứ:** `README.md`, `agent/01-scope-da2.md`, `agent/02-plan.md`, `docs/ux-walkthrough-2026-11-11.md`, `docs/fe-be-status.md`, danh sách controller và migration V1–V27.
 - **Trạng thái tài liệu:** bản nháp để tinh chỉnh. Mục 5 là đề xuất, chưa phải quyết định.
 - **Đính chính 16/11:** bản đầu dựa trên plan ngày 03/11 và nhánh `fix/query-performance`. Đối chiếu lại với `master` (`fdb7b22`) thì thông báo đơn nhận nuôi, lọc thú theo tỉnh, banner công khai và ghép đôi (V28) **đã có**; trạng thái bên dưới đã sửa theo `master`. `agent/02-plan.md` chưa phản ánh điều này.
 
