@@ -33,6 +33,9 @@ public class CreateAdminAccountRequestDto {
     @Schema(example = "USER", description = "System role code. Defaults to USER when empty.")
     private String systemRole;
 
+    /** The name other people see on the platform. Required; the username stays private. */
+    @NotBlank(message = "Full name is required")
+    @Size(max = 255)
     private String fullName;
     private String avatarUrl;
     @com.uit.petrescueapi.validation.Phone

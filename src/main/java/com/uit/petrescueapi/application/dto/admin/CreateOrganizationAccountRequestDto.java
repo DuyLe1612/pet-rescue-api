@@ -35,6 +35,12 @@ public class CreateOrganizationAccountRequestDto {
     @Schema(example = "P@ssw0rd123")
     private String password;
 
+    /** The name other people see on the platform. Required; the username stays private. */
+    @NotBlank(message = "Full name is required")
+    @Size(max = 255)
+    @Schema(example = "Nguyễn Thị Lan")
+    private String fullName;
+
     @NotBlank
     @Schema(example = "OWNER", allowableValues = {"OWNER", "STAFF", "VET", "MEMBER"})
     private String organizationRole;

@@ -11,6 +11,7 @@ import java.util.UUID;
 /**
  * Author snapshot embedded in posts and comments (migrate.md §6). Kept in sync by the
  * user-profile listener. Field is {@code userId}, not {@code id}, to avoid Spring Data's {@code _id} mapping.
+ * The username is deliberately not copied: people sign in with it, so it never leaves the users table.
  */
 @Data
 @Builder
@@ -18,7 +19,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class AuthorDocument {
     private UUID userId;
-    private String username;
     private String fullName;
     private String avatarUrl;
 
@@ -27,7 +27,6 @@ public class AuthorDocument {
                 ? AuthorDocument.builder().userId(userId).build()
                 : AuthorDocument.builder()
                         .userId(userId)
-                        .username(snapshot.username())
                         .fullName(snapshot.fullName())
                         .avatarUrl(snapshot.avatarUrl())
                         .build();

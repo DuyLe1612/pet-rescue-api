@@ -37,7 +37,8 @@ class UserSnapshotJdbcAdapterTest {
 
         assertThat(users).containsOnlyKeys(A, B);
         assertThat(users.get(A)).isEqualTo(new UserSnapshot(A, "alice", "Alice Nguyen", "a.png"));
-        assertThat(users.get(B).displayName()).isEqualTo("bob");
+        // No full name: a neutral label, never the username people sign in with.
+        assertThat(users.get(B).displayName()).isEqualTo("Thành viên PawHome");
     }
 
     @Test

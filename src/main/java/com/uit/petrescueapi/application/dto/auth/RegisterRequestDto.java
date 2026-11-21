@@ -36,6 +36,9 @@ public class RegisterRequestDto {
     @Schema(example = "P@ssw0rd123", description = "Password (min 8 chars, must contain uppercase, lowercase, digit)")
     private String password;
 
+    /** The name other people see on the platform. Required; the username stays private. */
+    @NotBlank(message = "Full name is required")
+    @Size(max = 255)
     @Schema(example = "John Doe")
     private String fullName;
 

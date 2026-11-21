@@ -7,6 +7,7 @@ import com.uit.petrescueapi.application.dto.post.PostFeedFilter;
 import com.uit.petrescueapi.domain.valueobject.PostCategory;
 import com.uit.petrescueapi.application.dto.post.PostRescueCaseDto;
 import com.uit.petrescueapi.application.dto.post.PostResponseDto;
+import com.uit.petrescueapi.application.support.DisplayName;
 import com.uit.petrescueapi.application.dto.post.PostSummaryResponseDto;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.PostQueryDataPort;
@@ -50,7 +51,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
             "postId", "_id",
             "likeCount", "stats.likes",
             "commentCount", "stats.comments",
-            "authorUsername", "author.username");
+            "authorName", "author.fullName");
 
     private static final List<String> OPEN_CASE_STATUSES = List.of("REPORTED", "IN_PROGRESS");
 
@@ -67,7 +68,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         return PostResponseDto.builder()
                 .postId(d.getId())
                 .authorId(author == null ? null : author.getUserId())
-                .authorUsername(author == null ? null : author.getUsername())
+                .authorName(DisplayName.of(author == null ? null : author.getFullName()))
                 .authorAvatarUrl(author == null ? null : author.getAvatarUrl())
                 .likeCount(d.getStats() == null ? 0 : d.getStats().getLikes())
                 .commentCount(d.getStats() == null ? 0 : d.getStats().getComments())
@@ -90,7 +91,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         if (search != null && !search.isBlank()) {
             // substring + case-insensitive, like the old LOWER(..) LIKE '%..%'; input is matched literally
             Pattern pattern = Pattern.compile(Pattern.quote(search.trim()), Pattern.CASE_INSENSITIVE);
-            and.add(new Criteria().orOperator(where("content").regex(pattern), where("author.username").regex(pattern)));
+            and.add(new Criteria().orOperator(where("content").regex(pattern), where("author.fullName").regex(pattern)));
         }
         Criteria criteria = new Criteria().andOperator(and);
         long total = mongo.count(query(criteria), PostDocument.class);
@@ -226,7 +227,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
         return PostSummaryResponseDto.builder()
                 .postId(d.getId())
                 .authorId(author == null ? null : author.getUserId())
-                .authorUsername(author == null ? null : author.getUsername())
+                .authorName(DisplayName.of(author == null ? null : author.getFullName()))
                 .authorAvatarUrl(author == null ? null : author.getAvatarUrl())
                 .content(d.getContent())
                 .tags(d.getTags())
@@ -240,7 +241,7 @@ public class MongoPostQueryAdapter implements PostQueryDataPort {
                         .map(c -> CommentPreviewDto.builder()
                                 .commentId(c.getCommentId())
                                 .authorId(c.getAuthor() == null ? null : c.getAuthor().getUserId())
-                                .authorUsername(c.getAuthor() == null ? null : c.getAuthor().getUsername())
+                                .authorName(DisplayName.of(c.getAuthor() == null ? null : c.getAuthor().getFullName()))
                                 .authorAvatarUrl(c.getAuthor() == null ? null : c.getAuthor().getAvatarUrl())
                                 .content(c.getContent())
                                 .createdAt(c.getCreatedAt())

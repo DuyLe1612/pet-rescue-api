@@ -64,13 +64,15 @@ class MongoSnapshotSyncTest extends MongoIntegrationTest {
         listener.onUserProfileChanged(new UserProfileChangedEvent(ALICE));
 
         Document alicePost = mongo.getCollection(MongoCollections.POSTS).find(new Document("author.userId", ALICE)).first();
-        assertThat(alicePost.get("author", Document.class)).containsEntry("username", "alice2").containsEntry("avatarUrl", "new.png");
+        // The username is never written: people sign in with it.
+        assertThat(alicePost.get("author", Document.class)).containsEntry("fullName", "Alice Tran").containsEntry("avatarUrl", "new.png")
+                .doesNotContainEntry("username", "alice2");
         List<Document> previews = alicePost.getList("previewComments", Document.class);
         assertThat(previews.get(0).get("author", Document.class)).containsEntry("username", "bob");
-        assertThat(previews.get(1).get("author", Document.class)).containsEntry("username", "alice2").containsEntry("fullName", "Alice Tran");
+        assertThat(previews.get(1).get("author", Document.class)).containsEntry("fullName", "Alice Tran").containsEntry("avatarUrl", "new.png");
 
         assertThat(mongo.getCollection(MongoCollections.COMMENTS).find().first().get("author", Document.class))
-                .containsEntry("username", "alice2");
+                .containsEntry("fullName", "Alice Tran");
         assertThat(mongo.getCollection(MongoCollections.INBOXES).find(new Document("_id", "b:c")).first().get("peer", Document.class))
                 .containsEntry("name", "Alice Tran").containsEntry("avatarUrl", "new.png");
         assertThat(mongo.getCollection(MongoCollections.INBOXES).find(new Document("_id", "a:c")).first().get("peer", Document.class))

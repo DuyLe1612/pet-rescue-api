@@ -21,7 +21,8 @@ public class RescueClaimResponseDto {
     private UUID caseId;
     private String caseCode;
     private UUID userId;
-    private String username;
+    /** The helper's display name (full name). Never the username. */
+    private String name;
     private UUID organizationId;
     private RescueClaimStatus status;
     private RescueClaimReleaseReason releaseReason;

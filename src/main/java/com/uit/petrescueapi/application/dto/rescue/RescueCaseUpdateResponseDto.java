@@ -18,7 +18,8 @@ public class RescueCaseUpdateResponseDto {
     private UUID updateId;
     private UUID caseId;
     private UUID authorId;
-    private String authorUsername;
+    /** Full name, or "Thành viên PawHome" when the author gave none. Never the username. */
+    private String authorName;
     private String authorAvatarUrl;
     private String note;
     private List<String> imageUrls;

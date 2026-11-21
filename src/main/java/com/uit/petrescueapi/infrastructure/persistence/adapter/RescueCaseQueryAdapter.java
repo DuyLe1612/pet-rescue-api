@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.rescue.RescueQueueItemDto;
 import com.uit.petrescueapi.application.dto.rescue.*;
+import com.uit.petrescueapi.application.support.DisplayName;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.RescueCaseQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -235,7 +236,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
                         ? RescuePriority.valueOf(p.getPriority())
                         : null)
                 .status(p.getStatus())
-                .reporterUsername(p.getReporterUsername())
+                .reporterName(DisplayName.of(p.getReporterFullName()))
                 .reportedAt(p.getReportedAt())
                 .locationText(p.getLocationText())
                 .distanceMeters(p.getDistance())
@@ -258,7 +259,7 @@ public class RescueCaseQueryAdapter implements RescueCaseQueryDataPort {
         return RescueCaseResponseDto.builder()
                 .caseId(p.getCaseId())
                 .caseCode(p.getCaseCode())
-                .reporterUsername(p.getReporterUsername())
+                .reporterName(DisplayName.of(p.getReporterFullName()))
                 .species(p.getSpecies())
                 .color(p.getColor())
                 .priority(p.getPriority() != null

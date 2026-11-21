@@ -41,7 +41,7 @@ public class UserDomainService {
      * Create a user with specified role (for admin/dev operations).
      * Password must be pre-hashed by the caller.
      */
-    public User createUser(String username, String email, String hashedPassword, String roleCode) {
+    public User createUser(String username, String email, String hashedPassword, String fullName, String roleCode) {
         if (userRepository.existsByEmail(email)) {
             throw new ResourceAlreadyExistsException("User", "email", email);
         }
@@ -58,6 +58,7 @@ public class UserDomainService {
                 .username(username)
                 .email(email)
                 .passwordHash(hashedPassword)
+                .fullName(fullName.trim())
                 .status(UserStatus.ACTIVE)
                 .emailVerified(true)  // Auto-verified for admin-created accounts
                 .roles(Set.of(role))

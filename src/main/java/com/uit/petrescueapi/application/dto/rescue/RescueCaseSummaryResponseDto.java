@@ -27,7 +27,8 @@ public class RescueCaseSummaryResponseDto {
     private RescuePriority priority;
     @Schema(example = "IN_PROGRESS", allowableValues = {"REPORTED", "IN_PROGRESS", "RESCUED", "CLOSED"})
     private String status;
-    private String reporterUsername;
+    /** The reporter's display name (full name, or "Thành viên PawHome"). Never the username. */
+    private String reporterName;
     private LocalDateTime reportedAt;
     private String firstImageUrl;
     private String locationText;

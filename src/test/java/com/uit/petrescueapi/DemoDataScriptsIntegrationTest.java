@@ -128,7 +128,7 @@ class DemoDataScriptsIntegrationTest {
     @Order(5)
     void cleanupRemovesTheDemoDataAndKeepsRealData() throws Exception {
         UUID real = UUID.randomUUID();
-        jdbc.update("INSERT INTO users (user_id, username, email, status, email_verified, user_code) VALUES (?, 'real.person', 'real@example.test', 'ACTIVE', TRUE, 'U-0001')", real);
+        jdbc.update("INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name) VALUES (?, 'real.person', 'real@example.test', 'ACTIVE', TRUE, 'U-0001', 'Người thật')", real);
 
         run("cleanup-postgres.sql");
 

@@ -18,6 +18,8 @@ public interface AdoptionDetailProjection {
     String getPetName();
     String getPetPrimaryImageUrl();
     String getApplicantUsername();
+
+    String getApplicantFullName();
     String getStatus();
     String getExperience();
     String getLiveCondition();

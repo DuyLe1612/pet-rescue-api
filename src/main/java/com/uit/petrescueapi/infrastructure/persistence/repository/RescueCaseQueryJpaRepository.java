@@ -69,7 +69,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
            rc.status        AS status,
            rc.reported_at   AS reportedAt,
            CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
-           u.username       AS reporterUsername,
+           u.full_name      AS reporterFullName,
            (
              SELECT mf.public_id
              FROM rescue_media rm
@@ -86,7 +86,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
-              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+              LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
           AND (:allTypes = true OR rc.case_type IN (:types))
@@ -104,7 +104,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
               LOWER(rc.case_code) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(rc.species) LIKE LOWER(CONCAT('%', :search, '%')) OR
               LOWER(rc.location_text) LIKE LOWER(CONCAT('%', :search, '%')) OR
-              LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+              LOWER(u.full_name) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:allStatuses = true OR rc.status IN (:statuses))
           AND (:allPriorities = true OR rc.priority IN (:priorities))
           AND (:allTypes = true OR rc.case_type IN (:types))
@@ -138,7 +138,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.status        AS status,
                rc.reported_at   AS reportedAt,
                rc.location_text AS locationText,
-               u.username       AS reporterUsername,
+               u.full_name      AS reporterFullName,
                rc.reported_by   AS reportedBy,
                rc.organization_id AS organizationId,
                o.name           AS organizationName,
@@ -193,7 +193,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
                CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
-               u.username AS reporterUsername,
+               u.full_name AS reporterFullName,
                (
                  SELECT mf.public_id
                  FROM rescue_media rm
@@ -260,7 +260,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
                CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
-               u.username AS reporterUsername,
+               u.full_name AS reporterFullName,
                (
                  SELECT mf.public_id
                  FROM rescue_media rm
@@ -300,7 +300,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
                rc.status AS status,
                (rc.reported_at AT TIME ZONE 'UTC') AS reportedAt,
                CASE WHEN (rc.case_type = 'LOST' OR (rc.case_type = 'FOUND' AND rc.holding_status = 'AT_HOME')) THEN NULL ELSE rc.location_text END AS locationText,
-               u.username AS reporterUsername,
+               u.full_name AS reporterFullName,
                (
                  SELECT mf.public_id
                  FROM rescue_media rm
@@ -473,10 +473,10 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rcc.rescue_note AS rescueNote,
         rcc.location_note AS locationNote,
         rcc.verified_by AS verifiedBy,
-        u.username AS verifiedByName,
+        u.full_name AS verifiedByName,
         rcc.verified_at AS verifiedAt,
         rcc.submitted_by AS submittedBy,
-        su.username AS submittedByName,
+        su.full_name AS submittedByName,
         rcc.outcome AS outcome,
         rcc.status AS status,
         rcc.reject_reason AS rejectReason
@@ -518,10 +518,10 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         rcc.rescue_note AS rescueNote,
         rcc.location_note AS locationNote,
         rcc.verified_by AS verifiedBy,
-        u.username AS verifiedByName,
+        u.full_name AS verifiedByName,
         rcc.verified_at AS verifiedAt,
         rcc.submitted_by AS submittedBy,
-        su.username AS submittedByName,
+        su.full_name AS submittedByName,
         rcc.outcome AS outcome,
         rcc.status AS status,
         rcc.reject_reason AS rejectReason
@@ -570,7 +570,7 @@ public interface RescueCaseQueryJpaRepository extends JpaRepository<RescueCaseJp
         CAST(NULL AS VARCHAR) AS verifiedByName,
         rcc.verified_at AS verifiedAt,
         rcc.submitted_by AS submittedBy,
-        su.username AS submittedByName,
+        su.full_name AS submittedByName,
         rcc.outcome AS outcome,
         rcc.status AS status,
         rcc.reject_reason AS rejectReason

@@ -118,9 +118,9 @@ if (typeof CLEANUP !== 'undefined' && CLEANUP) {
         // Newest first, a few hours apart, so the feed reads like a busy week.
         const createdAt = new Date(Date.now() - (n * 7 + (n % 3) * 2) * 3600 * 1000);
         const doc = {
+            // No username in the snapshot: people sign in with it, so it stays in the users table.
             author: {
                 userId: did('user', authorN),
-                username: 'demo.user' + authorN,
                 fullName: USER_NAMES[authorN - 1],
             },
             content: post.text,

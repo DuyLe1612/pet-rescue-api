@@ -66,7 +66,6 @@ public class MongoSnapshotSyncListener {
 
     private static Update authorUpdate(String path, UserSnapshot user) {
         return new Update()
-                .set(path + ".username", user.username())
                 .set(path + ".fullName", user.fullName())
                 .set(path + ".avatarUrl", user.avatarUrl());
     }

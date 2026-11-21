@@ -20,7 +20,8 @@ public class FlaggedRescueCaseDto {
     private String species;
     private String locationText;
     private UUID reporterId;
-    private String reporterUsername;
+    /** The reporter's display name (full name, or "Thành viên PawHome"). Never the username. */
+    private String reporterName;
     private LocalDateTime reportedAt;
     private int flagCount;
     private int falseReportCount;

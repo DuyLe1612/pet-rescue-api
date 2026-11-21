@@ -13,7 +13,7 @@ public interface PostWebMapper {
     @Mapping(target = "content", source = "content")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
-    @Mapping(target = "authorUsername", ignore = true)
+    @Mapping(target = "authorName", ignore = true)
     @Mapping(target = "imageUrls", ignore = true)
     @Mapping(target = "tags", ignore = true)
     PostResponseDto toDto(Post post);

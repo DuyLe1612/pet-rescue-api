@@ -17,7 +17,8 @@ public class CommentSummaryDto {
     private UUID postId;
     private UUID parentCommentId;
     private UUID authorId;
-    private String authorUsername;
+    /** Full name, or "Thành viên PawHome" when the author gave none. Never the username. */
+    private String authorName;
     private String content;
     private Integer likeCount;
     private Integer replyCount;
