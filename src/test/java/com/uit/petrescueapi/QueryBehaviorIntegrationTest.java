@@ -109,6 +109,7 @@ class QueryBehaviorIntegrationTest {
     @Autowired EntityManagerFactory emf;
     @Autowired DashboardDataPort dashboard;
     @Autowired ReputationDomainService reputation;
+    @Autowired com.uit.petrescueapi.domain.service.OrganizationDomainService organizations;
     @Autowired com.uit.petrescueapi.domain.repository.RescueCaseTriageRepository triage;
     @MockitoBean CloudStoragePort cloud;
     /** There is no broker in this test, and every message it is given is refused. */
@@ -373,6 +374,69 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(jsonPath("$.data.imageUrls[0]", startsWith("https://cdn.test/"))));
 
         assertThat(statements).isLessThanOrEqualTo(2);
+    }
+
+    @Test
+    void petListFiltersByHealthStatus() throws Exception {
+        UUID shelter = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        UUID healthy = pet("ORGANIZATION", shelter, shelter);
+        UUID treated = pet("ORGANIZATION", shelter, shelter);
+        UUID recovering = pet("ORGANIZATION", shelter, shelter);
+        jdbc.update("UPDATE pets SET health_status = 'HEALTHY' WHERE pet_id = ?", healthy);
+        jdbc.update("UPDATE pets SET health_status = 'UNDER_TREATMENT' WHERE pet_id = ?", treated);
+        jdbc.update("UPDATE pets SET health_status = 'RECOVERING' WHERE pet_id = ?", recovering);
+
+        for (String url : List.of(
+                "/api/v1/pets?organizationId=" + shelter + "&healthStatus=UNDER_TREATMENT,recovering&pageSize=100",
+                "/api/v1/pets?organizationId=" + shelter + "&healthStatus=UNDER_TREATMENT,RECOVERING&search=M&pageSize=100")) {
+            String body = mvc.perform(get(url)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            assertThat(JsonPath.<List<String>>read(body, "$.data.content[*].petId"))
+                    .containsExactlyInAnyOrder(treated.toString(), recovering.toString());
+        }
+        mvc.perform(get("/api/v1/pets?organizationId=" + shelter + "&pageSize=100"))
+                .andExpect(jsonPath("$.data.content", hasSize(3)));
+        mvc.perform(get("/api/v1/pets?healthStatus=SICKISH")).andExpect(status().isBadRequest());
+    }
+
+    // ── Users ───────────────────────────────────────
+
+    @Test
+    void userListShowsTheDisplayName() throws Exception {
+        UUID someone = person();
+        String tag = someone.toString().substring(0, 12);
+        UUID admin = admin();
+
+        for (String url : List.of("/api/v1/users?pageSize=500", "/api/v1/users?search=" + tag)) {
+            String body = mvc.perform(get(url).with(user(admin.toString()).roles("ADMIN")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            assertThat(JsonPath.<List<String>>read(body, "$.data.content[?(@.userId=='" + someone + "')].fullName"))
+                    .containsExactly("Người " + tag);
+        }
+    }
+
+    @Test
+    void systemRoleFollowsOrganizationMembership() {
+        UUID requester = person();
+        UUID station = organizationCreatedAt(LocalDateTime.now(), "PENDING");
+        jdbc.update("UPDATE organizations SET requested_by_user_id = ? WHERE organization_id = ?", requester, station);
+
+        organizations.changeStatus(station, com.uit.petrescueapi.domain.valueobject.OrganizationStatus.ACTIVE);
+        assertThat(systemRoles(requester)).containsExactly("MEMBER");
+
+        organizations.removeMember(station, requester);
+        assertThat(systemRoles(requester)).containsExactly("USER");
+
+        UUID admin = admin();
+        organizations.addMember(station, admin, "STAFF");
+        assertThat(systemRoles(admin)).containsExactlyInAnyOrder("ADMIN", "MEMBER");
+        organizations.removeMember(station, admin);
+        assertThat(systemRoles(admin)).containsExactly("ADMIN");
+    }
+
+    private List<String> systemRoles(UUID userId) {
+        return jdbc.queryForList("""
+                SELECT r.code FROM user_roles ur JOIN roles r ON r.role_id = ur.role_id WHERE ur.user_id = ?
+                """, String.class, userId);
     }
 
     // ── Organizations ───────────────────────────────

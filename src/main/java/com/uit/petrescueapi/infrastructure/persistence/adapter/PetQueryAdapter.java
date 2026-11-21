@@ -62,23 +62,48 @@ public class PetQueryAdapter implements PetQueryDataPort {
             UUID ownerUserId,
             UUID ownerOrganizationId,
             String province,
+            String healthStatus,
             Pageable pageable
     ) {
         province = province == null || province.isBlank() ? null : province.trim();
+        healthStatus = normalizeHealthStatuses(healthStatus);
         List<String> statusNames = statuses != null ? statuses.stream().map(PetStatus::name).toList() : null;
         if (searchName != null && !searchName.isBlank()) {
-                        return petSearchPort.searchPets(searchName, species, breed, gender, statusNames, ownerUserId, ownerOrganizationId, province, pageable);
+                        return petSearchPort.searchPets(searchName, species, breed, gender, statusNames, ownerUserId, ownerOrganizationId, province, healthStatus, pageable);
         }
 
                 if (statusNames == null || statusNames.isEmpty()) {
                         return queryRepo.findAllWithFilters(
-                                        species, breed, gender, null, ownerUserId, ownerOrganizationId, province, pageable
+                                        species, breed, gender, null, ownerUserId, ownerOrganizationId, province, healthStatus, pageable
                         ).map(this::toSummaryDto);
                 }
 
                 return queryRepo.findAllWithFiltersAndStatuses(
-                                species, breed, gender, null, statusNames, ownerUserId, ownerOrganizationId, province, pageable
+                                species, breed, gender, null, statusNames, ownerUserId, ownerOrganizationId, province, healthStatus, pageable
                 ).map(this::toSummaryDto);
+    }
+
+    /**
+     * "UNDER_TREATMENT, recovering" → "UNDER_TREATMENT,RECOVERING"; blank → null (no filter).
+     * Unknown values are refused so a typo does not silently return nothing.
+     */
+    private static String normalizeHealthStatuses(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return java.util.Arrays.stream(raw.split(","))
+                .map(String::trim)
+                .filter(v -> !v.isEmpty())
+                .map(v -> {
+                    try {
+                        return com.uit.petrescueapi.domain.valueobject.HealthStatus.valueOf(v.toUpperCase()).name();
+                    } catch (IllegalArgumentException e) {
+                        throw new com.uit.petrescueapi.domain.exception.BusinessException(
+                                "Invalid health status: " + v, "INVALID_HEALTH_STATUS");
+                    }
+                })
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(","));
     }
 
     @Override

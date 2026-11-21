@@ -30,7 +30,7 @@ public class UserAdminResponseDto {
     @Schema(example = "Paws Rescue Center")
     private String organizationName;
 
-    @Schema(example = "OWNER", allowableValues = {"OWNER", "MANAGER", "MEMBER", "VOLUNTEER"})
+    @Schema(example = "OWNER", allowableValues = {"OWNER", "STAFF", "VET", "MEMBER"})
     private String organizationRole;
 
     @Schema(example = "johndoe")

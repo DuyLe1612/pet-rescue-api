@@ -29,6 +29,7 @@ public interface UserQueryJpaRepository extends JpaRepository<UserJpaEntity, UUI
         SELECT u.userId       AS userId,
                u.userCode     AS userCode,
                u.username     AS username,
+               u.fullName     AS fullName,
                u.email        AS email,
                u.status       AS status
         FROM UserJpaEntity u
@@ -39,6 +40,7 @@ public interface UserQueryJpaRepository extends JpaRepository<UserJpaEntity, UUI
          SELECT u.userId       AS userId,
              u.userCode     AS userCode,
              u.username     AS username,
+             u.fullName     AS fullName,
              u.email        AS email,
              u.status       AS status
          FROM UserJpaEntity u

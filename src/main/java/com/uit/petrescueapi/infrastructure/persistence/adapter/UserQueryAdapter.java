@@ -94,6 +94,7 @@ public class UserQueryAdapter implements UserQueryDataPort {
                 .userId(p.getUserId())
                 .userCode(p.getUserCode())
                 .username(p.getUsername())
+                .fullName(p.getFullName())
                 .email(p.getEmail())
                 .status(p.getStatus())
                 .build();

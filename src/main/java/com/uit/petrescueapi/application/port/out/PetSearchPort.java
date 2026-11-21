@@ -21,6 +21,7 @@ public interface PetSearchPort {
             UUID ownerUserId,
             UUID ownerOrganizationId,
             String province,
+            String healthStatus,
             Pageable pageable
     );
 }
