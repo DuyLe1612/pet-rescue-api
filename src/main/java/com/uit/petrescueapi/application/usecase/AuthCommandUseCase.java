@@ -14,6 +14,7 @@ import com.uit.petrescueapi.domain.exception.AccountLockedException;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.exception.UnauthorizedException;
 import com.uit.petrescueapi.domain.service.AuthDomainService;
+import com.uit.petrescueapi.domain.valueobject.SystemRole;
 import com.uit.petrescueapi.domain.valueobject.UserStatus;
 import com.uit.petrescueapi.domain.entity.Organization;
 import com.uit.petrescueapi.domain.repository.OrganizationRepository;
@@ -164,7 +165,7 @@ public class AuthCommandUseCase implements AuthCommandPort {
         UUID organizationId = null;
         String organizationName = null;
         String organizationRole = null;
-        if (roleCodes.contains("MEMBER")) {
+        if (roleCodes.contains(SystemRole.MEMBER.name())) {
             organizationId = organizationMemberRepository.findOrganizationIdByUserId(user.getId());
             organizationRole = organizationMemberRepository.findOrgRoleByUserId(user.getId());
             if (organizationId != null) {
@@ -243,7 +244,7 @@ public class AuthCommandUseCase implements AuthCommandPort {
         UUID organizationId = null;
         String organizationName = null;
         String organizationRole = null;
-        if (roleCodes.contains("MEMBER")) {
+        if (roleCodes.contains(SystemRole.MEMBER.name())) {
             organizationId = organizationMemberRepository.findOrganizationIdByUserId(user.getId());
             organizationRole = organizationMemberRepository.findOrgRoleByUserId(user.getId());
             if (organizationId != null) {

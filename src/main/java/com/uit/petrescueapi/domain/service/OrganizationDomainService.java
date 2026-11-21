@@ -7,7 +7,9 @@ import com.uit.petrescueapi.domain.exception.ResourceAlreadyExistsException;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
 import com.uit.petrescueapi.domain.repository.OrganizationMemberRepository;
 import com.uit.petrescueapi.domain.repository.OrganizationRepository;
+import com.uit.petrescueapi.domain.repository.UserRepository;
 import com.uit.petrescueapi.domain.repository.VisualCodeRepository;
+import com.uit.petrescueapi.domain.valueobject.SystemRole;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,7 @@ public class OrganizationDomainService {
     private final OrganizationRepository orgRepository;
     private final OrganizationMemberRepository memberRepository;
     private final VisualCodeRepository visualCodeRepository;
+    private final UserRepository userRepository;
 
     // ── Commands ────────────────────────────────────
 
@@ -127,7 +130,9 @@ public class OrganizationDomainService {
                 .status("ACTIVE")
                 .joinedAt(LocalDateTime.now())
                 .build();
-        return memberRepository.save(member);
+        OrganizationMember saved = memberRepository.save(member);
+        syncMembershipRole(userId);
+        return saved;
     }
 
     public OrganizationMember updateMemberRole(UUID orgId, UUID userId, String role) {
@@ -148,6 +153,25 @@ public class OrganizationDomainService {
     public void removeMember(UUID orgId, UUID userId) {
         log.debug("Removing member {} from organization {}", userId, orgId);
         memberRepository.delete(orgId, userId);
+        syncMembershipRole(userId);
+    }
+
+    /**
+     * The system role follows membership: MEMBER while the person belongs to an organization, USER once
+     * they leave the last one. What they may do inside an organization is their organization role, which
+     * only organization routes check. Admins keep ADMIN either way and are never given USER.
+     */
+    private void syncMembershipRole(UUID userId) {
+        boolean member = memberRepository.findOrganizationIdByUserId(userId) != null;
+        if (member) {
+            userRepository.grantRole(userId, SystemRole.MEMBER.name());
+            userRepository.revokeRole(userId, SystemRole.USER.name());
+            return;
+        }
+        userRepository.revokeRole(userId, SystemRole.MEMBER.name());
+        if (!userRepository.hasRole(userId, SystemRole.ADMIN.name())) {
+            userRepository.grantRole(userId, SystemRole.USER.name());
+        }
     }
 
     @Transactional(readOnly = true)

@@ -64,6 +64,16 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    public void grantRole(UUID id, String roleCode) {
+        jpa.grantRole(id, roleCode);
+    }
+
+    @Override
+    public void revokeRole(UUID id, String roleCode) {
+        jpa.revokeRole(id, roleCode);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpa.existsByEmail(email);
     }

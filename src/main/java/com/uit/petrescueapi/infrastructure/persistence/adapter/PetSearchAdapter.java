@@ -33,15 +33,16 @@ public class PetSearchAdapter implements PetSearchPort {
                                                   UUID ownerUserId,
                                                   UUID ownerOrganizationId,
                                                   String province,
+                                                  String healthStatus,
                                                   Pageable pageable) {
         // For now the adapter uses DB LIKE search. A future implementation
         // can replace this bean to call an external search engine (Elasticsearch, etc.)
         if (statuses == null || statuses.isEmpty()) {
-            return queryRepo.findAllWithFilters(species, breed, gender, searchName, ownerUserId, ownerOrganizationId, province, pageable)
+            return queryRepo.findAllWithFilters(species, breed, gender, searchName, ownerUserId, ownerOrganizationId, province, healthStatus, pageable)
                 .map(this::toSummaryDto);
         }
 
-        return queryRepo.findAllWithFiltersAndStatuses(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, province, pageable)
+        return queryRepo.findAllWithFiltersAndStatuses(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, province, healthStatus, pageable)
             .map(this::toSummaryDto);
     }
 

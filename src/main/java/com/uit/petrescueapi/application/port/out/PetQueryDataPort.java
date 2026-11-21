@@ -28,6 +28,7 @@ public interface PetQueryDataPort {
             UUID ownerUserId,
             UUID ownerOrganizationId,
             String province,
+            String healthStatus,
             Pageable pageable
     );
 

@@ -18,6 +18,7 @@ import com.uit.petrescueapi.domain.entity.User;
 import com.uit.petrescueapi.domain.exception.BusinessException;
 import com.uit.petrescueapi.domain.service.OrganizationDomainService;
 import com.uit.petrescueapi.domain.service.UserDomainService;
+import com.uit.petrescueapi.domain.valueobject.SystemRole;
 import com.uit.petrescueapi.infrastructure.persistence.repository.UserReputationJpaRepository;
 import com.uit.petrescueapi.presentation.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -120,7 +121,7 @@ public class AdminController {
             @Valid @RequestBody CreateOrganizationAccountRequestDto cmd) {
 
         String systemRole = (cmd.getSystemRole() == null || cmd.getSystemRole().isBlank())
-                ? "MEMBER"
+                ? SystemRole.MEMBER.name()
                 : cmd.getSystemRole();
 
         String hashedPassword = passwordEncoder.encode(cmd.getPassword());

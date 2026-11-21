@@ -27,6 +27,7 @@ public class UserSearchAdapter implements UserSearchPort {
                 .userId(p.getUserId())
                 .userCode(p.getUserCode())
                 .username(p.getUsername())
+                .fullName(p.getFullName())
                 .email(p.getEmail())
                 .status(p.getStatus())
                 .build();

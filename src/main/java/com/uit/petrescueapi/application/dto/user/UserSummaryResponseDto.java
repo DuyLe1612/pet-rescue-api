@@ -23,6 +23,8 @@ public class UserSummaryResponseDto {
 
     @Schema(example = "johndoe")
     private String username;
+    /** The display name shown to other people. */
+    private String fullName;
 
     @Schema(example = "john@example.com")
     private String email;

@@ -33,6 +33,8 @@ public interface PetQueryPort {
             UUID ownerUserId,
             UUID ownerOrganizationId,
             String province,
+            /** Comma-separated health statuses; null means any. */
+            String healthStatus,
             Pageable pageable
     );
 

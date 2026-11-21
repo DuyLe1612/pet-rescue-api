@@ -28,6 +28,12 @@ public interface UserRepository {
 
     boolean hasRole(UUID id, String roleCode);
 
+    /** Adds a system role; does nothing if the user already has it. */
+    void grantRole(UUID id, String roleCode);
+
+    /** Removes a system role; does nothing if the user does not have it. */
+    void revokeRole(UUID id, String roleCode);
+
     boolean existsByEmail(String email);
 
     boolean existsByUsername(String username);
