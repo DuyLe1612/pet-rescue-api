@@ -17,7 +17,8 @@ import java.util.UUID;
 public class CommentPreviewDto {
     private UUID commentId;
     private UUID authorId;
-    private String authorUsername;
+    /** Full name, or "Thành viên PawHome" when the author gave none. Never the username. */
+    private String authorName;
     private String authorAvatarUrl;
     private String content;
     private LocalDateTime createdAt;

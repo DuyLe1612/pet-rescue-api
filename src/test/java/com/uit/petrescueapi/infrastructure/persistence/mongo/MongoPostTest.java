@@ -157,7 +157,9 @@ class MongoPostTest extends MongoIntegrationTest {
                 .mediaIds(List.of(MEDIA_2, MEDIA_1)).tagCodes(List.of("rescue", "dog")).rescueCaseId(RESCUE).build());
 
         PostResponseDto dto = postQuery.findById(p.getPostId());
-        assertThat(dto.getAuthorUsername()).isEqualTo("alice");
+        assertThat(dto.getAuthorName()).isEqualTo("Alice Nguyen");
+        // People sign in with their username, so it is never copied into a post.
+        assertThat(raw(p.getPostId()).get("author", Document.class)).doesNotContainKey("username");
         assertThat(dto.getImageUrls()).containsExactly("https://cdn/posts/two", "https://cdn/posts/one"); // upload order kept
         assertThat(dto.getTags()).containsExactly("rescue", "dog");
         assertThat(dto.getRescueCaseId()).isEqualTo(RESCUE);
@@ -196,7 +198,7 @@ class MongoPostTest extends MongoIntegrationTest {
         PostResponseDto dto = postQuery.findById(p.getPostId());
         assertThat(dto.getContent()).isEqualTo("v2");
         assertThat(dto.getImageUrls()).containsExactly("https://cdn/posts/one");
-        assertThat(dto.getAuthorUsername()).isEqualTo("alice");
+        assertThat(dto.getAuthorName()).isEqualTo("Alice Nguyen");
         assertThat(dto.getUpdatedAt()).isNotNull();
         assertThat(raw(p.getPostId()).get("stats", Document.class)).containsEntry("likes", 1);
     }
@@ -244,7 +246,7 @@ class MongoPostTest extends MongoIntegrationTest {
     private void insertPost(UUID id, LocalDateTime createdAt, List<String> tags, String category) {
         PostDocument doc = PostDocument.builder()
                 .id(id)
-                .author(AuthorDocument.builder().userId(ALICE).username("alice").build())
+                .author(AuthorDocument.builder().userId(ALICE).fullName("Alice Nguyen").build())
                 .content("p " + id)
                 .tags(tags)
                 .facets(category == null ? null : PostDocument.FacetsDocument.builder().category(category).species("DOG").district("Quận 7").build())
@@ -450,8 +452,10 @@ class MongoPostTest extends MongoIntegrationTest {
         assertThat(second.hasNext()).isFalse();
 
         assertThat(commentQuery.findRepliesByParentCommentId(roots.get(0).getCommentId(), PageRequest.of(0, 10)).getContent())
-                .extracting(CommentSummaryDto::getContent, CommentSummaryDto::getAuthorUsername)
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("r1", "alice"), org.assertj.core.groups.Tuple.tuple("r2", "bob"));
+                .extracting(CommentSummaryDto::getContent, CommentSummaryDto::getAuthorName)
+                // Bob has no full name: a neutral label, not his username.
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("r1", "Alice Nguyen"),
+                        org.assertj.core.groups.Tuple.tuple("r2", "Thành viên PawHome"));
     }
 
     @Test

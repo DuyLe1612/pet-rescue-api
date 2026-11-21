@@ -19,7 +19,7 @@ public interface RescueCaseDetailProjection {
     String getStatus();
     LocalDateTime getReportedAt();
     String getLocationText();
-    String getReporterUsername();
+    String getReporterFullName();
 
     // ── Detail fields ────────────────────────────
     UUID getReportedBy();

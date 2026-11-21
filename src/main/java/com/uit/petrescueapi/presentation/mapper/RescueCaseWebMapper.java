@@ -13,7 +13,7 @@ public interface RescueCaseWebMapper {
     @Mapping(target = "status", expression = "java(rc.getStatus() != null ? rc.getStatus().name() : null)")
     @Mapping(target = "priority", source = "priority")
     @Mapping(target = "reportedAt", source = "reportedAt")
-    @Mapping(target = "reporterUsername", ignore = true)
+    @Mapping(target = "reporterName", ignore = true)
     @Mapping(target = "imageUrls", source = "imagePublicIds")
     @Mapping(target = "contactPhone", source = "contactPhone")
     RescueCaseResponseDto toDto(RescueCase rc);

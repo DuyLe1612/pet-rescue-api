@@ -599,9 +599,9 @@ class RescueWorkflowIntegrationTest {
     private void flushUsers() {
         for (String[] user : pendingUsers) {
             jdbc.update("""
-                    INSERT INTO users (user_id, username, email, status, email_verified, user_code)
-                    VALUES (?, ?, ?, 'ACTIVE', TRUE, ?)
-                    """, UUID.fromString(user[0]), user[1], user[1] + "@petrescue.test", user[2]);
+                    INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name)
+                    VALUES (?, ?, ?, 'ACTIVE', TRUE, ?, ?)
+                    """, UUID.fromString(user[0]), user[1], user[1] + "@petrescue.test", user[2], "Người " + user[2]);
             grant(UUID.fromString(user[0]), "USER");
         }
         pendingUsers.clear();

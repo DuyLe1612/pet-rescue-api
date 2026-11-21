@@ -214,9 +214,9 @@ class CanonicalValuesIntegrationTest {
         UUID id = UUID.randomUUID();
         String tag = id.toString().substring(0, 12);
         jdbc.update("""
-                INSERT INTO users (user_id, username, email, status, email_verified, user_code)
-                VALUES (?, ?, ?, 'ACTIVE', TRUE, ?)
-                """, id, "u-" + tag, tag + "@petrescue.test", tag);
+                INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name)
+                VALUES (?, ?, ?, 'ACTIVE', TRUE, ?, ?)
+                """, id, "u-" + tag, tag + "@petrescue.test", tag, "Người " + tag);
         jdbc.update("INSERT INTO user_roles (user_id, role_id) SELECT ?, role_id FROM roles WHERE code = 'USER'", id);
         return id;
     }

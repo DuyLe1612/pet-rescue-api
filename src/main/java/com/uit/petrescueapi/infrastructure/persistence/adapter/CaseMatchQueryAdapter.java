@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.rescue.CaseMatchResponseDto;
+import com.uit.petrescueapi.application.support.DisplayName;
 import com.uit.petrescueapi.application.port.out.CaseMatchQueryDataPort;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class CaseMatchQueryAdapter implements CaseMatchQueryDataPort {
     private static final String SELECT = """
             SELECT s.suggestion_id, s.status AS match_status, s.score, s.distance_m, s.reasons,
                    o.case_id, o.case_code, o.case_type, o.status, o.species, o.color, o.description, o.distinctive_marks,
-                   o.holding_status, (o.reported_at AT TIME ZONE 'UTC') AS reported_at, u.username,
+                   o.holding_status, (o.reported_at AT TIME ZONE 'UTC') AS reported_at, u.full_name,
                    ST_Y(p.shown) AS latitude, ST_X(p.shown) AS longitude, p.blurred,
                    (SELECT mf.public_id FROM rescue_media rm JOIN media_files mf ON mf.media_id = rm.media_id
                      WHERE rm.case_id = o.case_id ORDER BY mf.created_at LIMIT 1) AS first_image
@@ -72,7 +73,7 @@ public class CaseMatchQueryAdapter implements CaseMatchQueryDataPort {
                             .longitude((Double) rs.getObject("longitude"))
                             .locationBlurMeters(blurred ? 300 : null)
                             .reportedAt(reportedAt == null ? null : reportedAt.toLocalDateTime())
-                            .reporterUsername(rs.getString("username"))
+                            .reporterName(DisplayName.of(rs.getString("full_name")))
                             .firstImageUrl(image == null ? null : cloudStoragePort.buildUrl(image))
                             .build())
                     .build();

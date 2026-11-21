@@ -45,7 +45,8 @@ public class CaseMatchResponseDto {
         private Double longitude;
         private Integer locationBlurMeters;
         private LocalDateTime reportedAt;
-        private String reporterUsername;
+            /** The reporter's display name (full name, or "Thành viên PawHome"). Never the username. */
+        private String reporterName;
         private String firstImageUrl;
     }
 }

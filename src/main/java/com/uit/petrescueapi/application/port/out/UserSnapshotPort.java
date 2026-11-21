@@ -1,5 +1,7 @@
 package com.uit.petrescueapi.application.port.out;
 
+import com.uit.petrescueapi.application.support.DisplayName;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.UUID;
@@ -15,9 +17,9 @@ public interface UserSnapshotPort {
 
     record UserSnapshot(UUID id, String username, String fullName, String avatarUrl) {
 
-        /** Same rule as the old SQL: {@code COALESCE(NULLIF(full_name, ''), username)}. */
+        /** The full name, or a neutral label; never the username, which people sign in with. */
         public String displayName() {
-            return fullName != null && !fullName.isBlank() ? fullName : username;
+            return DisplayName.of(fullName);
         }
     }
 }

@@ -24,8 +24,9 @@ public class UpdateUserProfileRequestDto {
     @Size(max = 100)
     private String username;
 
-    @Schema(example = "John Doe")
+    @Schema(example = "John Doe", description = "Leave out to keep the current name; it cannot be blank.")
     @Size(max = 255)
+    @jakarta.validation.constraints.Pattern(regexp = ".*\\S.*", message = "Full name cannot be blank")
     private String fullName;
 
     @Schema(example = "https://cdn.example.com/avatars/john.jpg")

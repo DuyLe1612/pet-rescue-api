@@ -8,7 +8,7 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface CommentWebMapper {
 
-    @Mapping(target = "authorUsername", ignore = true)
+    @Mapping(target = "authorName", ignore = true)
     @Mapping(target = "updatedAt", ignore = true)
     CommentResponseDto toDto(Comment comment);
 }

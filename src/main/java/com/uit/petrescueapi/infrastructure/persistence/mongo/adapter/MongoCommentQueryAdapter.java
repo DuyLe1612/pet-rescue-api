@@ -1,6 +1,7 @@
 package com.uit.petrescueapi.infrastructure.persistence.mongo.adapter;
 
 import com.uit.petrescueapi.application.dto.comment.CommentResponseDto;
+import com.uit.petrescueapi.application.support.DisplayName;
 import com.uit.petrescueapi.application.dto.comment.CommentSummaryDto;
 import com.uit.petrescueapi.application.port.out.CommentQueryDataPort;
 import com.uit.petrescueapi.domain.exception.ResourceNotFoundException;
@@ -71,7 +72,7 @@ public class MongoCommentQueryAdapter implements CommentQueryDataPort {
                 .postId(d.getPostId())
                 .parentCommentId(d.getParentId())
                 .authorId(d.getAuthor() == null ? null : d.getAuthor().getUserId())
-                .authorUsername(d.getAuthor() == null ? null : d.getAuthor().getUsername())
+                .authorName(DisplayName.of(d.getAuthor() == null ? null : d.getAuthor().getFullName()))
                 .content(d.getContent())
                 .likeCount(d.getStats().getLikes())
                 .replyCount(d.getStats().getReplies())
@@ -86,7 +87,7 @@ public class MongoCommentQueryAdapter implements CommentQueryDataPort {
                 .postId(d.getPostId())
                 .parentCommentId(d.getParentId())
                 .authorId(d.getAuthor() == null ? null : d.getAuthor().getUserId())
-                .authorUsername(d.getAuthor() == null ? null : d.getAuthor().getUsername())
+                .authorName(DisplayName.of(d.getAuthor() == null ? null : d.getAuthor().getFullName()))
                 .content(d.getContent())
                 .likeCount(d.getStats().getLikes())
                 .replyCount(d.getStats().getReplies())

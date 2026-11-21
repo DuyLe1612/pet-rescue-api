@@ -168,7 +168,8 @@ public class RescueCaseQueryUseCase implements RescueCaseQueryPort {
         accessControl.requireCaseEditor(caseDomainService.findById(caseId), requesterId);
         return claimDomainService.findActiveByCase(caseId).stream().map(claim -> {
             RescueClaimResponseDto dto = RescueClaimResponseDto.from(claim);
-            dto.setUsername(userDomainService.findById(claim.getUserId()).getUsername());
+            dto.setName(com.uit.petrescueapi.application.support.DisplayName.of(
+                    userDomainService.findById(claim.getUserId()).getFullName()));
             return dto;
         }).toList();
     }

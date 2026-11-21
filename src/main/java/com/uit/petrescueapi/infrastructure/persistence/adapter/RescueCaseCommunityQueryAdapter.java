@@ -2,6 +2,7 @@ package com.uit.petrescueapi.infrastructure.persistence.adapter;
 
 import com.uit.petrescueapi.application.dto.rescue.FlaggedRescueCaseDto;
 import com.uit.petrescueapi.application.dto.rescue.RescueCaseUpdateResponseDto;
+import com.uit.petrescueapi.application.support.DisplayName;
 import com.uit.petrescueapi.application.port.out.CloudStoragePort;
 import com.uit.petrescueapi.application.port.out.RescueCaseCommunityQueryDataPort;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +32,7 @@ import java.util.UUID;
 public class RescueCaseCommunityQueryAdapter implements RescueCaseCommunityQueryDataPort {
 
     private static final String UPDATE_SELECT = """
-            SELECT up.update_id, up.case_id, up.author_id, u.username, u.avatar_url, up.note,
+            SELECT up.update_id, up.case_id, up.author_id, u.full_name, u.avatar_url, up.note,
                    (up.created_at AT TIME ZONE 'UTC') AS created_at
             FROM rescue_case_updates up
             LEFT JOIN users u ON u.user_id = up.author_id
@@ -68,7 +69,7 @@ public class RescueCaseCommunityQueryAdapter implements RescueCaseCommunityQuery
                 .addValue("limit", pageable.getPageSize())
                 .addValue("offset", pageable.getOffset());
         List<FlaggedRescueCaseDto> rows = jdbc.query("""
-                SELECT rc.case_id, rc.case_code, rc.status, rc.species, rc.location_text, rc.reported_by, u.username,
+                SELECT rc.case_id, rc.case_code, rc.status, rc.species, rc.location_text, rc.reported_by, u.full_name,
                        (rc.reported_at AT TIME ZONE 'UTC') AS reported_at,
                        COUNT(*) AS flag_count,
                        COUNT(*) FILTER (WHERE f.reason = 'FALSE_REPORT') AS false_report_count,
@@ -79,7 +80,7 @@ public class RescueCaseCommunityQueryAdapter implements RescueCaseCommunityQuery
                 JOIN rescue_cases rc ON rc.case_id = f.case_id
                 LEFT JOIN users u ON u.user_id = rc.reported_by
                 WHERE rc.is_deleted = false AND rc.status IN ('REPORTED', 'IN_PROGRESS')
-                GROUP BY rc.case_id, u.username
+                GROUP BY rc.case_id, u.full_name
                 ORDER BY flag_count DESC, last_flagged_at DESC
                 LIMIT :limit OFFSET :offset
                 """, params, (rs, i) -> FlaggedRescueCaseDto.builder()
@@ -89,7 +90,7 @@ public class RescueCaseCommunityQueryAdapter implements RescueCaseCommunityQuery
                 .species(rs.getString("species"))
                 .locationText(rs.getString("location_text"))
                 .reporterId(rs.getObject("reported_by", UUID.class))
-                .reporterUsername(rs.getString("username"))
+                .reporterName(DisplayName.of(rs.getString("full_name")))
                 .reportedAt(toLocal(rs.getTimestamp("reported_at")))
                 .flagCount(rs.getInt("flag_count"))
                 .falseReportCount(rs.getInt("false_report_count"))
@@ -141,7 +142,7 @@ public class RescueCaseCommunityQueryAdapter implements RescueCaseCommunityQuery
                 .updateId(rs.getObject("update_id", UUID.class))
                 .caseId(rs.getObject("case_id", UUID.class))
                 .authorId(rs.getObject("author_id", UUID.class))
-                .authorUsername(rs.getString("username"))
+                .authorName(DisplayName.of(rs.getString("full_name")))
                 .authorAvatarUrl(rs.getString("avatar_url"))
                 .note(rs.getString("note"))
                 .createdAt(toLocal(rs.getTimestamp("created_at")))

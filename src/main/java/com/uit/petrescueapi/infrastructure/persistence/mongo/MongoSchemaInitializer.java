@@ -30,7 +30,29 @@ public class MongoSchemaInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         createValidators();
         createIndexes();
+        removeUsernameSnapshots();
         log.info("MongoDB schema (validators + indexes) is up to date");
+    }
+
+    /**
+     * Author snapshots used to copy the username, which people sign in with. Drops it from the
+     * documents written before that stopped. Matches nothing once it has run, so it is cheap to repeat.
+     */
+    private void removeUsernameSnapshots() {
+        MongoDatabase db = mongo.getDb();
+        long posts = db.getCollection(POSTS).updateMany(
+                new Document("author.username", new Document("$exists", true)),
+                new Document("$unset", new Document("author.username", ""))).getModifiedCount();
+        long previews = db.getCollection(POSTS).updateMany(
+                new Document("previewComments.author.username", new Document("$exists", true)),
+                new Document("$unset", new Document("previewComments.$[].author.username", ""))).getModifiedCount();
+        long comments = db.getCollection(COMMENTS).updateMany(
+                new Document("author.username", new Document("$exists", true)),
+                new Document("$unset", new Document("author.username", ""))).getModifiedCount();
+        if (posts + previews + comments > 0) {
+            log.info("Removed usernames from author snapshots: {} posts, {} with comment previews, {} comments",
+                    posts, previews, comments);
+        }
     }
 
     // ── Validators (moderate: only new/updated valid docs are checked) ──

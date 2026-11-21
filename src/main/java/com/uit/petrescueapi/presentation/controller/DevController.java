@@ -46,6 +46,10 @@ public class DevController {
         @Size(min = 6, max = 128)
         public String password;
 
+        @NotBlank
+        @Size(max = 255)
+        public String fullName;
+
         // optional role code, default ADMIN
         public String role = "ADMIN";
     }
@@ -55,7 +59,7 @@ public class DevController {
         String hashedPassword = passwordEncoder.encode(req.password);
 
         // Use domain service — encapsulates validation and transaction
-        User saved = userDomainService.createUser(req.username, req.email, hashedPassword, req.role);
+        User saved = userDomainService.createUser(req.username, req.email, hashedPassword, req.fullName, req.role);
 
         UserResponseDto dto = UserResponseDto.builder()
                 .userId(saved.getId())

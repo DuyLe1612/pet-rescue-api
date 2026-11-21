@@ -78,6 +78,9 @@ public class SecurityConfig {
                        .requestMatchers(HttpMethod.GET, "/api/v1/rescue-cases/*/triage").authenticated()
                        .requestMatchers(HttpMethod.GET, "/api/v1/rescue-cases/**").permitAll()
                        .requestMatchers(HttpMethod.GET, "/api/v1/banners/active").permitAll()
+                       // The public map shows organization pins; opening one must not need sign-in.
+                       // Only an id: /organizations/me and the member lists stay behind sign-in.
+                       .requestMatchers(HttpMethod.GET, "/api/v1/organizations/{id:[0-9a-fA-F-]{36}}").permitAll()
                        // The community feed is how most people come across a rescue case, signed in or not.
                        .requestMatchers(HttpMethod.GET, "/api/v1/posts/feed").permitAll()
                        // A shared link must open for whoever receives it: one post and its comments.

@@ -36,7 +36,8 @@ public class RescueCaseResponseDto {
     private Double blurredLatitude;
     @com.fasterxml.jackson.annotation.JsonIgnore
     private Double blurredLongitude;
-    private String reporterUsername;
+    /** The reporter's display name (full name, or "Thành viên PawHome"). Never the username. */
+    private String reporterName;
     private String species;
     private String color;
     @Schema(description = "Priority level", example = "HIGH")

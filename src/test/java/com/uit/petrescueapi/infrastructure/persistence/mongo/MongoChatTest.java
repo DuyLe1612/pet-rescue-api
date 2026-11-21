@@ -114,7 +114,7 @@ class MongoChatTest extends MongoIntegrationTest {
         assertThat(aliceInbox).singleElement().satisfies(s -> {
             assertThat(s.getId()).isEqualTo(c.getId());
             assertThat(s.getOtherUserId()).isEqualTo(BOB);
-            assertThat(s.getOtherUserName()).isEqualTo("bob");          // blank full name falls back to username
+            assertThat(s.getOtherUserName()).isEqualTo("Thành viên PawHome"); // blank full name: a neutral label, never the username
             assertThat(s.getOtherUserAvatarUrl()).isEqualTo("b.png");
             assertThat(s.getUnread()).isZero();
         });

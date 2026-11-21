@@ -43,6 +43,8 @@ public class AdoptionResponseDto {
     private LocalDateTime createdAt;
     private UUID applicantId;
     private String applicantUsername;
+    /** The applicant's display name (full name), what staff should see first. */
+    private String applicantName;
     private UUID organizationId;
     private String organizationName;
     private String note;

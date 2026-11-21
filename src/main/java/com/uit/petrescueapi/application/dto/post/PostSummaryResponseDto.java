@@ -23,7 +23,8 @@ public class PostSummaryResponseDto {
     private UUID authorId;
 
     @Schema(example = "johndoe")
-    private String authorUsername;
+    /** Full name, or "Thành viên PawHome" when the author gave none. Never the username. */
+    private String authorName;
 
     private String authorAvatarUrl;
 

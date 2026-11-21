@@ -1904,7 +1904,7 @@ class QueryBehaviorIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].note").value("Đã tới nơi, bé đang ở gầm cầu"))
                 .andExpect(jsonPath("$.data.content[0].authorId").value(claimer.toString()))
-                .andExpect(jsonPath("$.data.content[0].authorUsername", startsWith("u-")))
+                .andExpect(jsonPath("$.data.content[0].authorName", startsWith("Người ")))
                 .andExpect(jsonPath("$.data.content[0].imageUrls[0]", startsWith("https://cdn.test/")));
     }
 
@@ -2340,9 +2340,9 @@ class QueryBehaviorIntegrationTest {
         UUID id = UUID.randomUUID();
         String tag = id.toString().substring(0, 12);
         jdbc.update("""
-                INSERT INTO users (user_id, username, email, status, email_verified, user_code)
-                VALUES (?, ?, ?, 'ACTIVE', TRUE, ?)
-                """, id, "u-" + tag, tag + "@petrescue.test", tag);
+                INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name)
+                VALUES (?, ?, ?, 'ACTIVE', TRUE, ?, ?)
+                """, id, "u-" + tag, tag + "@petrescue.test", tag, "Người " + tag);
         grant(id, "USER");
         return id;
     }

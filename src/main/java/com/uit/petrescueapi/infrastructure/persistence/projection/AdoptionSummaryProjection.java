@@ -18,6 +18,8 @@ public interface AdoptionSummaryProjection {
     String getPetPrimaryImageUrl();
     UUID getApplicantId();
     String getApplicantUsername();
+
+    String getApplicantFullName();
     UUID getOrganizationId();
     String getOrganizationName();
     String getStatus();

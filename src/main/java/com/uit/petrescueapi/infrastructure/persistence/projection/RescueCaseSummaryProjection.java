@@ -18,7 +18,7 @@ public interface RescueCaseSummaryProjection {
     String getStatus();
     LocalDateTime getReportedAt();
     String getLocationText();
-    String getReporterUsername();
+    String getReporterFullName();
     String getFirstImageUrl();
     /** Only the nearby query selects it. */
     Double getDistance();

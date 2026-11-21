@@ -129,6 +129,7 @@ public class AdminController {
                 cmd.getUsername(),
                 cmd.getEmail(),
                 hashedPassword,
+                cmd.getFullName(),
                 systemRole
         );
 
