@@ -76,6 +76,8 @@ class DemoDataScriptsIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM users WHERE user_code LIKE 'U-D%'")).isEqualTo(47);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%'")).isEqualTo(8);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%' AND status = 'PENDING'")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%' AND image_url IS NULL"))
+                .as("every centre has a photo people can recognise it by").isZero();
         assertThat(count("SELECT COUNT(*) FROM pets WHERE pet_code LIKE 'P-D%'")).isEqualTo(60);
         assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'")).isEqualTo(80);
         assertThat(count("SELECT COUNT(*) FROM adoption_applications WHERE adoption_code LIKE 'A-D%'")).isEqualTo(28);

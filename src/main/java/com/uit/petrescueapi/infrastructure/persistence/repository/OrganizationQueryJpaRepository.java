@@ -3,6 +3,7 @@ package com.uit.petrescueapi.infrastructure.persistence.repository;
 import com.uit.petrescueapi.domain.valueobject.OrganizationStatus;
 import com.uit.petrescueapi.infrastructure.persistence.entity.OrganizationJpaEntity;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationDetailProjection;
+import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationOverviewProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationMapMarkerProjection;
 import com.uit.petrescueapi.infrastructure.persistence.projection.OrganizationSummaryProjection;
 import org.springframework.data.domain.Page;
@@ -70,6 +71,42 @@ public interface OrganizationQueryJpaRepository extends JpaRepository<Organizati
             WHERE o.organization_id = :id
             """, nativeQuery = true)
     Optional<OrganizationDetailProjection> findDetailById(@Param("id") UUID id);
+
+    /** Every count of one centre in one round trip. Pets count by current owner, like the pet list. */
+    @Query(value = """
+            WITH own AS (
+                SELECT p.status, p.health_status
+                FROM pets p
+                JOIN pets_current_owner co ON co.pet_id = p.pet_id
+                WHERE co.owner_type = 'ORGANIZATION' AND co.owner_id = :id AND p.is_deleted = false
+            )
+            SELECT o.organization_id   AS organizationId,
+                   o.organization_code AS organizationCode,
+                   NULLIF(BTRIM(req.full_name), '') AS requestedByName,
+                   (o.created_at AT TIME ZONE 'UTC') AS createdAt,
+                   (SELECT COUNT(*) FROM own WHERE status = 'AVAILABLE') AS availablePets,
+                   (SELECT COUNT(*) FROM own WHERE status NOT IN ('ADOPTED', 'DECEASED')) AS petsInCare,
+                   (SELECT COUNT(*) FROM own WHERE health_status = 'UNDER_TREATMENT'
+                                              AND status NOT IN ('ADOPTED', 'DECEASED')) AS petsUnderTreatment,
+                   (SELECT COUNT(*) FROM adoption_applications a
+                    WHERE a.organization_id = o.organization_id AND a.is_deleted = false AND a.status = 'COMPLETED') AS adoptedPets,
+                   (SELECT COUNT(*) FROM adoption_applications a
+                    WHERE a.organization_id = o.organization_id AND a.is_deleted = false AND a.status = 'PENDING') AS pendingAdoptions,
+                   (SELECT COUNT(*) FROM adoption_applications a
+                    WHERE a.organization_id = o.organization_id AND a.is_deleted = false AND a.status = 'APPROVED') AS awaitingPickup,
+                   (SELECT COUNT(*) FROM rescue_case_claims c
+                    WHERE c.organization_id = o.organization_id AND c.status = 'ACTIVE') AS activeRescueClaims,
+                   (SELECT COUNT(DISTINCT c.case_id) FROM rescue_case_claims c
+                    WHERE c.organization_id = o.organization_id AND c.status = 'COMPLETED') AS rescuedCases,
+                   (SELECT COUNT(*) FROM followup_alerts f
+                    WHERE f.organization_id = o.organization_id AND f.status <> 'RESOLVED') AS openFollowupAlerts,
+                   (SELECT COUNT(*) FROM organization_members m
+                    WHERE m.organization_id = o.organization_id AND m.status = 'ACTIVE') AS activeMembers
+            FROM organizations o
+            LEFT JOIN users req ON req.user_id = o.requested_by_user_id
+            WHERE o.organization_id = :id
+            """, nativeQuery = true)
+    Optional<OrganizationOverviewProjection> findOverview(@Param("id") UUID id);
 
                 @Query(value = """
                                                 SELECT o.organization_id AS organizationId,

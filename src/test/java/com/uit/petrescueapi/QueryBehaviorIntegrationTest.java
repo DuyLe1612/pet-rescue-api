@@ -456,6 +456,40 @@ class QueryBehaviorIntegrationTest {
     }
 
     @Test
+    void centreOverviewShowsPublicFiguresToEveryoneAndTheWorkOnlyToItsPeople() throws Exception {
+        UUID registrant = person();
+        UUID centre = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
+        jdbc.update("UPDATE organizations SET requested_by_user_id = ?, organization_code = 'O-TEST' WHERE organization_id = ?",
+                registrant, centre);
+        UUID staff = member(centre, "STAFF");
+        UUID available = pet("ORGANIZATION", centre, centre);
+        UUID treated = pet("ORGANIZATION", centre, centre);
+        jdbc.update("UPDATE pets SET status = 'FOSTERING', health_status = 'UNDER_TREATMENT' WHERE pet_id = ?", treated);
+        UUID adopted = pet("ORGANIZATION", centre, centre);
+        jdbc.update("UPDATE pets SET status = 'ADOPTED' WHERE pet_id = ?", adopted);
+        application(available, person(), centre, "PENDING");
+        application(adopted, person(), centre, "COMPLETED");
+
+        String url = "/api/v1/organizations/" + centre + "/overview";
+        mvc.perform(get(url))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.availablePets").value(1))
+                .andExpect(jsonPath("$.data.petsInCare").value(2))
+                .andExpect(jsonPath("$.data.adoptedPets").value(1))
+                .andExpect(jsonPath("$.data.operations").doesNotExist());
+        call(get(url), person()).andExpect(jsonPath("$.data.operations").doesNotExist());
+
+        for (UUID insider : List.of(staff, admin())) {
+            call(get(url), insider)
+                    .andExpect(jsonPath("$.data.operations.organizationCode").value("O-TEST"))
+                    .andExpect(jsonPath("$.data.operations.requestedByName").value("Người " + registrant.toString().substring(0, 12)))
+                    .andExpect(jsonPath("$.data.operations.pendingAdoptions").value(1))
+                    .andExpect(jsonPath("$.data.operations.petsUnderTreatment").value(1))
+                    .andExpect(jsonPath("$.data.operations.activeMembers").value(1));
+        }
+    }
+
+    @Test
     void organizationListCarriesTheColumnsItAlreadyReads() throws Exception {
         UUID org = organizationCreatedAt(LocalDateTime.now(), "ACTIVE");
         jdbc.update("UPDATE organizations SET phone = '0288888888', email = 'a@b.test', street_address = '1 Lê Lợi', image_url = 'https://i.test/a.png' WHERE organization_id = ?", org);

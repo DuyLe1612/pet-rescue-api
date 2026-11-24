@@ -22,6 +22,9 @@ public interface OrganizationQueryPort {
 
     OrganizationResponseDto findById(UUID organizationId);
 
+    /** Public figures for anyone; day-to-day work too when the viewer is an admin or a member of the centre. */
+    com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto findOverview(UUID organizationId, UUID viewerId);
+
     Page<OrganizationSummaryResponseDto> findAll(List<OrganizationStatus> statuses, String search, Pageable pageable);
 
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);

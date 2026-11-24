@@ -21,6 +21,9 @@ public interface OrganizationQueryDataPort {
     Page<OrganizationSummaryResponseDto> findAllSummary(List<OrganizationStatus> statuses, String search, Pageable pageable);
     Optional<OrganizationResponseDto> findById(UUID id);
 
+    /** Counts for one centre; {@code withOperations} adds the internal ones. Empty when it does not exist. */
+    Optional<com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto> findOverview(UUID id, boolean withOperations);
+
     Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable);
     List<OrganizationMapMarkerDto> findMapMarkers(List<OrganizationStatus> statuses, List<String> types, String province);
     

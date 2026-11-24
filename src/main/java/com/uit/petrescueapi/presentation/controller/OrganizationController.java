@@ -205,6 +205,24 @@ public class OrganizationController {
                 PageResponse.from(queryPort.findAll(statusList, search, PageableRequestFactory.of(page, pageSize, sortBy, sortOrder)))));
     }
 
+    @GetMapping("/{id}/overview")
+    @Operation(summary = "Centre overview",
+            description = "Public figures (pets waiting, in care, adopted, cases rescued) for anyone. "
+                    + "Admins and members of the centre also get its day-to-day work under operations.")
+    public ResponseEntity<ApiResponse<com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto>> getOverview(
+            @PathVariable UUID id, org.springframework.security.core.Authentication authentication) {
+        UUID viewerId = null;
+        if (authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+            try {
+                viewerId = UUID.fromString(authentication.getName());
+            } catch (IllegalArgumentException ignored) {
+                // not a user id: treat as a guest
+            }
+        }
+        return ResponseEntity.ok(ApiResponse.ok(queryPort.findOverview(id, viewerId)));
+    }
+
     @GetMapping("/{id}/members")
     @Operation(summary = "List members of an organization (paginated)")
     public ResponseEntity<ApiResponse<PageResponse<OrganizationMemberResponseDto>>> getMembers(

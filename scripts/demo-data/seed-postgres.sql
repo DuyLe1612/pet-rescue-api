@@ -234,6 +234,17 @@ JOIN demo_org_base b ON b.n = 1 + (g.n - 1) % 8
 JOIN demo_place p ON p.idx = b.place_idx
 ON CONFLICT DO NOTHING;
 
+-- A photo for every centre, so people recognise it on the map and its page. Cat houses get cats.
+-- Separate from the insert so centres seeded before this line get one too.
+UPDATE organizations o
+SET image_url = 'https://images.unsplash.com/photo-' || f.photo_id || '?w=1200&q=80&auto=format&fit=crop'
+FROM generate_series(1, 8 * pg_temp.scale()) AS g(n)
+JOIN demo_org_base b ON b.n = 1 + (g.n - 1) % 8
+JOIN demo_photo f ON f.kind = CASE WHEN b.n IN (2, 8) THEN 'pet-cat' ELSE 'pet-dog' END
+                 AND f.idx = (g.n - 1) % 8
+WHERE o.organization_id = pg_temp.did('org', g.n)
+  AND o.image_url IS NULL;
+
 INSERT INTO organization_members (organization_id, user_id, role, joined_at, status)
 SELECT pg_temp.did('org', n), pg_temp.did('owner', n), 'OWNER', now() - interval '190 days', 'ACTIVE'
 FROM generate_series(1, 8 * pg_temp.scale()) n
