@@ -1,15 +1,17 @@
 package com.uit.petrescueapi.domain.valueobject;
 
 /**
- * Application-level roles assigned to users.
+ * System roles, one per kind of account. Names are the codes stored in {@code roles.code}.
  * <ul>
- *   <li>{@code USER} – default registered user</li>
- *   <li>{@code ADMIN} – system administrator</li>
- *   <li>{@code MEMBERSHIP} – organization member (shelter / vet center)</li>
+ *   <li>{@code ADMIN} – administrator of the whole platform</li>
+ *   <li>{@code USER} – an ordinary account</li>
+ *   <li>{@code MEMBER} – membership: the account belongs to an organization. What it may do there
+ *       (OWNER, STAFF, VET...) is its {@link OrganizationRole}, checked only on organization routes.</li>
  * </ul>
+ * A person gets MEMBER when they join an organization and goes back to USER when they leave the last one.
  */
 public enum SystemRole {
     USER,
     ADMIN,
-    MEMBERSHIP
+    MEMBER
 }

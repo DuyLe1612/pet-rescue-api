@@ -13,6 +13,8 @@ public interface UserSummaryProjection {
     UUID getUserId();
     String getUserCode();
     String getUsername();
+
+    String getFullName();
     String getEmail();
     String getStatus();
 }

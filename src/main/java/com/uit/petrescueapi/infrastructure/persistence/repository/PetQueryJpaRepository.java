@@ -108,6 +108,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:healthStatus AS VARCHAR) IS NULL OR p.health_status = ANY(string_to_array(CAST(:healthStatus AS VARCHAR), ',')))
           AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
                 SELECT 1 FROM organizations po
                 WHERE po.organization_id = p.shelter_id
@@ -126,6 +127,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:healthStatus AS VARCHAR) IS NULL OR p.health_status = ANY(string_to_array(CAST(:healthStatus AS VARCHAR), ',')))
           AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
                 SELECT 1 FROM organizations po
                 WHERE po.organization_id = p.shelter_id
@@ -143,6 +145,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             @Param("ownerUserId") UUID ownerUserId,
             @Param("ownerOrganizationId") UUID ownerOrganizationId,
             @Param("province") String province,
+            @Param("healthStatus") String healthStatus,
             Pageable pageable);
 
     @Query(value = """
@@ -183,6 +186,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:healthStatus AS VARCHAR) IS NULL OR p.health_status = ANY(string_to_array(CAST(:healthStatus AS VARCHAR), ',')))
           AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
                 SELECT 1 FROM organizations po
                 WHERE po.organization_id = p.shelter_id
@@ -202,6 +206,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
           AND (:species IS NULL OR LOWER(ps.name) = LOWER(:species) OR LOWER(ps.name_vi) = LOWER(:species) OR CAST(p.species_id AS TEXT) = :species)
           AND (:breed IS NULL OR LOWER(pb.name) = LOWER(:breed) OR LOWER(pb.name_vi) = LOWER(:breed) OR CAST(p.breed_id AS TEXT) = :breed)
           AND (:gender IS NULL OR p.gender = :gender)
+          AND (CAST(:healthStatus AS VARCHAR) IS NULL OR p.health_status = ANY(string_to_array(CAST(:healthStatus AS VARCHAR), ',')))
           AND (CAST(:province AS VARCHAR) IS NULL OR EXISTS (
                 SELECT 1 FROM organizations po
                 WHERE po.organization_id = p.shelter_id
@@ -221,6 +226,7 @@ public interface PetQueryJpaRepository extends JpaRepository<PetJpaEntity, UUID>
             @Param("ownerUserId") UUID ownerUserId,
             @Param("ownerOrganizationId") UUID ownerOrganizationId,
             @Param("province") String province,
+            @Param("healthStatus") String healthStatus,
             Pageable pageable);
 
     @Query(value = """

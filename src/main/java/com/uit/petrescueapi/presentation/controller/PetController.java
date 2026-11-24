@@ -206,6 +206,7 @@ public class PetController {
             @RequestParam(required = false) UUID userId,
             @RequestParam(required = false) UUID organizationId,
             @RequestParam(required = false) String province,
+            @RequestParam(required = false) String healthStatus,
             @RequestParam(required = false) Boolean availableOnly,
             @RequestParam(required = false) String sort) {
 
@@ -258,7 +259,7 @@ public class PetController {
 
         return ResponseEntity.ok(ApiResponse.ok(
                 PageResponse.from(petQueryPort.findAllWithFilters(
-                        species, breed, gender, search, statusList, userId, organizationId, province, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
+                        species, breed, gender, search, statusList, userId, organizationId, province, healthStatus, PageableRequestFactory.ofNative(page, pageSize, sortBy, sortOrder)
                 ))));
     }
 

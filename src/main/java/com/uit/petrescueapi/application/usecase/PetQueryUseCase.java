@@ -56,11 +56,12 @@ public class PetQueryUseCase implements PetQueryPort {
             UUID ownerUserId,
             UUID ownerOrganizationId,
             String province,
+            String healthStatus,
             Pageable pageable
     ) {
         log.debug("Query: find all pets with filters (species={}, breed={}, gender={}, searchName={}, statuses={}, ownerUserId={}, ownerOrganizationId={})",
                 species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId);
-        return queryDataPort.findAllWithFilters(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, province, pageable);
+        return queryDataPort.findAllWithFilters(species, breed, gender, searchName, statuses, ownerUserId, ownerOrganizationId, province, healthStatus, pageable);
     }
 
     @Override
