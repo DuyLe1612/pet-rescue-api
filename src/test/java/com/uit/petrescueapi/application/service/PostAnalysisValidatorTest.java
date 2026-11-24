@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PostAnalysisValidatorTest {
 
     final Catalog catalog = new Catalog(List.of("Dog", "Cat"), List.of("injured", "dog", "q7"));
-    final PostAnalysisValidator validator = new PostAnalysisValidator();
+    final PostAnalysisValidator validator = com.uit.petrescueapi.support.TestPlaces.validator();
 
     private PostAnalysisSuggestion suggestion(PostCategory category, String species, boolean needsRescue,
                                               RescuePriority urgency, List<String> tags, Double confidence) {
@@ -29,10 +29,31 @@ class PostAnalysisValidatorTest {
         assertThat(out.errors()).isEmpty();
         assertThat(out.fatal()).isFalse();
         assertThat(out.suggestion().species()).isEqualTo("Dog");          // canonical taxonomy name
-        assertThat(out.suggestion().district()).isEqualTo("Quận 7");
-        assertThat(out.suggestion().province()).isNull();                 // blank → null
+        assertThat(out.suggestion().district()).isEqualTo("Quận 7 (cũ)"); // districts no longer exist
+        assertThat(out.suggestion().province()).isEqualTo("Thành phố Hồ Chí Minh"); // a numbered district is HCMC
         assertThat(out.suggestion().tags()).containsExactly("injured", "dog"); // unknown tags dropped silently
         assertThat(out.suggestion().urgency()).isEqualTo(RescuePriority.HIGH);
+    }
+
+    @Test
+    void theProvinceIsStoredAsTheCatalogueNamesIt() {
+        var out = validator.validate(new PostAnalysisSuggestion(PostCategory.LOST, "Cat", "P. Long Bình, SG", "P. Long Bình",
+                "sg", false, null, null, List.of(), 0.9, 0.9, 0.8), catalog);
+
+        assertThat(out.errors()).isEmpty();
+        assertThat(out.suggestion().province()).isEqualTo("Thành phố Hồ Chí Minh");
+        assertThat(out.suggestion().district()).isEqualTo("Phường Long Bình");
+        assertThat(out.suggestion().locationText()).isEqualTo("P. Long Bình, SG"); // what the author wrote is kept
+    }
+
+    @Test
+    void anUnknownProvinceIsClearedAndReported() {
+        var out = validator.validate(new PostAnalysisSuggestion(PostCategory.LOST, "Cat", null, null,
+                "Atlantis", false, null, null, List.of(), 0.9, 0.9, 0.8), catalog);
+
+        assertThat(out.suggestion().province()).isNull();
+        assertThat(out.suggestion().locationConfidence()).isNull();
+        assertThat(out.errors()).anyMatch(e -> e.contains("Atlantis"));
     }
 
     @Test

@@ -52,7 +52,8 @@ const PHOTOS = {
 // City of demo_place idx 0..23.
 const CITIES = ['HCM', 'HN', 'DN', 'HCM', 'HCM', 'HN', 'DN', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM',
     'HN', 'HN', 'HN', 'HN', 'HN', 'HN', 'DN', 'DN', 'DN']
-    .map((c) => ({ HCM: 'TP. Hồ Chí Minh', HN: 'Hà Nội', DN: 'Đà Nẵng' }[c]));
+    // the address catalogue's own names, which the post province filter matches
+    .map((c) => ({ HCM: 'Thành phố Hồ Chí Minh', HN: 'Thành phố Hà Nội', DN: 'Thành phố Đà Nẵng' }[c]));
 
 function media(kind, idx) {
     return {

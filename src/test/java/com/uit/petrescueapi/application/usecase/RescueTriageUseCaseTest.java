@@ -46,7 +46,7 @@ class RescueTriageUseCaseTest {
     RescueTriageUseCase useCase = build(Optional.of(ai));
 
     private RescueTriageUseCase build(Optional<PostAnalysisPort> port) {
-        return new RescueTriageUseCase(triage, port, catalog, new PostAnalysisValidator(), models, cases);
+        return new RescueTriageUseCase(triage, port, catalog, com.uit.petrescueapi.support.TestPlaces.validator(), models, cases);
     }
 
     @BeforeEach
@@ -121,7 +121,7 @@ class RescueTriageUseCaseTest {
         assertThat(t.getNeedsRescue()).isTrue();
         assertThat(t.getConditionSummary()).isEqualTo("Bleeding from the hind leg");
         assertThat(t.getSpecies()).as("normalised to the catalog name").isEqualTo("Dog");
-        assertThat(t.getDistrict()).isEqualTo("Quận 7");
+        assertThat(t.getDistrict()).isEqualTo("Quận 7 (cũ)");
         assertThat(t.getMissingFields()).as("no photo was attached").containsExactly("PHOTO");
         assertThat(t.getModel()).isEqualTo("openrouter/openai/gpt-oss-120b");
         assertThat(t.getRawOutput()).isEqualTo("{\"category\":\"RESCUE\"}");

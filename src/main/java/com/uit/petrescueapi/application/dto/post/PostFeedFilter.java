@@ -27,6 +27,11 @@ public record PostFeedFilter(String category, String species, String district, S
         tag = blankToNull(tag);
     }
 
+    /** The same filter with another province, e.g. the catalogue name for "sg" or "79". */
+    public PostFeedFilter withProvince(String value) {
+        return new PostFeedFilter(category, species, district, value, needsRescue, tag, rescueCaseId, hasOpenCase);
+    }
+
     public static PostFeedFilter none() {
         return new PostFeedFilter(null, null, null, null, null, null, null, null);
     }

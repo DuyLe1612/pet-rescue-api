@@ -99,7 +99,7 @@ class PostAnalysisUseCaseTest {
         AnalysisCatalogPort catalog = mock(AnalysisCatalogPort.class);
         when(catalog.speciesNames()).thenReturn(List.of("Dog", "Cat"));
         when(catalog.tagCodes()).thenReturn(List.of("injured", "dog"));
-        useCase = new PostAnalysisUseCase(store, Optional.of(ai), catalog, new PostAnalysisValidator(),
+        useCase = new PostAnalysisUseCase(store, Optional.of(ai), catalog, com.uit.petrescueapi.support.TestPlaces.validator(),
                 OPUS, List.of(HAIKU, OPUS));
     }
 
@@ -171,7 +171,7 @@ class PostAnalysisUseCaseTest {
 
     @Test
     void withoutModelAnalyzeIsANoOp() {
-        var noAi = new PostAnalysisUseCase(store, Optional.empty(), mock(AnalysisCatalogPort.class), new PostAnalysisValidator(),
+        var noAi = new PostAnalysisUseCase(store, Optional.empty(), mock(AnalysisCatalogPort.class), com.uit.petrescueapi.support.TestPlaces.validator(),
                 OPUS, List.of(OPUS));
         noAi.analyze(postId);
         assertThat(store.posts.get(postId).status()).isEqualTo(PostAnalysisStatus.PENDING);
@@ -228,7 +228,7 @@ class PostAnalysisUseCaseTest {
         var dto = useCase.confirm(postId, confirmation("cat", List.of("Dog"), true), AUTHOR);
 
         assertThat(dto.getStatus()).isEqualTo(PostAnalysisStatus.CONFIRMED);
-        assertThat(dto.getFacets()).isEqualTo(new PostFacets(PostCategory.RESCUE, "Cat", "Quận 7", "TP. Hồ Chí Minh", true));
+        assertThat(dto.getFacets()).isEqualTo(new PostFacets(PostCategory.RESCUE, "Cat", "Quận 7 (cũ)", "Thành phố Hồ Chí Minh", true));
         assertThat(store.confirmedTags).containsExactly("dog");
     }
 

@@ -45,7 +45,7 @@ class ClaudePostAnalysisAdapterTest {
 
         assertThat(a).isEqualTo(b);                     // byte-stable → cacheable prefix
         assertThat(a).contains("Cat, Dog").contains("injured, rescue");
-        assertThat(a).contains("RESCUE").contains("Quận 7");
+        assertThat(a).contains("RESCUE").contains("Quận 9").contains("Teencode");
     }
 
     @Test

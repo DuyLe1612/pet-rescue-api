@@ -22,6 +22,8 @@ class PostAnalysisWiringTest {
                     PostAnalysisValidator.class)
             .withBean(PostAnalysisStorePort.class, () -> mock(PostAnalysisStorePort.class))
             .withBean(AnalysisCatalogPort.class, () -> mock(AnalysisCatalogPort.class))
+            .withBean(com.uit.petrescueapi.application.service.VietnamPlaceResolver.class,
+                    com.uit.petrescueapi.support.TestPlaces::resolver)
             .withBean(RescueCaseCommandPort.class, () -> mock(RescueCaseCommandPort.class))
             .withBean(RescueCaseWebMapper.class, () -> mock(RescueCaseWebMapper.class));
 

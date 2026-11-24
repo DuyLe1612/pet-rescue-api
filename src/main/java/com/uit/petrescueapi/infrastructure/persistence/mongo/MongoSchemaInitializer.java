@@ -31,6 +31,7 @@ public class MongoSchemaInitializer implements ApplicationRunner {
         createValidators();
         createIndexes();
         removeUsernameSnapshots();
+        useCatalogueProvinceNames();
         log.info("MongoDB schema (validators + indexes) is up to date");
     }
 
@@ -52,6 +53,34 @@ public class MongoSchemaInitializer implements ApplicationRunner {
         if (posts + previews + comments > 0) {
             log.info("Removed usernames from author snapshots: {} posts, {} with comment previews, {} comments",
                     posts, previews, comments);
+        }
+    }
+
+    /** Province names facets held before they were matched to the address catalogue. */
+    private static final java.util.Map<String, String> OLD_PROVINCE_NAMES = java.util.Map.of(
+            "TP. Hồ Chí Minh", "Thành phố Hồ Chí Minh",
+            "TP.HCM", "Thành phố Hồ Chí Minh",
+            "TP HCM", "Thành phố Hồ Chí Minh",
+            "Hồ Chí Minh", "Thành phố Hồ Chí Minh",
+            "Hà Nội", "Thành phố Hà Nội",
+            "TP. Hà Nội", "Thành phố Hà Nội",
+            "Đà Nẵng", "Thành phố Đà Nẵng",
+            "TP. Đà Nẵng", "Thành phố Đà Nẵng");
+
+    /**
+     * Facets now store the province as the address catalogue names it, so the province filter
+     * matches; renames the forms written before. Matches nothing once it has run.
+     */
+    private void useCatalogueProvinceNames() {
+        MongoDatabase db = mongo.getDb();
+        long renamed = 0;
+        for (var entry : OLD_PROVINCE_NAMES.entrySet()) {
+            renamed += db.getCollection(POSTS).updateMany(
+                    new Document("facets.province", entry.getKey()),
+                    new Document("$set", new Document("facets.province", entry.getValue()))).getModifiedCount();
+        }
+        if (renamed > 0) {
+            log.info("Renamed the province of {} post facets to the catalogue name", renamed);
         }
     }
 

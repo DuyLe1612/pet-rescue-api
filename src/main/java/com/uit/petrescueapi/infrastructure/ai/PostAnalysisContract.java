@@ -19,7 +19,7 @@ final class PostAnalysisContract {
     }
 
     /** Bump when the prompt or schema changes: metrics are grouped by it (Goal 4). */
-    static final int PROMPT_VERSION = 1;
+    static final int PROMPT_VERSION = 2;
 
     enum Urgency { NONE, NORMAL, HIGH, CRITICAL }
 
@@ -29,15 +29,15 @@ final class PostAnalysisContract {
             PostCategory category,
             @JsonPropertyDescription("Animal species, exactly one name from the allowed species list, or \"\" if unclear.")
             String species,
-            @JsonPropertyDescription("Location as written in the post, e.g. \"Q7\", or \"\".")
+            @JsonPropertyDescription("The place exactly as written in the post, e.g. \"hẻm 21 xô viết nghệ tĩnh q.bt\", or \"\".")
             String locationText,
-            @JsonPropertyDescription("Normalised district, e.g. \"Quận 7\", \"Thủ Đức\", or \"\" if not stated.")
+            @JsonPropertyDescription("The ward (phường/xã) or old district named in the post, with diacritics restored and the prefix kept, e.g. \"Phường Long Bình\", \"Quận 9\", \"Gò Vấp\", or \"\".")
             String district,
-            @JsonPropertyDescription("Province/city only if stated or certain from the district, e.g. \"TP. Hồ Chí Minh\", else \"\".")
+            @JsonPropertyDescription("Province or city named in the post, with diacritics restored, e.g. \"Hồ Chí Minh\", \"Hà Nội\", \"Bình Dương\", or \"\". Do not infer it from a district; the backend does that.")
             String province,
             @JsonPropertyDescription("True only if an animal needs help now (injured, sick, abandoned, trapped, in danger).")
             boolean needsRescue,
-            @JsonPropertyDescription("One short English sentence on the animal's condition if needsRescue, else \"\".")
+            @JsonPropertyDescription("One short Vietnamese sentence, with diacritics, on the animal's condition if needsRescue, else \"\". It is shown to rescuers.")
             String rescueSummary,
             @JsonPropertyDescription("How urgent the rescue is; NONE when needsRescue is false.")
             Urgency urgency,
@@ -73,9 +73,18 @@ final class PostAnalysisContract {
     static String systemPrompt(Catalog catalog) {
         return """
                 You analyse community posts from a Vietnamese pet rescue app and turn them into structured data.
-                Posts are informal Vietnamese: abbreviations, slang and missing diacritics are normal
-                (e.g. "mn" = mọi người, "bé cún"/"chó"/"cẩu" = dog, "mèo"/"miu" = cat, "Q7" = Quận 7, "TĐ" = Thủ Đức,
-                "HCM"/"SG" = TP. Hồ Chí Minh, "HN" = Hà Nội).
+
+                How people type (read every style as the same Vietnamese):
+                - With or without diacritics: "meo bi thuong o go vap" = "mèo bị thương ở Gò Vấp".
+                - Telex/VNI leftovers when the keyboard is off: "meof" = mèo, "chos" = chó, "be1" = bé, "d9" = đ.
+                - Teencode and chat shortcuts: "k"/"ko"/"hok"/"hong" = không, "dc"/"đc" = được, "mn" = mọi người,
+                  "ib"/"inbox" = nhắn riêng, "a/e/c" = anh/em/chị, "j" = gì, "z"/"v" = vậy, "nha"/"nhe" = nhé.
+                - Animals: "cún"/"chó"/"cẩu"/"boss"/"bé" = usually dog or the pet itself, "mèo"/"miu"/"mướp"/"hoàng thượng" = cat.
+                - Places: "q9"/"Q.9"/"quận 9" = Quận 9, "p.12"/"P12" = Phường 12, "tp"/"TP" = thành phố, "hcm"/"tphcm"/"sg"/"sài gòn"
+                  = Hồ Chí Minh, "hn" = Hà Nội, "bt" = Bình Thạnh or Bình Tân, "gv" = Gò Vấp, "td"/"TĐ" = Thủ Đức, "pn" = Phú Nhuận.
+                - Phone numbers (09x…, 03x…, +84…) and house numbers are not places or ages.
+                Vietnam merged provinces and removed districts in July 2025; posts still use the old names. Report the
+                ward or district as written (restored diacritics) and leave matching to the backend.
 
                 Categories:
                 - RESCUE: an animal needs help now (injured, sick, abandoned, trapped, in danger).
@@ -86,6 +95,7 @@ final class PostAnalysisContract {
 
                 Rules:
                 - Extract only what the post says. Use "" for anything not stated; never guess a location or species.
+                - Several places: report the one where the animal is now (or was lost/found), not where the author lives.
                 - species must be exactly one of the allowed species names, or "".
                 - tags must come only from the allowed tag codes; pick at most 5.
                 - needsRescue can be true for RESCUE, LOST or FOUND posts when the animal is in danger.
