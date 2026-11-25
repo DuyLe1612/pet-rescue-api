@@ -30,6 +30,14 @@ import java.util.UUID;
 public class OrganizationQueryUseCase implements OrganizationQueryPort {
 
     private final OrganizationQueryDataPort queryDataPort;
+    private final com.uit.petrescueapi.domain.service.AccessControlDomainService accessControl;
+
+    @Override
+    public com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto findOverview(UUID organizationId, UUID viewerId) {
+        boolean inside = accessControl.canSeeOrganizationOperations(organizationId, viewerId);
+        return queryDataPort.findOverview(organizationId, inside)
+                .orElseThrow(() -> new ResourceNotFoundException("Organization", "id", organizationId));
+    }
 
     @Override
     public OrganizationResponseDto findById(UUID organizationId) {

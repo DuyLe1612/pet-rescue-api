@@ -115,8 +115,11 @@ public class PostAnalysisUseCase implements PostAnalysisCommandPort {
             throw new BusinessException("Unknown tags: " + unknown, "POST_ANALYSIS_TAGS");
         }
 
-        PostFacets facets = new PostFacets(request.category(), species, blankToNull(request.district()),
-                blankToNull(request.province()), request.needsRescue());
+        // Same place rules as the AI's answer; what cannot be matched is kept as the author wrote it.
+        var place = validator.place(request.province(), request.district());
+        String province = place.provinceName() != null ? place.provinceName() : blankToNull(request.province());
+        String area = place.area() != null ? place.area() : blankToNull(request.district());
+        PostFacets facets = new PostFacets(request.category(), species, area, province, request.needsRescue());
         store.confirm(postId, facets, tags, userId);
         return toDto(load(target.postId()));
     }

@@ -41,6 +41,11 @@ public class AdoptionApplicationRepositoryAdapter implements AdoptionApplication
     }
 
     @Override
+    public java.util.List<UUID> findOpenWithoutMatch(int limit) {
+        return jpa.findOpenWithoutMatch(limit);
+    }
+
+    @Override
     public long countByApplicantIdAndStatus(UUID applicantId, AdoptionApplicationStatus status) {
         return jpa.countByApplicantIdAndStatusAndDeletedFalse(applicantId, status);
     }

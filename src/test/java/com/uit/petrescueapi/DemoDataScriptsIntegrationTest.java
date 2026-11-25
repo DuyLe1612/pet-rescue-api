@@ -65,6 +65,10 @@ class DemoDataScriptsIntegrationTest {
     }
 
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.uit.petrescueapi.application.port.command.AdoptionCommandPort adoptions;
+    @Autowired com.uit.petrescueapi.application.port.query.ChatQueryPort chats;
+    @Autowired com.uit.petrescueapi.application.port.command.PostAnalysisCommandPort postAnalyses;
+    @Autowired org.springframework.data.mongodb.core.MongoTemplate mongo;
     @MockitoBean CloudStoragePort cloud;
     @MockitoBean org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
 
@@ -76,10 +80,12 @@ class DemoDataScriptsIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM users WHERE user_code LIKE 'U-D%'")).isEqualTo(47);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%'")).isEqualTo(8);
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%' AND status = 'PENDING'")).isEqualTo(2);
-        assertThat(count("SELECT COUNT(*) FROM pets WHERE pet_code LIKE 'P-D%'")).isEqualTo(60);
-        assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'")).isEqualTo(80);
-        assertThat(count("SELECT COUNT(*) FROM adoption_applications WHERE adoption_code LIKE 'A-D%'")).isEqualTo(28);
-        assertThat(count("SELECT COUNT(*) FROM rescue_case_completions c JOIN rescue_cases r ON r.case_id = c.case_id WHERE r.case_code LIKE 'R-D%'")).isEqualTo(36);
+        assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%' AND image_url IS NULL"))
+                .as("every centre has a photo people can recognise it by").isZero();
+        assertThat(count("SELECT COUNT(*) FROM pets WHERE pet_code LIKE 'P-D%'")).isEqualTo(62);
+        assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'")).isEqualTo(83);
+        assertThat(count("SELECT COUNT(*) FROM adoption_applications WHERE adoption_code LIKE 'A-D%'")).isEqualTo(37);
+        assertThat(count("SELECT COUNT(*) FROM rescue_case_completions c JOIN rescue_cases r ON r.case_id = c.case_id WHERE r.case_code LIKE 'R-D%'")).isEqualTo(37);
         assertThat(count("SELECT COUNT(*) FROM pet_medical_records m JOIN pets p ON p.pet_id = m.pet_id WHERE p.pet_code LIKE 'P-D%'")).isEqualTo(64);
     }
 
@@ -115,6 +121,71 @@ class DemoDataScriptsIntegrationTest {
 
     @Test
     @Order(4)
+    void everyScenarioOfTheReadmeHasItsData() {
+        // demo.user1
+        assertThat(count("SELECT COUNT(*) FROM adopter_profiles WHERE user_id = " + id("user", 1))).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM pets_current_owner WHERE owner_id = " + id("user", 1))).isGreaterThanOrEqualTo(3);
+        assertThat(count("SELECT COUNT(*) FROM adoption_followups WHERE adopter_id = " + id("user", 1) + " AND status = 'SENT'")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM case_match_suggestions WHERE status = 'PENDING' AND lost_case_id IN "
+                + "(SELECT case_id FROM rescue_cases WHERE case_type = 'LOST' AND reported_by = " + id("user", 1) + ")")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM rescue_case_completions c JOIN rescue_cases r ON r.case_id = c.case_id "
+                + "WHERE c.status = 'PENDING' AND r.reported_by = " + id("user", 1))).isPositive();
+        // demo.owner1
+        assertThat(count("SELECT COUNT(*) FROM followup_alerts WHERE status <> 'RESOLVED' AND organization_id = " + id("org", 1))).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM reclaim_logs WHERE organization_id = " + id("org", 1))).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM rescue_case_claims WHERE status = 'ACTIVE' AND organization_id = " + id("org", 1))).isEqualTo(1);
+        // demo.admin
+        assertThat(count("SELECT COUNT(DISTINCT case_id) FROM rescue_case_flags")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM rescue_case_completions WHERE status = 'DISPUTED'")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM banners WHERE is_active")).isEqualTo(3);
+        assertThat(count("SELECT COUNT(*) FROM rescue_case_triage")).isPositive();
+        assertThat(count("SELECT COUNT(*) FROM pet_traits t JOIN pets p ON p.pet_id = t.pet_id WHERE p.pet_code LIKE 'P-D%'")).isEqualTo(60);
+    }
+
+    @Test
+    @Order(5)
+    void theBackfillScoresOpenApplicationsWhereBothSidesCanBeCompared() {
+        adoptions.backfillMatches(100);
+
+        // the five applications at organization 1 from users with an adopter profile
+        assertThat(count("SELECT COUNT(*) FROM adoption_applications WHERE adoption_code BETWEEN 'A-D9001' AND 'A-D9005' AND match_level IS NOT NULL"))
+                .isEqualTo(5);
+        // user21 never filled in the profile: nothing to compare yet
+        assertThat(count("SELECT COUNT(*) FROM adoption_applications WHERE adoption_code = 'A-D9006' AND match_level IS NULL")).isEqualTo(1);
+        // user3 is allergic to dogs, user4 lives where only small pets are allowed
+        assertThat(text("SELECT match_warnings FROM adoption_applications WHERE adoption_code = 'A-D9003'")).contains("ALLERGY");
+        assertThat(text("SELECT match_warnings FROM adoption_applications WHERE adoption_code = 'A-D9004'")).contains("BUILDING_RULE");
+        assertThat(text("SELECT match_level FROM adoption_applications WHERE adoption_code = 'A-D9001'")).isIn("HIGH", "MEDIUM");
+    }
+
+    @Test
+    @Order(6)
+    void theApiReadsTheChatsAndPostAnalysesOfTheMongoSeed() throws Exception {
+        MONGO.copyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath("scripts/demo-data/seed-mongo.js"), "/seed.js");
+        String db = mongo.getDb().getName();
+        for (int pass = 0; pass < 2; pass++) {
+            var seeded = MONGO.execInContainer("mongosh", "--quiet", db, "--eval", "var DB_NAME = '" + db + "'", "/seed.js");
+            assertThat(seeded.getExitCode()).as(seeded.getStderr()).isZero();
+        }
+
+        UUID user1 = jdbc.queryForObject("SELECT " + id("user", 1), UUID.class);
+        var inbox = chats.listConversationsByCursor(user1, null, 20).getItems();
+        assertThat(inbox).hasSize(3);
+        assertThat(inbox).extracting(c -> c.getType()).containsExactlyInAnyOrder("GENERAL", "ADOPTION", "RESCUE");
+        assertThat(inbox).allMatch(c -> c.getOtherUserName() != null && c.getLastMessage() != null);
+        assertThat(inbox.stream().mapToInt(c -> c.getUnread()).sum()).isEqualTo(3);
+        var adoptionChat = inbox.stream().filter(c -> "ADOPTION".equals(c.getType())).findFirst().orElseThrow();
+        assertThat(chats.listMessagesByCursor(adoptionChat.getId(), user1, null, null, 20, "before").getItems()).hasSize(3);
+
+        UUID waiting = jdbc.queryForObject("SELECT " + id("post", 9001), UUID.class);
+        var analysis = postAnalyses.getAnalysis(waiting);
+        assertThat(analysis.getStatus()).hasToString("ANALYZED");
+        assertThat(analysis.getSuggestion().category()).hasToString("LOST");
+        assertThat(analysis.getSuggestion().province()).isEqualTo("Thành phố Hồ Chí Minh");
+    }
+
+    @Test
+    @Order(7)
     void runningTheSeedAgainChangesNothing() throws Exception {
         long before = count("SELECT COUNT(*) FROM rescue_cases") + count("SELECT COUNT(*) FROM pets")
                 + count("SELECT COUNT(*) FROM pet_medical_records");
@@ -125,7 +196,7 @@ class DemoDataScriptsIntegrationTest {
     }
 
     @Test
-    @Order(5)
+    @Order(8)
     void cleanupRemovesTheDemoDataAndKeepsRealData() throws Exception {
         UUID real = UUID.randomUUID();
         jdbc.update("INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name) VALUES (?, 'real.person', 'real@example.test', 'ACTIVE', TRUE, 'U-0001', 'Người thật')", real);
@@ -137,6 +208,15 @@ class DemoDataScriptsIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'")).isZero();
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%'")).isZero();
         assertThat(count("SELECT COUNT(*) FROM users WHERE user_id = '" + real + "'")).isEqualTo(1);
+    }
+
+    /** The id seed-postgres.sql gives a demo row, as SQL. */
+    private static String id(String kind, int n) {
+        return "md5('pet-rescue-demo:" + kind + ":" + n + "')::uuid";
+    }
+
+    private String text(String sql) {
+        return jdbc.queryForObject(sql, String.class);
     }
 
     private void run(String script) throws Exception {

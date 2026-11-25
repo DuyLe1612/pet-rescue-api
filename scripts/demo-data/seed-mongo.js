@@ -52,7 +52,8 @@ const PHOTOS = {
 // City of demo_place idx 0..23.
 const CITIES = ['HCM', 'HN', 'DN', 'HCM', 'HCM', 'HN', 'DN', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM', 'HCM',
     'HN', 'HN', 'HN', 'HN', 'HN', 'HN', 'DN', 'DN', 'DN']
-    .map((c) => ({ HCM: 'TP. Hồ Chí Minh', HN: 'Hà Nội', DN: 'Đà Nẵng' }[c]));
+    // the address catalogue's own names, which the post province filter matches
+    .map((c) => ({ HCM: 'Thành phố Hồ Chí Minh', HN: 'Thành phố Hà Nội', DN: 'Thành phố Đà Nẵng' }[c]));
 
 function media(kind, idx) {
     return {
@@ -103,9 +104,104 @@ const POSTS = [
     { caseN: 23, tags: ['rescue'], text: 'Bé cún nâu này bị ghẻ khá nặng, hay nằm ở bậc thềm đá gần nhà mình. Bé vẫn ăn uống được, cần người đưa đi điều trị da.' },
 ];
 
-const postIds = POSTS.map((_, i) => did('post', i + 1));
+// ── demo.user1's own posts: what the AI read, one waiting for user1 to confirm, one confirmed ──
+const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000);
+const USER1 = { userId: did('user', 1), fullName: USER_NAMES[0] };
+const OWN_POSTS = [
+    {
+        n: 9001, status: 'ANALYZED', hours: 3, photo: ['pet-cat', 5], tags: ['lost-pet'],
+        text: 'mn oi meo nha minh ten Muc, long den tuyen, deo vong co do, lac o gan cho Ba Chieu q.binh thanh tu toi hom kia. ai thay ib minh voi, cam on nhieu!!',
+        suggested: {
+            category: 'LOST', species: 'Cat', locationText: 'Gần chợ Bà Chiểu', district: 'Phường Bình Thạnh',
+            province: 'Thành phố Hồ Chí Minh', needsRescue: false, rescueSummary: null, urgency: null,
+            tags: ['lost-pet'], categoryConfidence: 0.93, speciesConfidence: 0.97, locationConfidence: 0.82,
+        },
+        facets: { category: 'GENERAL', species: null, district: null, province: null, needsRescue: false },
+    },
+    {
+        n: 9002, status: 'CONFIRMED', hours: 26, photo: ['pet-dog', 9], tags: ['care'],
+        text: 'Gấu nhà mình hồi phục gần hết rồi nè, giờ chạy nhảy cả ngày. Cảm ơn phòng khám An Tâm đã giảm phí cho bé được cứu hộ.',
+        suggested: {
+            category: 'GENERAL', species: 'Dog', locationText: null, district: null, province: null, needsRescue: false,
+            rescueSummary: null, urgency: null, tags: ['care'], categoryConfidence: 0.88, speciesConfidence: 0.95,
+            locationConfidence: 0.1,
+        },
+        facets: { category: 'GENERAL', species: 'Dog', district: null, province: null, needsRescue: false },
+    },
+];
+
+// ── demo.user1's chats: a friend, the centre about the application, the rescuer of case R-D0030 ──
+// Three people, each pair once: [peer kind, peer n, peer name, type, related row, conversation name, related info, messages]
+// Each message is [from user1?, text, hours ago]. The last message from the peer stays unread for user1.
+const CHATS = [
+    { n: 1, peer: ['user', 2, USER_NAMES[1]], type: 'GENERAL', related: null, name: null, info: null, msgs: [
+        [false, 'Ê bà, cuối tuần này đi ngày hội nhận nuôi ở công viên không?', 30],
+        [true, 'Đi chứ, tui đang tính nhận thêm một bé chó ở Mái Ấm Sài Gòn nè.', 29],
+        [false, 'Bé nào vậy, gửi tui coi với.', 28],
+        [true, 'Bé Gạo, hiền lắm, tui vừa nộp đơn xong.', 27],
+        [false, 'Dễ thương ghê! Có gì kể tui nghe nha.', 2],
+    ] },
+    { n: 2, peer: ['owner', 1, 'Trần Thị Hồng Nhung'], type: 'ADOPTION', related: did('application', 9001),
+      name: 'Đơn nhận nuôi A-D9001', info: 'Gạo', msgs: [
+        [false, 'Chào bạn, trạm đã nhận đơn nhận nuôi bé Gạo. Bạn rảnh qua trạm gặp bé vào thứ Bảy được không?', 20],
+        [true, 'Dạ được ạ, khoảng 9 giờ sáng em qua nha chị.', 19],
+        [false, 'Ok bạn, nhớ mang theo CCCD nhé. Hẹn gặp bạn!', 18],
+    ] },
+    { n: 3, peer: ['user', 12, USER_NAMES[11]], type: 'RESCUE', related: did('case', 30),
+      name: 'Ca R-D0030', info: 'Mèo', msgs: [
+        [false, 'Mình nhận ca bạn báo rồi nha, đang chạy qua.', 1],
+        [true, 'Cảm ơn bạn nhiều! Bé trốn dưới gầm chiếc xe màu xám đó.', 0.9],
+        [false, 'Bế được bé rồi, mình gửi báo cáo hoàn tất, bạn xác nhận giúp mình nhé.', 0.3],
+    ] },
+];
+const chatIds = CHATS.map((c) => did('conversation', c.n));
+
+// UUID as the plain lowercase string the API uses for map keys and the direct key.
+const hex = (u) => u.toString('hex').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5');
+
+function seedChat(c) {
+    const id = did('conversation', c.n);
+    const me = did('user', 1);
+    const peer = did(c.peer[0], c.peer[1]);
+    const messages = c.msgs.map(([mine, content, h], i) => ({
+        messageId: did('message', c.n * 100 + i + 1), seq: i + 1, senderId: mine ? me : peer, content: content,
+        sentAt: hoursAgo(h), createdAt: hoursAgo(h), updatedAt: hoursAgo(h), deleted: false,
+    }));
+    const last = messages[messages.length - 1];
+    const lastMessage = { messageId: last.messageId, seq: last.seq, senderId: last.senderId, preview: last.content, at: last.sentAt };
+    const started = messages[0].sentAt;
+    const [a, b] = [hex(me), hex(peer)].sort();
+    const unreadForMe = hex(last.senderId) === hex(peer) ? 1 : 0;
+    const readSeq = {};
+    readSeq[hex(me)] = last.seq - unreadForMe;
+    readSeq[hex(peer)] = last.seq;
+
+    const fresh = target.conversations.updateOne({ _id: id }, { $setOnInsert: {
+        type: c.type, name: c.name, relatedEntityId: c.related, relatedInfo: c.info, participantIds: [me, peer],
+        directKey: c.type + ':' + (c.related ? hex(c.related) : '-') + ':' + a + ':' + b,
+        seq: last.seq, readSeq: readSeq, lastMessage: lastMessage, lastMessageAt: last.sentAt,
+        createdAt: started, createdBy: me, updatedAt: last.sentAt, deleted: false,
+    } }, { upsert: true }).upsertedCount;
+    if (!fresh) return 0;
+    target.message_buckets.updateOne({ _id: hex(id) + ':0' },
+        { $setOnInsert: { conversationId: id, bucketNo: NumberLong('0'), messages: messages } }, { upsert: true });
+    [[me, peer, c.peer[2], unreadForMe], [peer, me, USER1.fullName, 0]].forEach(([owner, other, otherName, unread]) => {
+        target.inboxes.updateOne({ _id: hex(owner) + ':' + hex(id) }, { $setOnInsert: {
+            userId: owner, conversationId: id, type: c.type, name: c.name, relatedEntityId: c.related, relatedInfo: c.info,
+            peer: { userId: other, name: otherName, avatarUrl: null }, lastMessage: lastMessage, unread: unread,
+            sortAt: last.sentAt, joinedAt: started, lastReadAt: unread ? messages[messages.length - 2].sentAt : last.sentAt,
+            hidden: false, createdAt: started,
+        } }, { upsert: true });
+    });
+    return 1;
+}
+
+const postIds = POSTS.map((_, i) => did('post', i + 1)).concat(OWN_POSTS.map((p) => did('post', p.n)));
 
 if (typeof CLEANUP !== 'undefined' && CLEANUP) {
+    print('Removed chats: ' + target.conversations.deleteMany({ _id: { $in: chatIds } }).deletedCount);
+    target.message_buckets.deleteMany({ conversationId: { $in: chatIds } });
+    target.inboxes.deleteMany({ conversationId: { $in: chatIds } });
     print('Removed posts: ' + target.posts.deleteMany({ _id: { $in: postIds } }).deletedCount);
     print('Removed comments: ' + target.comments.deleteMany({ postId: { $in: postIds } }).deletedCount);
     print('Removed likes: ' + target.post_likes.deleteMany({ '_id.postId': { $in: postIds } }).deletedCount);
@@ -141,6 +237,22 @@ if (typeof CLEANUP !== 'undefined' && CLEANUP) {
         if (linked) doc.rescueCase = { caseId: linked.caseId, status: linked.status };
         written += target.posts.updateOne({ _id: did('post', n) }, { $setOnInsert: doc }, { upsert: true }).upsertedCount;
     });
+    OWN_POSTS.forEach((p) => {
+        const at = hoursAgo(p.hours);
+        const doc = {
+            author: USER1, content: p.text, media: [media(p.photo[0], p.photo[1])], tags: p.tags,
+            stats: { likes: 4, comments: 0 }, previewComments: [], facets: p.facets,
+            analysis: {
+                status: p.status, schemaVersion: 1, model: 'openrouter/google/gemini-2.5-flash-lite', analyzedAt: at,
+                attempts: 1, totalAttempts: 1, suggested: p.suggested, updatedAt: at,
+                confirmedBy: p.status === 'CONFIRMED' ? USER1.userId : null,
+                confirmedAt: p.status === 'CONFIRMED' ? at : null,
+            },
+            createdAt: at, createdBy: USER1.userId, updatedAt: at, deleted: false,
+        };
+        written += target.posts.updateOne({ _id: did('post', p.n) }, { $setOnInsert: doc }, { upsert: true }).upsertedCount;
+    });
+    const chats = CHATS.reduce((sum, c) => sum + seedChat(c), 0);
     print('Database: ' + target.getName() + '. New posts: ' + written + ', total demo posts: '
-        + target.posts.countDocuments({ _id: { $in: postIds } }));
+        + target.posts.countDocuments({ _id: { $in: postIds } }) + '. New chats: ' + chats);
 }

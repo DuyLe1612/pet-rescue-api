@@ -10,6 +10,12 @@ import java.util.UUID;
 
 public interface AdoptionCommandPort {
     AdoptionApplication submit(CreateAdoptionRequestDto cmd, UUID applicantId);
+
+    /**
+     * Scores open applications that were filed before both sides could be compared (no adopter
+     * profile or no pet traits yet), with the same evaluation as on submit. Returns how many were scored.
+     */
+    int backfillMatches(int limit);
     AdoptionApplication approve(UUID applicationId, DecisionRequestDto decision, UUID decidedBy);
     AdoptionApplication reject(UUID applicationId, DecisionRequestDto decision, UUID decidedBy);
     AdoptionApplication cancel(UUID applicationId, UUID requesterId);

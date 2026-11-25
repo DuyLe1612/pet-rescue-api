@@ -20,7 +20,18 @@ public class PostAnalysisValidator {
 
     static final int MAX_TAGS = 10;
 
+    private final VietnamPlaceResolver places;
+
+    public PostAnalysisValidator(VietnamPlaceResolver places) {
+        this.places = places;
+    }
+
     public record Outcome(PostAnalysisSuggestion suggestion, List<String> errors, boolean fatal) {
+    }
+
+    /** Where a province and area the author typed point to; unknown parts are null. */
+    public VietnamPlaceResolver.Place place(String province, String area) {
+        return places.resolve(province, area, null);
     }
 
     public Outcome validate(PostAnalysisSuggestion s, Catalog catalog) {
@@ -37,19 +48,27 @@ public class PostAnalysisValidator {
             speciesConfidence = null;
         }
 
+        // The province is stored as the catalogue names it, so filters match; the area is the ward
+        // when the post names one, else the old district as a label ("Quận 9 (cũ)").
+        VietnamPlaceResolver.Place place = places.resolve(s.province(), s.district(), s.locationText());
+        if (blankToNull(s.province()) != null && place.provinceName() == null) {
+            errors.add("unknown province: " + s.province());
+        }
+        boolean located = place.provinceName() != null || place.area() != null;
+
         PostAnalysisSuggestion clean = new PostAnalysisSuggestion(
                 s.category(),
                 species,
                 blankToNull(s.locationText()),
-                blankToNull(s.district()),
-                blankToNull(s.province()),
+                place.area(),
+                place.provinceName(),
                 s.needsRescue(),
                 s.needsRescue() ? blankToNull(s.rescueSummary()) : null,
                 s.needsRescue() ? s.urgency() : null,
                 knownTags(s.tags(), catalog.tagCodes()),
                 clamp("category confidence", s.categoryConfidence(), errors),
                 species == null ? null : clamp("species confidence", speciesConfidence, errors),
-                clamp("location confidence", s.locationConfidence(), errors));
+                located ? clamp("location confidence", s.locationConfidence(), errors) : null);
         return new Outcome(clean, errors, false);
     }
 

@@ -228,6 +228,11 @@ public class AccessControlDomainService {
                 || hasOrgRole(owner.getOwnerId(), requesterId, PET_MANAGER_ROLES));
     }
 
+    /** Admins and the centre's own members see its day-to-day work; everyone else the public figures. */
+    public boolean canSeeOrganizationOperations(UUID organizationId, UUID requesterId) {
+        return requesterId != null && (isAdmin(requesterId) || isOrgMember(organizationId, requesterId));
+    }
+
     // ── Organization helpers ────────────────────────
 
     private boolean isOrgMember(UUID organizationId, UUID requesterId) {

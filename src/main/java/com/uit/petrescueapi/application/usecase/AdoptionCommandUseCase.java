@@ -64,6 +64,21 @@ public class AdoptionCommandUseCase implements AdoptionCommandPort {
     }
 
     @Override
+    public int backfillMatches(int limit) {
+        int scored = 0;
+        for (UUID id : domainService.findOpenWithoutMatch(limit)) {
+            final boolean[] done = {false};
+            domainService.recordMatch(id, application ->
+                    matchingQueryPort.evaluate(application.getApplicantId(), application.getPetId()).ifPresent(evaluation -> {
+                        freezeMatch(application, evaluation);
+                        done[0] = true;
+                    }));
+            if (done[0]) scored++;
+        }
+        return scored;
+    }
+
+    @Override
     public AdoptionApplication approve(UUID applicationId, DecisionRequestDto decision, UUID decidedBy) {
         log.debug("Command: approve adoption application {}", applicationId);
         return domainService.approve(applicationId, decidedBy, decision.getReadyAt(), decision.getReasonCode());

@@ -50,6 +50,33 @@ public class OrganizationQueryAdapter implements OrganizationQueryDataPort {
     }
 
     @Override
+    public Optional<com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto> findOverview(UUID id, boolean withOperations) {
+        return queryRepo.findOverview(id).map(p -> com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto.builder()
+                .organizationId(p.getOrganizationId())
+                .availablePets(n(p.getAvailablePets()))
+                .petsInCare(n(p.getPetsInCare()))
+                .adoptedPets(n(p.getAdoptedPets()))
+                .rescuedCases(n(p.getRescuedCases()))
+                .operations(!withOperations ? null
+                        : com.uit.petrescueapi.application.dto.organization.OrganizationOverviewDto.Operations.builder()
+                                .organizationCode(p.getOrganizationCode())
+                                .requestedByName(p.getRequestedByName())
+                                .createdAt(p.getCreatedAt())
+                                .pendingAdoptions(n(p.getPendingAdoptions()))
+                                .awaitingPickup(n(p.getAwaitingPickup()))
+                                .activeRescueClaims(n(p.getActiveRescueClaims()))
+                                .petsUnderTreatment(n(p.getPetsUnderTreatment()))
+                                .openFollowupAlerts(n(p.getOpenFollowupAlerts()))
+                                .activeMembers(n(p.getActiveMembers()))
+                                .build())
+                .build());
+    }
+
+    private static long n(Long value) {
+        return value == null ? 0 : value;
+    }
+
+    @Override
     public Page<OrganizationMemberResponseDto> findMembers(UUID organizationId, Pageable pageable) {
         return memberRepo.findByOrganizationId(organizationId, pageable).map(this::toMemberDto);
     }

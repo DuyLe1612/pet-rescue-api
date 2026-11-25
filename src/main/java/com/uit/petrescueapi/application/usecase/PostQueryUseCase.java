@@ -40,6 +40,19 @@ public class PostQueryUseCase implements PostQueryPort {
     private final PostQueryDataPort queryDataPort;
     private final PostReferencePort references;
     private final CloudStoragePort cloudStorage;
+    private final com.uit.petrescueapi.application.service.VietnamPlaceResolver places;
+
+    /** Facets store the catalogue name; accept "sg", "TP HCM" or the code "79" for it. */
+    private PostFeedFilter canonical(PostFeedFilter filter) {
+        if (filter == null) {
+            return PostFeedFilter.none();
+        }
+        if (filter.province() == null) {
+            return filter;
+        }
+        String name = places.resolve(filter.province(), null, null).provinceName();
+        return name == null ? filter : filter.withProvince(name);
+    }
 
     @Override
     public PostResponseDto findById(UUID postId, UUID viewerId) {
@@ -58,7 +71,7 @@ public class PostQueryUseCase implements PostQueryPort {
     @Override
     public Page<PostSummaryResponseDto> findAll(String search, PostFeedFilter filter, Pageable pageable) {
         log.debug("Query: find all posts (paginated, search={})", search);
-        Page<PostSummaryResponseDto> page = queryDataPort.findAllSummaries(search, filter == null ? PostFeedFilter.none() : filter, pageable);
+        Page<PostSummaryResponseDto> page = queryDataPort.findAllSummaries(search, canonical(filter), pageable);
         attachCaseCards(page.getContent());
         return page;
     }
@@ -66,7 +79,7 @@ public class PostQueryUseCase implements PostQueryPort {
     @Override
     public PostCursorResponseDto findFeedByCursor(LocalDateTime cursor, UUID cursorId, int size, UUID viewerId, PostFeedFilter filter) {
         log.debug("Query: find post feed by cursor {}, size {}", cursor, size);
-        PostCursorResponseDto feed = queryDataPort.findFeedByCursor(cursor, cursorId, size, viewerId, filter == null ? PostFeedFilter.none() : filter);
+        PostCursorResponseDto feed = queryDataPort.findFeedByCursor(cursor, cursorId, size, viewerId, canonical(filter));
         attachCaseCards(feed.getItems());
         return feed;
     }
