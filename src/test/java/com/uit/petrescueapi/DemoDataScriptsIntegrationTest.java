@@ -156,6 +156,8 @@ class DemoDataScriptsIntegrationTest {
         assertThat(text("SELECT match_warnings FROM adoption_applications WHERE adoption_code = 'A-D9003'")).contains("ALLERGY");
         assertThat(text("SELECT match_warnings FROM adoption_applications WHERE adoption_code = 'A-D9004'")).contains("BUILDING_RULE");
         assertThat(text("SELECT match_level FROM adoption_applications WHERE adoption_code = 'A-D9001'")).isIn("HIGH", "MEDIUM");
+        // user2 competes with user1 for the same pet, with nothing against it
+        assertThat(text("SELECT COALESCE(match_warnings, '') FROM adoption_applications WHERE adoption_code = 'A-D9002'")).isEmpty();
     }
 
     @Test

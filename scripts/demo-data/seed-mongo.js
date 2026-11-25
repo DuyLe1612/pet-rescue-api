@@ -138,12 +138,12 @@ const CHATS = [
         [false, 'Ê bà, cuối tuần này đi ngày hội nhận nuôi ở công viên không?', 30],
         [true, 'Đi chứ, tui đang tính nhận thêm một bé chó ở Mái Ấm Sài Gòn nè.', 29],
         [false, 'Bé nào vậy, gửi tui coi với.', 28],
-        [true, 'Bé Gạo, hiền lắm, tui vừa nộp đơn xong.', 27],
+        [true, 'Bé Ki, hiền lắm, tui vừa nộp đơn xong.', 27],
         [false, 'Dễ thương ghê! Có gì kể tui nghe nha.', 2],
     ] },
     { n: 2, peer: ['owner', 1, 'Trần Thị Hồng Nhung'], type: 'ADOPTION', related: did('application', 9001),
-      name: 'Đơn nhận nuôi A-D9001', info: 'Gạo', msgs: [
-        [false, 'Chào bạn, trạm đã nhận đơn nhận nuôi bé Gạo. Bạn rảnh qua trạm gặp bé vào thứ Bảy được không?', 20],
+      name: 'Đơn nhận nuôi A-D9001', info: 'Ki', msgs: [
+        [false, 'Chào bạn, trạm đã nhận đơn nhận nuôi bé Ki. Bạn rảnh qua trạm gặp bé vào thứ Bảy được không?', 20],
         [true, 'Dạ được ạ, khoảng 9 giờ sáng em qua nha chị.', 19],
         [false, 'Ok bạn, nhớ mang theo CCCD nhé. Hẹn gặp bạn!', 18],
     ] },
