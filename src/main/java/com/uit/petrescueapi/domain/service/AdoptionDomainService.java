@@ -45,6 +45,20 @@ import java.util.UUID;
 public class AdoptionDomainService {
 
     private final AdoptionApplicationRepository applicationRepository;
+
+    /** Open applications still missing a match score that can be computed now. */
+    @Transactional(readOnly = true)
+    public List<UUID> findOpenWithoutMatch(int limit) {
+        return applicationRepository.findOpenWithoutMatch(limit);
+    }
+
+    /** Loads one application, lets {@code score} write its match fields, saves it. */
+    public void recordMatch(UUID applicationId, java.util.function.Consumer<AdoptionApplication> score) {
+        applicationRepository.findById(applicationId).ifPresent(application -> {
+            score.accept(application);
+            applicationRepository.save(application);
+        });
+    }
     private final PetDomainService petDomainService;
     private final VisualCodeRepository visualCodeRepository;
     private final OrganizationDomainService organizationDomainService;

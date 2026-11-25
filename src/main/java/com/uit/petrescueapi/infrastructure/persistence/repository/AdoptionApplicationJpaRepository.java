@@ -18,6 +18,19 @@ public interface AdoptionApplicationJpaRepository extends JpaRepository<Adoption
 
     long countByApplicantIdAndStatusAndDeletedFalse(UUID applicantId, AdoptionApplicationStatus status);
 
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT a.application_id
+            FROM adoption_applications a
+            WHERE a.is_deleted = FALSE
+              AND a.status IN ('PENDING', 'APPROVED')
+              AND a.match_level IS NULL
+              AND EXISTS (SELECT 1 FROM adopter_profiles p WHERE p.user_id = a.applicant_id)
+              AND EXISTS (SELECT 1 FROM pet_traits t WHERE t.pet_id = a.pet_id)
+            ORDER BY a.created_at
+            LIMIT :limit
+            """, nativeQuery = true)
+    java.util.List<UUID> findOpenWithoutMatch(@org.springframework.data.repository.query.Param("limit") int limit);
+
     @org.springframework.data.jpa.repository.Query("""
             SELECT DISTINCT a.applicantId FROM AdoptionApplicationJpaEntity a
             WHERE a.petId = :petId AND a.applicationId <> :exceptId AND a.deleted = false
