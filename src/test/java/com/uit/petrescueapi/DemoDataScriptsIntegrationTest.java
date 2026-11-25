@@ -200,6 +200,18 @@ class DemoDataScriptsIntegrationTest {
     void cleanupRemovesTheDemoDataAndKeepsRealData() throws Exception {
         UUID real = UUID.randomUUID();
         jdbc.update("INSERT INTO users (user_id, username, email, status, email_verified, user_code, full_name) VALUES (?, 'real.person', 'real@example.test', 'ACTIVE', TRUE, 'U-0001', 'Người thật')", real);
+        // During a demo, user1 reports a case (the API gives it a real code) and a real person keeps the pet from it.
+        jdbc.update("""
+                INSERT INTO rescue_cases (case_id, case_code, reported_by, species, location, status, reported_at, created_at)
+                SELECT gen_random_uuid(), 'R-0001', reported_by, species, location, 'RESCUED', now(), now()
+                FROM rescue_cases WHERE case_code = 'R-D0030'
+                """);
+        jdbc.update("""
+                INSERT INTO pets (pet_id, pet_code, name, species_id, status, rescue_case_id, created_at)
+                SELECT gen_random_uuid(), 'P-0001', 'Bé thật', species_id, 'ADOPTED',
+                       (SELECT case_id FROM rescue_cases WHERE case_code = 'R-0001'), now()
+                FROM pets WHERE pet_code = 'P-D0001'
+                """);
 
         run("cleanup-postgres.sql");
 
@@ -208,6 +220,11 @@ class DemoDataScriptsIntegrationTest {
         assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'")).isZero();
         assertThat(count("SELECT COUNT(*) FROM organizations WHERE organization_code LIKE 'O-D%'")).isZero();
         assertThat(count("SELECT COUNT(*) FROM users WHERE user_id = '" + real + "'")).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM rescue_cases WHERE case_code = 'R-0001'")).as("a demo user's case goes too").isZero();
+        assertThat(count("SELECT COUNT(*) FROM pets WHERE pet_code = 'P-0001' AND rescue_case_id IS NULL")).as("the real pet stays").isEqualTo(1);
+        for (String table : new String[] {"adopter_profiles", "pet_traits", "adoption_followups", "followup_alerts", "rescue_case_flags", "rescue_case_triage", "case_match_suggestions", "banners"}) {
+            assertThat(count("SELECT COUNT(*) FROM " + table)).as(table).isZero();
+        }
     }
 
     /** The id seed-postgres.sql gives a demo row, as SQL. */
