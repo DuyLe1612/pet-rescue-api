@@ -11,7 +11,9 @@ CREATE TEMP TABLE gone_users ON COMMIT DROP AS SELECT user_id FROM users WHERE u
 CREATE TEMP TABLE gone_orgs  ON COMMIT DROP AS
     SELECT organization_id FROM organizations WHERE organization_code LIKE 'O-D%' OR organization_code LIKE 'DMO%';
 CREATE TEMP TABLE gone_pets  ON COMMIT DROP AS SELECT pet_id FROM pets WHERE pet_code LIKE 'P-D%' OR pet_code LIKE 'DMP%';
-CREATE TEMP TABLE gone_cases ON COMMIT DROP AS SELECT case_id FROM rescue_cases WHERE case_code LIKE 'R-D%' OR case_code LIKE 'DMC%';
+CREATE TEMP TABLE gone_cases ON COMMIT DROP AS
+    SELECT case_id FROM rescue_cases
+    WHERE case_code LIKE 'R-D%' OR case_code LIKE 'DMC%' OR reported_by IN (SELECT user_id FROM gone_users);
 CREATE TEMP TABLE gone_apps  ON COMMIT DROP AS
     SELECT application_id FROM adoption_applications
     WHERE adoption_code LIKE 'A-D%' OR adoption_code LIKE 'DMA%'

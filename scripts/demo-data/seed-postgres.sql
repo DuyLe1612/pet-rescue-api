@@ -620,6 +620,7 @@ UPDATE adopter_profiles SET housing_type = 'HOUSE', building_rule = 'ALLOWED', h
                             monthly_budget = 2000000, emergency_vet_budget = 5000000, adjustment_weeks_expected = 8,
                             experience_level = 4, willing_training = TRUE, province_code = '79'
 WHERE user_id = pg_temp.did('user', 1);
+UPDATE adopter_profiles SET housing_type = 'HOUSE', building_rule = 'ALLOWED' WHERE user_id = pg_temp.did('user', 2);
 UPDATE adopter_profiles SET allergy_dog = TRUE WHERE user_id = pg_temp.did('user', 3);
 UPDATE adopter_profiles SET housing_type = 'APARTMENT', building_rule = 'SMALL_ONLY' WHERE user_id = pg_temp.did('user', 4);
 
