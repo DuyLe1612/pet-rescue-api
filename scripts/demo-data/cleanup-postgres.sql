@@ -27,6 +27,7 @@ CREATE TEMP TABLE gone_media ON COMMIT DROP AS
     SELECT media_id FROM media_files WHERE uploader_id IN (SELECT user_id FROM gone_users);
 
 DELETE FROM notifications WHERE user_id IN (SELECT user_id FROM gone_users);
+DELETE FROM banners WHERE created_by IN (SELECT user_id FROM gone_users);
 DELETE FROM friend_requests WHERE requester_id IN (SELECT user_id FROM gone_users) OR addressee_id IN (SELECT user_id FROM gone_users);
 
 DELETE FROM rescue_completion_media WHERE completion_id IN (SELECT completion_id FROM gone_completions)
@@ -36,6 +37,23 @@ DELETE FROM rescue_case_claims WHERE case_id IN (SELECT case_id FROM gone_cases)
     OR user_id IN (SELECT user_id FROM gone_users)
     OR organization_id IN (SELECT organization_id FROM gone_orgs);
 DELETE FROM rescue_media WHERE case_id IN (SELECT case_id FROM gone_cases) OR media_id IN (SELECT media_id FROM gone_media);
+DELETE FROM rescue_case_update_media WHERE media_id IN (SELECT media_id FROM gone_media)
+    OR update_id IN (SELECT update_id FROM rescue_case_updates
+                     WHERE case_id IN (SELECT case_id FROM gone_cases) OR author_id IN (SELECT user_id FROM gone_users));
+DELETE FROM rescue_case_updates WHERE case_id IN (SELECT case_id FROM gone_cases) OR author_id IN (SELECT user_id FROM gone_users);
+DELETE FROM rescue_case_flags WHERE case_id IN (SELECT case_id FROM gone_cases) OR user_id IN (SELECT user_id FROM gone_users);
+DELETE FROM rescue_case_triage WHERE case_id IN (SELECT case_id FROM gone_cases);
+DELETE FROM case_match_suggestions WHERE lost_case_id IN (SELECT case_id FROM gone_cases)
+    OR other_case_id IN (SELECT case_id FROM gone_cases);
+
+-- After adoption: alerts point at check-ins, both at the application.
+DELETE FROM followup_alerts WHERE application_id IN (SELECT application_id FROM gone_apps);
+DELETE FROM adoption_followups WHERE application_id IN (SELECT application_id FROM gone_apps);
+DELETE FROM adoption_outcomes WHERE application_id IN (SELECT application_id FROM gone_apps);
+DELETE FROM adopter_profiles WHERE user_id IN (SELECT user_id FROM gone_users);
+DELETE FROM pet_traits WHERE pet_id IN (SELECT pet_id FROM gone_pets);
+UPDATE pets_current_owner SET adoption_application_id = NULL WHERE adoption_application_id IN (SELECT application_id FROM gone_apps);
+UPDATE pet_ownerships SET adoption_application_id = NULL WHERE adoption_application_id IN (SELECT application_id FROM gone_apps);
 
 DELETE FROM reclaim_logs WHERE application_id IN (SELECT application_id FROM gone_apps)
     OR pet_id IN (SELECT pet_id FROM gone_pets)

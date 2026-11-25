@@ -531,6 +531,395 @@ SELECT pg_temp.did('notification', d.n), pg_temp.did('user', d.reporter_n), 'RES
 FROM demo_case d WHERE d.status = 'IN_PROGRESS'
 ON CONFLICT DO NOTHING;
 
+-- ══ Every feature has data ═════════════════════════════════════════════════════
+-- The scenarios in README "Kịch bản demo" run on three accounts: demo.user1, demo.owner1
+-- (organization 1, Trạm cứu hộ Mái Ấm Sài Gòn, in TP.HCM) and demo.admin. Organization 1 has
+-- pets 1, 7, 13, 19, 31, 37, 43 and 49 (all dogs). Rows made only for a scenario use number 9001
+-- and up, so they never collide with the generated ones.
+
+-- How each pet came to its owner ("Thú của tôi" shows it).
+UPDATE pets_current_owner o
+SET acquisition_type = CASE WHEN d.sheltered THEN 'ORG_INTAKE' ELSE 'ADOPTED' END,
+    adoption_application_id = CASE WHEN d.sheltered THEN NULL ELSE pg_temp.did('application', d.n) END
+FROM demo_pet d
+WHERE o.pet_id = pg_temp.did('pet', d.n) AND o.acquisition_type IS NULL;
+
+UPDATE pet_ownerships w
+SET acquisition_type = o.acquisition_type, adoption_application_id = o.adoption_application_id
+FROM pets_current_owner o
+WHERE w.pet_id = o.pet_id AND w.owner_id = o.owner_id AND w.acquisition_type IS NULL
+  AND w.pet_id IN (SELECT pg_temp.did('pet', n) FROM demo_pet);
+
+UPDATE adoption_applications SET completed_at = COALESCE(completed_at, decided_at, updated_at)
+WHERE adoption_code LIKE 'A-D%' AND status = 'COMPLETED';
+
+-- ── Matching: traits for every pet, adopter profiles for users 1–20 (21–30 have none) ──
+
+INSERT INTO pet_traits (pet_id, friendly_people, friendly_children, fear_strangers, fear_noise, energy, good_with_dogs,
+                        good_with_cats, alone_minutes, house_trained, bite_history, bite_verified, size, noise_level,
+                        monthly_cost, care_level, source_role, note, updated_by, updated_at)
+SELECT pg_temp.did('pet', d.n),
+       3 + d.n % 3,
+       CASE WHEN d.n % 4 = 0 THEN 2 ELSE 4 END,
+       1 + d.n % 3,
+       1 + (d.n + 1) % 3,
+       1 + d.n % 5,
+       CASE WHEN d.species = 'Dog' THEN 4 ELSE 2 + d.n % 3 END,
+       CASE WHEN d.species = 'Cat' THEN 5 ELSE 2 + d.n % 3 END,
+       (ARRAY[120, 240, 360, 480])[1 + d.n % 4],
+       2 + d.n % 4,
+       CASE WHEN d.n % 13 = 0 THEN 'MINOR' ELSE 'NONE' END,
+       FALSE,
+       CASE WHEN d.species = 'Cat' THEN 'SMALL' ELSE (ARRAY['SMALL','MEDIUM','LARGE'])[1 + d.n % 3] END,
+       1 + d.n % 4,
+       CASE WHEN d.species = 'Dog' THEN 600000 + (d.n % 4) * 150000 ELSE 400000 + (d.n % 3) * 100000 END,
+       CASE WHEN d.health IN ('UNDER_TREATMENT', 'SPECIAL_NEEDS') THEN 'HIGH' WHEN d.health = 'RECOVERING' THEN 'MEDIUM' ELSE 'LOW' END,
+       'STAFF',
+       format('%s quan sát được sau %s ngày ở trạm.', d.name, 14 + d.n % 20),
+       pg_temp.did('staff', d.org_n),
+       now() - interval '20 days'
+FROM demo_pet d
+ON CONFLICT DO NOTHING;
+
+-- Pet 13 suits a calm home with older children; pet 31 is a large dog.
+UPDATE pet_traits SET friendly_children = 5, energy = 3, alone_minutes = 360, size = 'MEDIUM', good_with_cats = 4,
+                      note = 'Hiền, quen trẻ lớn, ở nhà một mình được nửa ngày.'
+WHERE pet_id = pg_temp.did('pet', 13);
+UPDATE pet_traits SET size = 'LARGE', energy = 5, alone_minutes = 120 WHERE pet_id = pg_temp.did('pet', 31);
+
+INSERT INTO adopter_profiles (user_id, housing_type, building_rule, has_children_under_5, has_children_5_to_8,
+                              has_children_over_8, allergy_dog, allergy_cat, has_dog, has_cat, hours_away_per_day,
+                              activity_level, monthly_budget, emergency_vet_budget, adjustment_weeks_expected,
+                              intolerable_behaviors, return_circumstances, relocation_plan, experience_level,
+                              willing_training, province_code, consent_at, created_at, updated_at)
+SELECT pg_temp.did('user', n),
+       (ARRAY['HOUSE','APARTMENT','HOUSE','APARTMENT','FARM'])[1 + n % 5],
+       (ARRAY['ALLOWED','ALLOWED','SMALL_ONLY','ALLOWED','UNKNOWN'])[1 + n % 5],
+       n % 6 = 0, n % 5 = 0, n % 4 = 0,
+       FALSE, n % 9 = 0,
+       n % 3 = 0, n % 4 = 1,
+       (ARRAY[2, 4, 6, 8, 10])[1 + n % 5],
+       1 + n % 5,
+       (ARRAY[500000, 1000000, 1500000, 2000000])[1 + n % 4],
+       (ARRAY[1000000, 2000000, 5000000])[1 + n % 3],
+       (ARRAY[2, 4, 8])[1 + n % 3],
+       CASE WHEN n % 2 = 0 THEN 'Cắn người' ELSE 'Cắn phá đồ đạc liên tục' END,
+       'Chỉ khi cả nhà phải đi nước ngoài dài hạn.',
+       'Mang bé theo khi chuyển nhà.',
+       1 + n % 5,
+       n % 3 <> 1,
+       (SELECT province_code FROM demo_place WHERE idx = n % 24),
+       now() - interval '30 days', now() - interval '30 days', now() - interval '5 days'
+FROM generate_series(1, 20 * pg_temp.scale()) n
+ON CONFLICT DO NOTHING;
+
+-- user1: house in HCMC, works from home, experienced. user3 is allergic to dogs; user4's building allows small pets only.
+UPDATE adopter_profiles SET housing_type = 'HOUSE', building_rule = 'ALLOWED', has_children_under_5 = FALSE,
+                            has_children_5_to_8 = FALSE, has_children_over_8 = TRUE, allergy_dog = FALSE, allergy_cat = FALSE,
+                            has_dog = FALSE, has_cat = TRUE, hours_away_per_day = 3, activity_level = 3,
+                            monthly_budget = 2000000, emergency_vet_budget = 5000000, adjustment_weeks_expected = 8,
+                            experience_level = 4, willing_training = TRUE, province_code = '79'
+WHERE user_id = pg_temp.did('user', 1);
+UPDATE adopter_profiles SET allergy_dog = TRUE WHERE user_id = pg_temp.did('user', 3);
+UPDATE adopter_profiles SET housing_type = 'APARTMENT', building_rule = 'SMALL_ONLY' WHERE user_id = pg_temp.did('user', 4);
+
+-- ── Applications at organization 1. Their match is filled in by the backend's backfill job ──
+-- (MatchBackfillWorker, a few seconds after start and every 5 minutes), with the same rules as on submit.
+
+INSERT INTO adoption_applications (application_id, adoption_code, pet_id, applicant_id, organization_id, status, note,
+                                   experience, live_condition, decided_at, decided_by, ready_at, completed_at,
+                                   created_at, updated_at)
+SELECT pg_temp.did('application', a.n), pg_temp.code('A-D', a.n), pg_temp.did('pet', a.pet_n),
+       pg_temp.did('user', a.user_n), pg_temp.did('org', 1), a.status, a.note,
+       'Đã nuôi chó mèo vài năm.', a.home,
+       CASE WHEN a.status <> 'PENDING' THEN now() - a.age + interval '1 day' END,
+       CASE WHEN a.status <> 'PENDING' THEN pg_temp.did('owner', 1) END,
+       CASE WHEN a.status = 'APPROVED' THEN now() + interval '3 days' END,
+       CASE WHEN a.status = 'COMPLETED' THEN a.done END,
+       now() - a.age, now() - interval '1 hour'
+FROM (VALUES
+    (9001, 13, 1,  'PENDING',   interval '2 days',  NULL::timestamptz, 'Nhà mình có sân và một bé mèo đã quen chó. Mình làm việc ở nhà nên có thời gian dắt bé đi dạo.', 'Nhà phố có sân, con lớn 10 tuổi.'),
+    (9002, 13, 2,  'PENDING',   interval '1 day',   NULL, 'Mình muốn nhận bé để làm bạn với con trai.', 'Căn hộ chung cư.'),
+    (9003, 19, 3,  'PENDING',   interval '3 days',  NULL, 'Mình rất thích chó dù hơi dị ứng lông, sẽ uống thuốc.', 'Nhà phố.'),
+    (9004, 31, 4,  'PENDING',   interval '4 days',  NULL, 'Mình muốn nuôi một bé chó lớn để giữ nhà.', 'Căn hộ chung cư, ban quản lý chỉ cho nuôi thú nhỏ.'),
+    (9005, 37, 5,  'APPROVED',  interval '5 days',  NULL, 'Mình đã chuẩn bị chuồng và đồ ăn cho bé.', 'Nhà vườn.'),
+    (9006, 43, 21, 'PENDING',   interval '6 hours', NULL, 'Mình mới tìm hiểu, muốn nhận bé về nuôi.', 'Nhà thuê.'),
+    (9007, 1,  1,  'COMPLETED', interval '18 days', now() - interval '16 days', 'Mình đã sẵn sàng đón bé.', 'Nhà phố có sân.'),
+    (9008, 49, 6,  'COMPLETED', interval '22 days', now() - interval '20 days', 'Gia đình mình rất mong có bé.', 'Căn hộ.'),
+    (9009, 7,  7,  'COMPLETED', interval '45 days', now() - interval '40 days', 'Mình nhận bé làm bạn.', 'Nhà phố.')
+) AS a(n, pet_n, user_n, status, age, done, note, home)
+ON CONFLICT DO NOTHING;
+
+-- Pets 1 and 49 went home with their adopters; pet 7 came back to the centre after a reclaim.
+UPDATE pets SET status = 'ADOPTED' WHERE pet_id IN (pg_temp.did('pet', 1), pg_temp.did('pet', 49));
+UPDATE pets_current_owner o SET owner_type = 'USER', owner_id = v.user_id, acquisition_type = 'ADOPTED',
+                                adoption_application_id = v.app_id
+FROM (VALUES (pg_temp.did('pet', 1), pg_temp.did('user', 1), pg_temp.did('application', 9007)),
+             (pg_temp.did('pet', 49), pg_temp.did('user', 6), pg_temp.did('application', 9008))) AS v(pet_id, user_id, app_id)
+WHERE o.pet_id = v.pet_id;
+UPDATE pet_ownerships SET to_time = now() - interval '16 days'
+WHERE pet_id = pg_temp.did('pet', 1) AND owner_type = 'ORGANIZATION' AND to_time IS NULL;
+UPDATE pet_ownerships SET to_time = now() - interval '20 days'
+WHERE pet_id = pg_temp.did('pet', 49) AND owner_type = 'ORGANIZATION' AND to_time IS NULL;
+INSERT INTO pet_ownerships (pet_id, owner_type, owner_id, from_time, to_time, acquisition_type, adoption_application_id)
+SELECT v.pet_id, 'USER', v.user_id, v.from_time, v.to_time, 'ADOPTED', v.app_id
+FROM (VALUES (pg_temp.did('pet', 1), pg_temp.did('user', 1), now() - interval '16 days', NULL::timestamptz, pg_temp.did('application', 9007)),
+             (pg_temp.did('pet', 49), pg_temp.did('user', 6), now() - interval '20 days', NULL, pg_temp.did('application', 9008)),
+             (pg_temp.did('pet', 7), pg_temp.did('user', 7), now() - interval '40 days', now() - interval '10 days', pg_temp.did('application', 9009))
+     ) AS v(pet_id, user_id, from_time, to_time, app_id)
+WHERE NOT EXISTS (SELECT 1 FROM pet_ownerships w WHERE w.pet_id = v.pet_id AND w.owner_id = v.user_id);
+
+-- ── After adoption: check-ins, alerts, the reclaim and its outcome ──
+
+INSERT INTO adoption_followups (followup_id, application_id, pet_id, adopter_id, organization_id, milestone, status, due_at,
+                                sent_at, responded_at, expires_at, answers, still_has_pet, severity, created_at)
+SELECT pg_temp.did('followup', f.n), pg_temp.did('application', f.app_n), pg_temp.did('pet', f.pet_n),
+       pg_temp.did('user', f.user_n), pg_temp.did('org', 1), f.milestone, f.status, f.due,
+       CASE WHEN f.status IN ('SENT', 'RESPONDED') THEN f.due END,
+       CASE WHEN f.status = 'RESPONDED' THEN f.due + interval '5 hours' END,
+       CASE WHEN f.status = 'SENT' THEN now() + interval '6 days' END,
+       f.answers::jsonb,
+       CASE WHEN f.answers IS NOT NULL THEN TRUE END,
+       f.severity,
+       now() - interval '16 days'
+FROM (VALUES
+    -- user1 and pet 1: day 2 answered, all well; week 2 waiting for an answer in the app
+    (9001, 9007, 1, 1, 'DAY_2',   'RESPONDED', now() - interval '14 days', '{"stillHasPet":true,"wellbeing":"NORMAL","fear":"SOME","incident":"NONE","support":"NONE","note":"Bé ăn ngủ tốt, hơi sợ tiếng xe máy."}', 'GREEN'),
+    (9002, 9007, 1, 1, 'WEEK_2',  'SENT',      now() - interval '2 days',  NULL, NULL),
+    (9003, 9007, 1, 1, 'MONTH_3', 'SCHEDULED', now() + interval '74 days', NULL, NULL),
+    (9004, 9007, 1, 1, 'MONTH_6', 'SCHEDULED', now() + interval '164 days', NULL, NULL),
+    -- user6 and pet 49: worried on day 2, thinking of giving the pet back at week 2
+    (9005, 9008, 49, 6, 'DAY_2',  'RESPONDED', now() - interval '18 days', '{"stillHasPet":true,"wellbeing":"WORRIED","fear":"MUCH","incident":"NONE","support":"ADVICE","note":"Bé tru cả đêm, không chịu ăn."}', 'YELLOW'),
+    (9006, 9008, 49, 6, 'WEEK_2', 'RESPONDED', now() - interval '6 days',  '{"stillHasPet":true,"wellbeing":"WORRIED","fear":"MUCH","incident":"NO_INJURY","support":"CONSIDERING_RETURN","note":"Bé gầm gừ với con nhỏ, nhà mình đang cân nhắc trả bé."}', 'RED'),
+    (9007, 9008, 49, 6, 'MONTH_3','SCHEDULED', now() + interval '70 days', NULL, NULL),
+    -- pet 7 was reclaimed: what was left is cancelled
+    (9008, 9009, 7, 7, 'DAY_2',   'RESPONDED', now() - interval '38 days', '{"stillHasPet":true,"wellbeing":"ALARMING","fear":"MUCH","incident":"INJURY","support":"NONE","note":"Bé bị nhốt ngoài ban công."}', 'RED'),
+    (9009, 9009, 7, 7, 'WEEK_2',  'CANCELLED', now() - interval '26 days', NULL, NULL)
+) AS f(n, app_n, pet_n, user_n, milestone, status, due, answers, severity)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO followup_alerts (alert_id, followup_id, application_id, organization_id, severity, reason_codes, status,
+                             assigned_to, first_action_at, resolved_at, resolution, note, created_at)
+VALUES
+    (pg_temp.did('alert', 9001), pg_temp.did('followup', 9006), pg_temp.did('application', 9008), pg_temp.did('org', 1),
+     'RED', 'CONSIDERING_RETURN,BEHAVIOR', 'OPEN', NULL, NULL, NULL, NULL, NULL, now() - interval '6 days'),
+    (pg_temp.did('alert', 9002), pg_temp.did('followup', 9005), pg_temp.did('application', 9008), pg_temp.did('org', 1),
+     'YELLOW', 'PET_HEALTH_WORRIED', 'IN_PROGRESS', pg_temp.did('staff', 1), now() - interval '17 days', NULL, NULL,
+     'Đã gọi điện hướng dẫn cho bé ăn pate trộn cơm.', now() - interval '18 days'),
+    (pg_temp.did('alert', 9003), pg_temp.did('followup', 9008), pg_temp.did('application', 9009), pg_temp.did('org', 1),
+     'RED', 'BITE_INJURY,PET_HEALTH', 'RESOLVED', pg_temp.did('owner', 1), now() - interval '37 days', now() - interval '10 days',
+     'RECLAIMED', 'Đã đến nhà kiểm tra và thu hồi bé.', now() - interval '38 days')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO reclaim_logs (reclaim_id, application_id, pet_id, organization_id, user_id, reclaimed_by, reason, proof_id,
+                          reputation_delta, reclaimed_at, created_at, created_by)
+VALUES (pg_temp.did('reclaim', 9001), pg_temp.did('application', 9009), pg_temp.did('pet', 7), pg_temp.did('org', 1),
+        pg_temp.did('user', 7), pg_temp.did('owner', 1),
+        'Bé bị nhốt ngoài ban công và bị thương ở chân; người nhận nuôi không hợp tác sau hai lần nhắc.',
+        (SELECT media_id FROM demo_media WHERE kind = 'case-dog' AND idx = 0), -300,
+        now() - interval '10 days', now() - interval '10 days', pg_temp.did('owner', 1))
+ON CONFLICT DO NOTHING;
+
+INSERT INTO adoption_outcomes (outcome_id, application_id, pet_id, outcome_type, reason_code, initiated_by, occurred_at,
+                               days_since_completed, note)
+VALUES (pg_temp.did('outcome', 9001), pg_temp.did('application', 9009), pg_temp.did('pet', 7), 'RECLAIMED', 'OTHER',
+        pg_temp.did('owner', 1), now() - interval '10 days', 30, 'Trạm thu hồi vì bé bị nhốt và bị thương.')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO reputation_logs (log_id, user_id, delta, reason, reference_type, reference_id, created_at, created_by)
+VALUES (pg_temp.did('reputation', 9001), pg_temp.did('user', 7), -300, 'RECLAIM', 'ADOPTION', pg_temp.did('application', 9009),
+        now() - interval '10 days', pg_temp.did('owner', 1)),
+       (pg_temp.did('reputation', 9002), pg_temp.did('user', 1), 50, 'RESCUE_COMPLETED', 'RESCUE_CASE', pg_temp.did('case', 19),
+        now() - interval '30 days', NULL),
+       (pg_temp.did('reputation', 9003), pg_temp.did('user', 1), 30, 'ADOPTION_COMPLETED', 'ADOPTION', pg_temp.did('application', 9007),
+        now() - interval '16 days', NULL)
+ON CONFLICT DO NOTHING;
+
+-- ── Rescue: updates, a report waiting for the reporter, a disputed report, flags, AI triage ──
+
+-- Case 30 was reported by user1; user12 is on it, posted progress and sent the result for user1 to confirm.
+INSERT INTO rescue_case_updates (update_id, case_id, author_id, note, created_at)
+VALUES (pg_temp.did('case-update', 9001), pg_temp.did('case', 30), pg_temp.did('user', 12),
+        'Mình đã tới nơi, bé trốn dưới gầm xe, đang dụ bé ra bằng pate.', now() - interval '50 minutes'),
+       (pg_temp.did('case-update', 9002), pg_temp.did('case', 30), pg_temp.did('user', 12),
+        'Đã bế được bé, chân trước bị trầy. Đang chở bé tới phòng khám An Tâm.', now() - interval '30 minutes'),
+       -- user1 is on case 49 and posted a first update
+       (pg_temp.did('case-update', 9003), pg_temp.did('case', 49), pg_temp.did('user', 1),
+        'Mình đang trên đường tới, khoảng 15 phút nữa.', now() - interval '40 minutes')
+ON CONFLICT DO NOTHING;
+INSERT INTO rescue_case_update_media (update_id, media_id, position)
+SELECT pg_temp.did('case-update', 9002), media_id, 0 FROM demo_media WHERE kind = 'case-cat' AND idx = 2
+ON CONFLICT DO NOTHING;
+
+INSERT INTO rescue_case_completions (completion_id, case_id, rescued_at, rescue_note, location_note, submitted_by, outcome,
+                                     status, created_at)
+VALUES (pg_temp.did('completion', 9001), pg_temp.did('case', 30), now() - interval '20 minutes',
+        'Bé đã được khám, chỉ trầy ngoài da. Mình giao bé cho Trạm Mái Ấm Sài Gòn chăm tiếp.', 'Phòng khám An Tâm',
+        pg_temp.did('user', 12), 'HANDED_TO_ORG', 'PENDING', now() - interval '20 minutes')
+ON CONFLICT DO NOTHING;
+INSERT INTO rescue_completion_media (completion_id, media_id)
+SELECT pg_temp.did('completion', 9001), media_id FROM demo_media WHERE kind = 'case-cat' AND idx = 2
+ON CONFLICT DO NOTHING;
+
+-- The reporter of case 8 says the rescue never happened: admins settle it.
+UPDATE rescue_case_completions SET status = 'DISPUTED', escalated_at = now() - interval '1 day',
+       reject_reason = 'Mình quay lại chỗ cũ vẫn thấy bé nằm đó, chưa ai đưa bé đi cả.'
+WHERE completion_id = pg_temp.did('completion', 8) AND status = 'PENDING';
+
+-- Case 79: user1 rescued the dog and kept it ("Thú của tôi").
+UPDATE rescue_case_completions SET outcome = 'KEPT_BY_RESCUER' WHERE completion_id = pg_temp.did('completion', 79);
+
+-- Flags: case 2 looks false to three people; user1 said case 1 is already handled.
+INSERT INTO rescue_case_flags (case_id, user_id, reason, note, created_at)
+VALUES (pg_temp.did('case', 2), pg_temp.did('user', 2), 'FALSE_REPORT', 'Mình ở gần đó, không thấy bé nào.', now() - interval '3 hours'),
+       (pg_temp.did('case', 2), pg_temp.did('user', 3), 'FALSE_REPORT', NULL, now() - interval '2 hours'),
+       (pg_temp.did('case', 2), pg_temp.did('user', 4), 'DUPLICATE', 'Trùng với một ca khác cùng hẻm.', now() - interval '1 hour'),
+       (pg_temp.did('case', 1), pg_temp.did('user', 1), 'ALREADY_HANDLED', 'Chiều qua đã có người đưa bé đi.', now() - interval '5 hours')
+ON CONFLICT DO NOTHING;
+
+-- What the AI read from every open case: the queue and the case detail show it.
+INSERT INTO rescue_case_triage (case_id, status, attempts, model, prompt_version, ai_urgency, needs_rescue, condition_summary,
+                                species, province, missing_fields, latency_ms, analyzed_at, created_at, updated_at)
+SELECT pg_temp.did('case', d.n), 'ANALYZED', 1, 'openrouter/google/gemini-2.5-flash-lite', 2,
+       CASE WHEN d.n % 9 = 0 AND d.priority = 'NORMAL' THEN 'HIGH' ELSE d.priority END,
+       TRUE,
+       CASE d.priority
+           WHEN 'CRITICAL' THEN 'Bé bị thương nặng, chảy máu hoặc khó thở, cần đến ngay.'
+           WHEN 'HIGH' THEN 'Bé yếu, gầy hoặc bị thương ở chân, cần giúp trong ngày.'
+           WHEN 'NORMAL' THEN 'Bé có vấn đề nhẹ về da hoặc đi lạc, cần người đưa đi khám.'
+           ELSE 'Bé khỏe, cần tìm nơi nhận nuôi hoặc triệt sản.'
+       END,
+       d.species, p.province_name,
+       CASE WHEN d.n % 6 = 0 THEN 'CONTACT_PHONE' END,
+       900 + (d.n * 37) % 1200,
+       pg_temp.ago(d.n, 80 * pg_temp.scale()) + interval '2 minutes',
+       pg_temp.ago(d.n, 80 * pg_temp.scale()), now()
+FROM demo_case d JOIN demo_place p ON p.idx = d.place_idx
+WHERE d.status IN ('REPORTED', 'IN_PROGRESS')
+ON CONFLICT DO NOTHING;
+
+-- Organization 1 has taken a case near the centre (rescue queue → "Ca cứu hộ đang nhận").
+INSERT INTO rescue_cases (case_id, case_code, reported_by, organization_id, species, color, size, priority, description,
+                          location, location_text, province_code, province_name, ward_code, ward_name, status,
+                          contact_phone, needs_help, reported_at, created_at, updated_at)
+VALUES (pg_temp.did('case', 9001), pg_temp.code('R-D', 9001), pg_temp.did('user', 9), pg_temp.did('org', 1), 'Dog', 'Vàng',
+        'MEDIUM', 'HIGH', 'Bé bị kẹt chân vào hàng rào sắt, kêu suốt từ sáng.',
+        ST_SetSRID(ST_MakePoint(106.7150, 10.8040), 4326), 'Hẻm 120 Xô Viết Nghệ Tĩnh', '79', 'Thành phố Hồ Chí Minh',
+        '26929', 'Phường Bình Thạnh', 'IN_PROGRESS', pg_temp.phone(9001), FALSE,
+        now() - interval '3 hours', now() - interval '3 hours', now())
+ON CONFLICT DO NOTHING;
+INSERT INTO rescue_media (case_id, media_id)
+SELECT pg_temp.did('case', 9001), media_id FROM demo_media WHERE kind = 'case-dog' AND idx = 3
+ON CONFLICT DO NOTHING;
+INSERT INTO rescue_case_claims (claim_id, case_id, user_id, organization_id, status, claimed_at, expires_at)
+VALUES (pg_temp.did('claim', 9001), pg_temp.did('case', 9001), pg_temp.did('staff', 1), pg_temp.did('org', 1), 'ACTIVE',
+        now() - interval '2 hours', NULL)
+ON CONFLICT DO NOTHING;
+
+-- ── Lost and found: user1's own cat is lost; user8 found a cat like it nearby ──
+
+INSERT INTO pets (pet_id, pet_code, name, species_id, age, gender, color, weight, description, status, health_status,
+                  is_vaccinated, is_neutered, visibility, created_at)
+SELECT pg_temp.did('pet', 9001), pg_temp.code('P-D', 9001), 'Mực', s.species_id, 24, 'MALE', 'Đen tuyền', 4.2,
+       'Mèo nhà mình nuôi từ nhỏ, có vòng cổ đỏ và đốm trắng ở ngực.', 'LOST', 'HEALTHY', TRUE, TRUE, 'PRIVATE',
+       now() - interval '200 days'
+FROM pet_species s WHERE s.name = 'Cat' AND s.is_deleted = FALSE
+ON CONFLICT DO NOTHING;
+-- the dog user1 rescued from case 79 and kept
+INSERT INTO pets (pet_id, pet_code, name, species_id, age, gender, color, weight, description, status, health_status,
+                  is_vaccinated, is_neutered, visibility, rescue_case_id, created_at)
+SELECT pg_temp.did('pet', 9002), pg_temp.code('P-D', 9002), 'Gấu', s.species_id, 14, 'FEMALE', 'Nâu', 9.5,
+       'Bé được mình cứu ở bãi giữ xe rồi giữ lại nuôi luôn.', 'ADOPTED', 'RECOVERING', TRUE, FALSE, 'PUBLIC',
+       pg_temp.did('case', 79), now() - interval '30 days'
+FROM pet_species s WHERE s.name = 'Dog' AND s.is_deleted = FALSE
+ON CONFLICT DO NOTHING;
+-- the breed of the photo each one wears
+UPDATE pets p SET breed_id = (SELECT b.breed_id FROM pet_breeds b
+                              WHERE b.species_id = p.species_id AND b.name = m.breed AND b.is_deleted = FALSE LIMIT 1)
+FROM (VALUES (9001, 'pet-cat', 5), (9002, 'pet-dog', 9)) AS v(n, kind, idx)
+JOIN demo_media m ON m.kind = v.kind AND m.idx = v.idx
+WHERE p.pet_id = pg_temp.did('pet', v.n) AND p.breed_id IS NULL;
+INSERT INTO pets_current_owner (pet_id, owner_type, owner_id, acquisition_type)
+VALUES (pg_temp.did('pet', 9001), 'USER', pg_temp.did('user', 1), 'SELF_REGISTERED'),
+       (pg_temp.did('pet', 9002), 'USER', pg_temp.did('user', 1), 'SELF_REGISTERED')
+ON CONFLICT DO NOTHING;
+INSERT INTO pet_ownerships (pet_id, owner_type, owner_id, from_time, acquisition_type)
+SELECT v.pet_id, 'USER', pg_temp.did('user', 1), v.from_time, 'SELF_REGISTERED'
+FROM (VALUES (pg_temp.did('pet', 9001), now() - interval '200 days'), (pg_temp.did('pet', 9002), now() - interval '30 days')) AS v(pet_id, from_time)
+WHERE NOT EXISTS (SELECT 1 FROM pet_ownerships w WHERE w.pet_id = v.pet_id);
+INSERT INTO pet_media (media_id, pet_id, media_file_id, type, is_primary, created_at)
+SELECT pg_temp.did('pet-media', v.n), pg_temp.did('pet', v.n), m.media_id, 'image', TRUE, now() - interval '30 days'
+FROM (VALUES (9001, 'pet-cat', 5), (9002, 'pet-dog', 9)) AS v(n, kind, idx)
+JOIN demo_media m ON m.kind = v.kind AND m.idx = v.idx
+ON CONFLICT DO NOTHING;
+
+INSERT INTO rescue_cases (case_id, case_code, reported_by, pet_id, species, color, size, priority, description, location,
+                          location_text, province_code, province_name, ward_code, ward_name, status, contact_phone,
+                          needs_help, case_type, last_seen_at, holding_status, distinctive_marks, pet_status_before_lost,
+                          reported_at, created_at, updated_at)
+VALUES (pg_temp.did('case', 9002), pg_temp.code('R-D', 9002), pg_temp.did('user', 1), pg_temp.did('pet', 9001), 'Cat',
+        'Đen tuyền', 'SMALL', 'NORMAL', 'Mực đi lạc từ tối hôm kia, sợ người lạ, có vòng cổ đỏ.',
+        ST_SetSRID(ST_MakePoint(106.7080, 10.8060), 4326), 'Gần chợ Bà Chiểu', '79', 'Thành phố Hồ Chí Minh', '26929',
+        'Phường Bình Thạnh', 'REPORTED', pg_temp.phone(1), FALSE, 'LOST', now() - interval '2 days', NULL,
+        'Vòng cổ đỏ, đốm trắng ở ngực', 'ADOPTED', now() - interval '2 days', now() - interval '2 days', now()),
+       (pg_temp.did('case', 9003), pg_temp.code('R-D', 9003), pg_temp.did('user', 8), NULL, 'Cat', 'Đen', 'SMALL',
+        'NORMAL', 'Mình nhặt được một bé mèo đen đeo vòng cổ đỏ, rất sợ người, đang giữ ở nhà.',
+        ST_SetSRID(ST_MakePoint(106.7150, 10.8120), 4326), 'Hẻm 45 Bạch Đằng', '79', 'Thành phố Hồ Chí Minh', '26929',
+        'Phường Bình Thạnh', 'REPORTED', pg_temp.phone(8), FALSE, 'FOUND', NULL, 'AT_HOME', 'Vòng cổ đỏ', NULL,
+        now() - interval '1 day', now() - interval '1 day', now())
+ON CONFLICT DO NOTHING;
+INSERT INTO rescue_media (case_id, media_id)
+SELECT v.case_id, m.media_id
+FROM (VALUES (pg_temp.did('case', 9002), 'pet-cat', 5), (pg_temp.did('case', 9003), 'case-cat', 4)) AS v(case_id, kind, idx)
+JOIN demo_media m ON m.kind = v.kind AND m.idx = v.idx
+ON CONFLICT DO NOTHING;
+INSERT INTO case_match_suggestions (suggestion_id, lost_case_id, other_case_id, distance_m, score, reasons, status, created_at)
+VALUES (pg_temp.did('match', 9001), pg_temp.did('case', 9002), pg_temp.did('case', 9003), 950, 82,
+        E'Cùng loài mèo, màu đen\nCùng có vòng cổ đỏ\nCách nơi lạc khoảng 950 m\nTìm thấy một ngày sau khi lạc',
+        'PENDING', now() - interval '20 hours')
+ON CONFLICT DO NOTHING;
+
+-- ── Notifications for the scenario accounts ──
+
+INSERT INTO notifications (notification_id, user_id, type, title, body, data, created_at)
+VALUES
+    (pg_temp.did('notification', 9001), pg_temp.did('user', 1), 'RESCUE_COMPLETION_SUBMITTED',
+     'Ca R-D0030 có báo cáo hoàn tất', 'Người cứu đã gửi kết quả, hãy xác nhận giúp.',
+     jsonb_build_object('caseId', pg_temp.did('case', 30)), now() - interval '20 minutes'),
+    (pg_temp.did('notification', 9002), pg_temp.did('user', 1), 'RESCUE_MATCH_SUGGESTED',
+     'Có thể đã tìm thấy Mực', 'Một bé mèo giống Mực được báo tìm thấy cách khoảng 950 m.',
+     jsonb_build_object('caseId', pg_temp.did('case', 9002), 'suggestionId', pg_temp.did('match', 9001)), now() - interval '20 hours'),
+    (pg_temp.did('notification', 9003), pg_temp.did('user', 1), 'FOLLOWUP_DUE',
+     'Bé Lu thế nào sau hai tuần?', 'Trạm Mái Ấm Sài Gòn muốn hỏi thăm bé.',
+     jsonb_build_object('followupId', pg_temp.did('followup', 9002)), now() - interval '2 days'),
+    (pg_temp.did('notification', 9004), pg_temp.did('user', 1), 'RESCUE_CASE_UPDATED',
+     'Ca R-D0030 có cập nhật', 'Người cứu đã bế được bé và đang chở đi khám.',
+     jsonb_build_object('caseId', pg_temp.did('case', 30)), now() - interval '30 minutes'),
+    (pg_temp.did('notification', 9005), pg_temp.did('owner', 1), 'ADOPTION_SUBMITTED',
+     'Đơn nhận nuôi mới cho bé', 'Có 5 đơn đang chờ trạm duyệt.',
+     jsonb_build_object('applicationId', pg_temp.did('application', 9001)), now() - interval '2 days'),
+    (pg_temp.did('notification', 9006), pg_temp.did('owner', 1), 'FOLLOWUP_ALERT',
+     'Việc đỏ sau nhận nuôi', 'Một gia đình đang cân nhắc trả bé.',
+     jsonb_build_object('alertId', pg_temp.did('alert', 9001)), now() - interval '6 days'),
+    (pg_temp.did('notification', 9007), pg_temp.did('admin', 1), 'RESCUE_COMPLETION_NEEDS_REVIEW',
+     'Báo cáo hoàn tất bị khiếu nại', 'Người báo ca R-D0008 không đồng ý với kết quả.',
+     jsonb_build_object('caseId', pg_temp.did('case', 8)), now() - interval '1 day')
+ON CONFLICT DO NOTHING;
+
+-- ── Banners on the public pages ──
+
+INSERT INTO banners (banner_id, title, subtitle, media_id, link_url, link_type, display_order, start_date, end_date,
+                     is_active, target_page, created_at, created_by)
+SELECT pg_temp.did('banner', v.n), v.title, v.subtitle, m.media_id, v.link, 'INTERNAL', v.n, now() - interval '30 days',
+       now() + interval '60 days', TRUE, v.target, now() - interval '30 days', pg_temp.did('admin', 1)
+FROM (VALUES
+    (1, 'HOME', 'Thấy một bé cần giúp? Báo ngay', 'Ghim vị trí, người gần nhất sẽ thấy ca của bạn.', '/ban-do', 'case-dog', 1),
+    (2, 'ADOPTION', 'Hơn 30 bé đang chờ một mái nhà', 'Điền hồ sơ để biết bé nào hợp với bạn nhất.', '/nhan-nuoi', 'pet-dog', 2),
+    (3, 'RESCUE', 'Cùng cứu hộ trong khu của bạn', 'Nhận một ca gần nhà và cập nhật tiến độ cho người báo.', '/ban-do', 'case-cat', 3)
+) AS v(n, target, title, subtitle, link, kind, idx)
+JOIN demo_media m ON m.kind = v.kind AND m.idx = v.idx
+ON CONFLICT DO NOTHING;
+
 COMMIT;
 
 -- Run this to see what is there.
@@ -539,4 +928,7 @@ UNION ALL SELECT 'organizations', COUNT(*) FROM organizations WHERE organization
 UNION ALL SELECT 'pets', COUNT(*) FROM pets WHERE pet_code LIKE 'P-D%'
 UNION ALL SELECT 'rescue_cases', COUNT(*) FROM rescue_cases WHERE case_code LIKE 'R-D%'
 UNION ALL SELECT 'adoptions', COUNT(*) FROM adoption_applications WHERE adoption_code LIKE 'A-D%'
-UNION ALL SELECT 'medical_records', COUNT(*) FROM pet_medical_records r JOIN pets p ON p.pet_id = r.pet_id WHERE p.pet_code LIKE 'P-D%';
+UNION ALL SELECT 'medical_records', COUNT(*) FROM pet_medical_records r JOIN pets p ON p.pet_id = r.pet_id WHERE p.pet_code LIKE 'P-D%'
+UNION ALL SELECT 'adopter_profiles', COUNT(*) FROM adopter_profiles a JOIN users u ON u.user_id = a.user_id WHERE u.user_code LIKE 'U-D%'
+UNION ALL SELECT 'pet_traits', COUNT(*) FROM pet_traits t JOIN pets p ON p.pet_id = t.pet_id WHERE p.pet_code LIKE 'P-D%'
+UNION ALL SELECT 'followups', COUNT(*) FROM adoption_followups f JOIN adoption_applications a ON a.application_id = f.application_id WHERE a.adoption_code LIKE 'A-D%';
